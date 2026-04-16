@@ -2,6 +2,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { register } from "@/lib/api";
+import { Eye, EyeOff } from "lucide-react";
 
 function RegisterForm() {
   const router = useRouter();
@@ -9,6 +10,8 @@ function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [refFromUrl, setRefFromUrl] = useState(false);
   const [error, setError] = useState("");
@@ -83,27 +86,41 @@ function RegisterForm() {
 
           <div>
             <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Пароль</label>
-            <input
-              type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition"
-              style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required
+                className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition pr-11"
+                style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
+                placeholder="••••••••"
+              />
+              <button type="button" onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 transition hover:opacity-80"
+                style={{ color: "var(--muted)" }}>
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>
               Повторите пароль
             </label>
-            <input
-              type="password" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} required
-              className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition"
-              style={{
-                background: "#0d0d1a",
-                borderColor: !passwordsMatch ? "#ff4d4d" : passwordConfirm.length > 0 && passwordsMatch ? "#22c97a" : "var(--border)"
-              }}
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                type={showPasswordConfirm ? "text" : "password"} value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} required
+                className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition pr-11"
+                style={{
+                  background: "#0d0d1a",
+                  borderColor: !passwordsMatch ? "#ff4d4d" : passwordConfirm.length > 0 && passwordsMatch ? "#22c97a" : "var(--border)"
+                }}
+                placeholder="••••••••"
+              />
+              <button type="button" onClick={() => setShowPasswordConfirm(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 transition hover:opacity-80"
+                style={{ color: "var(--muted)" }}>
+                {showPasswordConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {!passwordsMatch && (
               <p className="text-xs mt-1 text-red-400">Пароли не совпадают</p>
             )}
