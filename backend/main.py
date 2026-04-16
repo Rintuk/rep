@@ -13,6 +13,15 @@ async def lifespan(app: FastAPI):
         for sql in [
             "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS is_started BOOLEAN DEFAULT FALSE",
             "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS start_real_total FLOAT DEFAULT 0",
+            """CREATE TABLE IF NOT EXISTS deposit_requests (
+                id TEXT PRIMARY KEY,
+                user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+                amount FLOAT NOT NULL,
+                comment TEXT DEFAULT '',
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )""",
         ]:
             try:
                 await conn.execute(text(sql))

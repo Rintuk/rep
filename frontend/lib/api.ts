@@ -68,6 +68,31 @@ export async function resetUserPassword(id: string, new_password: string) {
   await api.post(`/auth/admin/users/${id}/reset-password`, null, { params: { new_password } });
 }
 
+export async function createDepositRequest(amount: number, comment: string) {
+  const res = await api.post("/auth/deposits/request", null, { params: { amount, comment } });
+  return res.data;
+}
+
+export async function getMyDeposits() {
+  const res = await api.get("/auth/deposits/my");
+  return res.data;
+}
+
+export async function getAdminDeposits() {
+  const res = await api.get("/auth/admin/deposits");
+  return res.data;
+}
+
+export async function approveDeposit(id: string) {
+  const res = await api.post(`/auth/admin/deposits/${id}/approve`);
+  return res.data;
+}
+
+export async function rejectDeposit(id: string) {
+  const res = await api.post(`/auth/admin/deposits/${id}/reject`);
+  return res.data;
+}
+
 export async function getDemoAccount() {
   const res = await api.get("/api/demo/account");
   return res.data;

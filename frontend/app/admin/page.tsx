@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import React from "react";
 import {
   getAdminOverview, approveUser, rejectUser,
-  updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword
+  updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword,
+  getAdminDeposits, approveDeposit, rejectDeposit
 } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, Users, CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Trash2, Save } from "lucide-react";
 
@@ -36,7 +37,8 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits">("overview");
+  const [deposits, setDeposits] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
 
   // Inline investor management
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -56,13 +58,25 @@ export default function AdminPage() {
 
   async function fetchData() {
     try {
-      const d = await getAdminOverview();
+      const [d, dep] = await Promise.all([getAdminOverview(), getAdminDeposits()]);
       setData(d);
+      setDeposits(dep);
     } catch {
       setError("Нет доступа или ошибка загрузки");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleApproveDeposit(id: string) {
+    await approveDeposit(id);
+    fetchData();
+  }
+
+  async function handleRejectDeposit(id: string) {
+    if (!confirm("Отклонить заявку?")) return;
+    await rejectDeposit(id);
+    fetchData();
   }
 
   async function handleApprove(id: string) {
@@ -172,9 +186,11 @@ export default function AdminPage() {
   const pnlColor = data.drawdown_pct >= 0 ? "#22c97a" : "#ff4d4d";
   const incomeColor = data.admin_income > 0 ? "#22c97a" : "#888";
 
+  const pendingDeposits = deposits.filter(d => d.status === "pending").length;
   const TABS = [
     { key: "overview", label: "📊 Обзор" },
     { key: "investors", label: `👥 Инвесторы (${data.investors_count})` },
+    { key: "deposits", label: "💳 Заявки", badge: pendingDeposits },
     { key: "referrals", label: `🔗 Рефералы (${data.referrals.length})` },
     { key: "trades", label: "📋 Сделки" },
     { key: "ai", label: "🧠 Лента ИИ" },
@@ -267,13 +283,17 @@ export default function AdminPage() {
         <div className="flex gap-1 border-b" style={{ borderColor: "var(--border)" }}>
           {TABS.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as typeof activeTab)}
-              className="px-4 py-2 text-sm font-medium transition rounded-t-lg"
+              className="relative px-4 py-2 text-sm font-medium transition rounded-t-lg"
               style={{
                 color: activeTab === t.key ? "white" : "var(--muted)",
                 background: activeTab === t.key ? "var(--card)" : "transparent",
                 borderBottom: activeTab === t.key ? "2px solid #4488dd" : "2px solid transparent",
               }}>
               {t.label}
+              {"badge" in t && t.badge > 0 && (
+                <span className="absolute -top-1 -right-1 text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold"
+                  style={{ background: "#f59e0b", color: "#000" }}>{t.badge}</span>
+              )}
             </button>
           ))}
         </div>
@@ -464,6 +484,49 @@ export default function AdminPage() {
               </tbody>
             </table>
             </div>
+          </div>
+        )}
+
+        {/* Заявки на пополнение */}
+        {activeTab === "deposits" && (
+          <div className="space-y-3">
+            {deposits.length === 0 ? (
+              <div className="rounded-xl p-8 text-center border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                <p style={{ color: "var(--muted)" }}>Заявок пока нет</p>
+              </div>
+            ) : deposits.map(d => (
+              <div key={d.id} className="rounded-xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                style={{ background: "var(--card)", borderColor: d.status === "pending" ? "#f59e0b44" : "var(--border)" }}>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white font-semibold">{d.email}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
+                      background: d.status === "approved" ? "#0d3a20" : d.status === "rejected" ? "#3a0d0d" : "#1a1200",
+                      color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b"
+                    }}>
+                      {d.status === "approved" ? "✓ Подтверждено" : d.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
+                    </span>
+                  </div>
+                  <p className="text-xl font-bold mt-1" style={{ color: "#22c97a" }}>{d.amount.toFixed(2)} USDT</p>
+                  {d.comment && <p className="text-sm mt-0.5" style={{ color: "var(--muted)" }}>💬 {d.comment}</p>}
+                  <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>{new Date(d.created_at).toLocaleString("ru")}</p>
+                </div>
+                {d.status === "pending" && (
+                  <div className="flex gap-2">
+                    <button onClick={() => handleApproveDeposit(d.id)}
+                      className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
+                      style={{ background: "#0d3a20", color: "#22c97a" }}>
+                      <CheckCircle size={14} /> Подтвердить
+                    </button>
+                    <button onClick={() => handleRejectDeposit(d.id)}
+                      className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
+                      style={{ background: "#3a0d0d", color: "#ff4d4d" }}>
+                      <XCircle size={14} /> Отклонить
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 

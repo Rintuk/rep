@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDashboard } from "@/lib/api";
-import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy } from "lucide-react";
+import { getDashboard, createDepositRequest, getMyDeposits } from "@/lib/api";
+import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X } from "lucide-react";
 
 interface Position { symbol: string; amount: number; avg_price: number; }
 interface Trade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }
@@ -23,6 +23,12 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositComment, setDepositComment] = useState("");
+  const [depositLoading, setDepositLoading] = useState(false);
+  const [depositDone, setDepositDone] = useState(false);
+  const [myDeposits, setMyDeposits] = useState<{id:string;amount:number;status:string;created_at:string}[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -32,6 +38,7 @@ export default function DashboardPage() {
       setReferralCode(payload.sub || "");
     } catch {}
     fetchData();
+    getMyDeposits().then(setMyDeposits).catch(() => {});
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -48,6 +55,22 @@ export default function DashboardPage() {
   function logout() {
     localStorage.removeItem("token");
     router.push("/login");
+  }
+
+  async function handleDepositSubmit() {
+    const amount = parseFloat(depositAmount);
+    if (!amount || amount <= 0) return;
+    setDepositLoading(true);
+    try {
+      await createDepositRequest(amount, depositComment);
+      setDepositDone(true);
+      setDepositAmount("");
+      setDepositComment("");
+      const updated = await getMyDeposits();
+      setMyDeposits(updated);
+    } finally {
+      setDepositLoading(false);
+    }
   }
 
   function copyRefLink() {
@@ -110,6 +133,12 @@ export default function DashboardPage() {
             <span className="text-xs font-semibold hidden sm:inline" style={{ color: "var(--muted)" }}>Демо</span>
           </div>
 
+          <button onClick={() => { setShowDeposit(true); setDepositDone(false); }}
+            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
+            style={{ borderColor: "#22c97a55", color: "#22c97a" }}>
+            <PlusCircle size={14} />
+            <span className="hidden sm:inline">Пополнить</span>
+          </button>
           <button onClick={copyRefLink}
             className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
             style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
@@ -251,12 +280,100 @@ export default function DashboardPage() {
           }
         </div>
 
+        {/* История заявок */}
+        {myDeposits.length > 0 && (
+          <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <h2 className="font-semibold text-white mb-4">💳 Заявки на пополнение</h2>
+            <div className="space-y-2">
+              {myDeposits.map(d => (
+                <div key={d.id} className="flex items-center justify-between py-2 border-b" style={{ borderColor: "var(--border)" }}>
+                  <div>
+                    <p className="text-white font-medium">{d.amount.toFixed(2)} USDT</p>
+                    <p className="text-xs" style={{ color: "var(--muted)" }}>{new Date(d.created_at).toLocaleString("ru")}</p>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
+                    background: d.status === "approved" ? "#0d3a20" : d.status === "rejected" ? "#3a0d0d" : "#1a1200",
+                    color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b"
+                  }}>
+                    {d.status === "approved" ? "✓ Подтверждено" : d.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {data.last_updated && (
           <p className="text-center text-xs pb-4" style={{ color: "var(--muted)" }}>
             Последнее обновление: {new Date(data.last_updated).toLocaleString("ru")}
           </p>
         )}
       </main>
+
+      {/* Модальное окно пополнения */}
+      {showDeposit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: "rgba(0,0,0,0.7)" }}
+          onClick={e => { if (e.target === e.currentTarget) setShowDeposit(false); }}>
+          <div className="rounded-2xl p-6 w-full max-w-sm border" style={{ background: "var(--card)", borderColor: "#22c97a44" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold text-white text-lg">Пополнение депозита</h2>
+              <button onClick={() => setShowDeposit(false)} style={{ color: "var(--muted)" }}><X size={20} /></button>
+            </div>
+
+            {depositDone ? (
+              <div className="text-center py-6 space-y-3">
+                <div className="text-4xl">✅</div>
+                <p className="text-white font-semibold">Заявка принята!</p>
+                <p className="text-sm" style={{ color: "var(--muted)" }}>
+                  Ваш депозит будет обработан администратором <span style={{ color: "#22c97a" }}>в течение суток.</span>
+                </p>
+                <button onClick={() => setShowDeposit(false)}
+                  className="w-full py-2 rounded-lg font-semibold text-white mt-2 transition hover:opacity-90"
+                  style={{ background: "#22c97a33", color: "#22c97a" }}>
+                  Закрыть
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Сумма (USDT)</label>
+                  <input
+                    type="number" min="1" step="0.01"
+                    value={depositAmount}
+                    onChange={e => setDepositAmount(e.target.value)}
+                    placeholder="100"
+                    className="w-full rounded-lg px-4 py-3 text-white text-xl font-bold border outline-none"
+                    style={{ background: "#0d0d1a", borderColor: "#22c97a44" }}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Комментарий / TXID (необязательно)</label>
+                  <input
+                    type="text"
+                    value={depositComment}
+                    onChange={e => setDepositComment(e.target.value)}
+                    placeholder="Хэш транзакции или примечание..."
+                    className="w-full rounded-lg px-4 py-3 text-white border outline-none"
+                    style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
+                  />
+                </div>
+                <div className="rounded-lg p-3 text-sm" style={{ background: "#1a1200", color: "#f59e0b" }}>
+                  ⏳ Заявка будет обработана администратором в течение суток.
+                </div>
+                <button
+                  onClick={handleDepositSubmit}
+                  disabled={depositLoading || !depositAmount || parseFloat(depositAmount) <= 0}
+                  className="w-full py-3 rounded-lg font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ background: "#22c97a" }}>
+                  {depositLoading ? "Отправка..." : "Отправить заявку"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

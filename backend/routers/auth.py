@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
-from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry
+from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry, DepositRequest
 from schemas import RegisterIn, LoginIn, TokenOut
 from security import hash_password, verify_password, create_access_token, get_admin_user
 from datetime import datetime, timedelta
@@ -287,3 +287,84 @@ async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
     await db.delete(user)
     await db.commit()
     return {"status": "deleted"}
+
+
+# ── Заявки на пополнение депозита ─────────────────────────────
+from security import get_current_user
+
+@router.post("/deposits/request")
+async def create_deposit_request(
+    amount: float,
+    comment: str = "",
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+    req = DepositRequest(user_id=user.id, amount=amount, comment=comment)
+    db.add(req)
+    await db.commit()
+    return {"status": "ok", "message": "Заявка принята. Будет обработана в течение суток."}
+
+
+@router.get("/deposits/my")
+async def my_deposit_requests(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = (await db.execute(
+        select(DepositRequest).where(DepositRequest.user_id == user.id)
+        .order_by(DepositRequest.created_at.desc()).limit(20)
+    )).scalars().all()
+    return [{"id": r.id, "amount": r.amount, "comment": r.comment,
+             "status": r.status, "created_at": str(r.created_at)} for r in rows]
+
+
+@router.get("/admin/deposits", dependencies=[Depends(get_admin_user)])
+async def list_deposit_requests(db: AsyncSession = Depends(get_db)):
+    rows = (await db.execute(
+        select(DepositRequest).order_by(DepositRequest.created_at.desc()).limit(100)
+    )).scalars().all()
+    result = []
+    for r in rows:
+        user = (await db.execute(select(User).where(User.id == r.user_id))).scalar_one_or_none()
+        result.append({
+            "id": r.id, "user_id": r.user_id,
+            "email": user.email if user else "?",
+            "amount": r.amount, "comment": r.comment,
+            "status": r.status, "created_at": str(r.created_at),
+        })
+    return result
+
+
+@router.post("/admin/deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
+async def approve_deposit(request_id: str, db: AsyncSession = Depends(get_db)):
+    req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id))).scalar_one_or_none()
+    if not req:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail="Заявка уже обработана")
+
+    # Прибавляем к investment_usdt
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
+    if fin:
+        fin.investment_usdt += req.amount
+        fin.updated_at = datetime.utcnow()
+    else:
+        db.add(UserFinancials(user_id=req.user_id, investment_usdt=req.amount))
+
+    req.status = "approved"
+    req.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"status": "approved", "amount": req.amount}
+
+
+@router.post("/admin/deposits/{request_id}/reject", dependencies=[Depends(get_admin_user)])
+async def reject_deposit(request_id: str, db: AsyncSession = Depends(get_db)):
+    req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id))).scalar_one_or_none()
+    if not req:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    req.status = "rejected"
+    req.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"status": "rejected"}

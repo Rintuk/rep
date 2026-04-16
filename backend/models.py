@@ -75,6 +75,21 @@ class VirtualTrade(Base):
     account: Mapped["VirtualAccount"] = relationship("VirtualAccount", back_populates="trades")
 
 
+class DepositRequest(Base):
+    """Заявка инвестора на пополнение депозита."""
+    __tablename__ = "deposit_requests"
+
+    id:         Mapped[str]      = mapped_column(String, primary_key=True, default=gen_uuid)
+    user_id:    Mapped[str]      = mapped_column(String, ForeignKey("users.id"))
+    amount:     Mapped[float]    = mapped_column(Float)
+    comment:    Mapped[str]      = mapped_column(Text, default="")
+    status:     Mapped[str]      = mapped_column(String, default="pending")  # pending / approved / rejected
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User")
+
+
 class BotSnapshot(Base):
     """Снимок состояния бота — сохраняется каждый цикл сканирования."""
     __tablename__ = "bot_snapshots"
