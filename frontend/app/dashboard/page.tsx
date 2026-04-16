@@ -80,24 +80,24 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       {/* Шапка */}
-      <header className="border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+      <header className="border-b px-4 py-3 flex items-center justify-between" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
         <div className="flex items-center gap-3">
           <span className="text-2xl">🤖</span>
           <div>
-            <h1 className="font-bold text-white text-lg leading-none">AI Маклер</h1>
+            <h1 className="font-bold text-white text-base leading-none">AI Маклер</h1>
             <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
               background: data.server_online ? "#0d3a20" : "#3a0d0d",
               color: data.server_online ? "#22c97a" : "#ff4d4d"
             }}>
-              {data.server_online ? "● Server ONLINE" : "● Server OFFLINE"}
+              {data.server_online ? "● ONLINE" : "● OFFLINE"}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           {/* Переключатель Реал / Демо */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-white">Реал</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-white hidden sm:inline">Реал</span>
             <button
               onClick={() => router.push("/demo")}
               className="relative w-12 h-6 rounded-full transition-colors"
@@ -107,19 +107,20 @@ export default function DashboardPage() {
               <span className="absolute left-1 top-1 w-4 h-4 rounded-full transition-transform"
                 style={{ background: "#666", transform: "translateX(0)" }} />
             </button>
-            <span className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Демо</span>
+            <span className="text-xs font-semibold hidden sm:inline" style={{ color: "var(--muted)" }}>Демо</span>
           </div>
 
           <button onClick={copyRefLink}
-            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
+            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
             style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
             <Copy size={14} />
-            {copied ? "Скопировано!" : "Реф. ссылка"}
+            <span className="hidden sm:inline">{copied ? "Скопировано!" : "Реф. ссылка"}</span>
           </button>
           <button onClick={logout}
-            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
+            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
             style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-            <LogOut size={14} /> Выйти
+            <LogOut size={14} />
+            <span className="hidden sm:inline">Выйти</span>
           </button>
         </div>
       </header>
