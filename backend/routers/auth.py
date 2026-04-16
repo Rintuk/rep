@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
-from models import User
+from models import User, UserFinancials
 from schemas import RegisterIn, LoginIn, TokenOut
 from security import hash_password, verify_password, create_access_token, get_admin_user
+from datetime import datetime
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -95,3 +96,73 @@ async def set_referral_limit(user_id: str, limit: int, db: AsyncSession = Depend
     user.referral_limit = limit
     await db.commit()
     return {"status": "ok", "referral_limit": limit}
+
+
+@router.get("/admin/users/{user_id}", dependencies=[Depends(get_admin_user)])
+async def get_user_detail(user_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    # Рефералы
+    refs = (await db.execute(select(User).where(User.referred_by == user_id))).scalars().all()
+
+    # Финансы
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "is_active": user.is_active,
+        "is_admin": user.is_admin,
+        "referral_code": user.referral_code,
+        "referral_limit": user.referral_limit,
+        "referred_by": user.referred_by,
+        "created_at": str(user.created_at),
+        "investment_usdt": fin.investment_usdt if fin else 0.0,
+        "withdrawal_usdt": fin.withdrawal_usdt if fin else 0.0,
+        "note": fin.note if fin else "",
+        "referrals": [
+            {"id": r.id, "email": r.email, "is_active": r.is_active, "created_at": str(r.created_at)}
+            for r in refs
+        ],
+    }
+
+
+@router.patch("/admin/users/{user_id}/financials", dependencies=[Depends(get_admin_user)])
+async def update_user_financials(
+    user_id: str,
+    investment_usdt: float = 0.0,
+    withdrawal_usdt: float = 0.0,
+    note: str = "",
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
+    if fin:
+        fin.investment_usdt = investment_usdt
+        fin.withdrawal_usdt = withdrawal_usdt
+        fin.note = note
+        fin.updated_at = datetime.utcnow()
+    else:
+        db.add(UserFinancials(user_id=user_id, investment_usdt=investment_usdt,
+                              withdrawal_usdt=withdrawal_usdt, note=note))
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/admin/users/{user_id}", dependencies=[Depends(get_admin_user)])
+async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if user.is_admin:
+        raise HTTPException(status_code=403, detail="Нельзя удалить администратора")
+    await db.delete(user)
+    await db.commit()
+    return {"status": "deleted"}

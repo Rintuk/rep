@@ -113,11 +113,18 @@ export default function AdminPage() {
                     </p>
                     <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Реф. лимит: {u.referral_limit}</p>
                   </div>
-                  <button onClick={() => copyRefLink(u.referral_code)}
-                    className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg border transition hover:opacity-80"
-                    style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-                    <Copy size={12} /> Реф. ссылка
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => copyRefLink(u.referral_code)}
+                      className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg border transition hover:opacity-80"
+                      style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+                      <Copy size={12} /> Реф. ссылка
+                    </button>
+                    <button onClick={() => router.push(`/admin/users/${u.id}`)}
+                      className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg border transition hover:opacity-80"
+                      style={{ borderColor: "#4488dd", color: "#4488dd" }}>
+                      Открыть →
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

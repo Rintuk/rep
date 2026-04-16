@@ -39,3 +39,22 @@ export async function approveUser(id: string) {
 export async function rejectUser(id: string) {
   await api.post(`/auth/admin/reject/${id}`);
 }
+
+export async function getUserDetail(id: string) {
+  const res = await api.get(`/auth/admin/users/${id}`);
+  return res.data;
+}
+
+export async function updateUserFinancials(id: string, investment_usdt: number, withdrawal_usdt: number, note: string) {
+  await api.patch(`/auth/admin/users/${id}/financials`, null, {
+    params: { investment_usdt, withdrawal_usdt, note }
+  });
+}
+
+export async function deleteUser(id: string) {
+  await api.delete(`/auth/admin/users/${id}`);
+}
+
+export async function setReferralLimit(id: string, limit: number) {
+  await api.patch(`/auth/admin/referral-limit/${id}`, null, { params: { limit } });
+}

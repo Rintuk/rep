@@ -22,7 +22,21 @@ class User(Base):
     referral_limit: Mapped[int]  = mapped_column(Integer, default=3)
     created_at:     Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    referrals: Mapped[list["User"]] = relationship("User", foreign_keys=[referred_by])
+    referrals:  Mapped[list["User"]]       = relationship("User", foreign_keys=[referred_by])
+    financials: Mapped["UserFinancials | None"] = relationship("UserFinancials", back_populates="user", uselist=False)
+
+
+class UserFinancials(Base):
+    """Финансовые данные инвестора — вводятся вручную администратором."""
+    __tablename__ = "user_financials"
+
+    user_id:         Mapped[str]   = mapped_column(String, ForeignKey("users.id"), primary_key=True)
+    investment_usdt: Mapped[float] = mapped_column(Float, default=0.0)
+    withdrawal_usdt: Mapped[float] = mapped_column(Float, default=0.0)
+    note:            Mapped[str]   = mapped_column(Text, default="")
+    updated_at:      Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", back_populates="financials")
 
 
 class BotSnapshot(Base):
