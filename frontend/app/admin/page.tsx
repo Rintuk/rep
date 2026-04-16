@@ -1,30 +1,44 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAdminUsers, approveUser, rejectUser } from "@/lib/api";
-import { CheckCircle, XCircle, Copy } from "lucide-react";
+import { getAdminOverview, approveUser, rejectUser } from "@/lib/api";
+import { TrendingUp, TrendingDown, Wallet, Activity, Users, CheckCircle, XCircle, RefreshCw } from "lucide-react";
 
-interface User {
-  id: string; email: string; is_active: boolean; is_admin: boolean;
-  referral_code: string; referral_limit: number; created_at: string;
+const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888" };
+
+interface Overview {
+  pool_total: number; pool_free: number; pool_positions_usdt: number;
+  server_online: boolean; drawdown_pct: number; hwm: number; last_updated: string | null;
+  investors_count: number; pending_count: number;
+  total_invested: number; total_withdrawn: number;
+  admin_income: number; pool_profit: number;
+  positions: { symbol: string; amount: number; avg_price: number; value: number }[];
+  trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
+  ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
+  investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number }[];
+  referrals: { id: string; email: string; is_active: boolean; referred_by_email: string; investment: number }[];
+  pending_users: { id: string; email: string; created_at: string }[];
 }
 
 export default function AdminPage() {
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
+  const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai">("overview");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
-    fetchUsers();
+    fetchData();
+    const interval = setInterval(fetchData, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  async function fetchUsers() {
+  async function fetchData() {
     try {
-      const data = await getAdminUsers();
-      setUsers(data);
+      const d = await getAdminOverview();
+      setData(d);
     } catch {
       setError("Нет доступа или ошибка загрузки");
     } finally {
@@ -34,60 +48,96 @@ export default function AdminPage() {
 
   async function handleApprove(id: string) {
     await approveUser(id);
-    fetchUsers();
+    fetchData();
   }
 
   async function handleReject(id: string) {
-    if (!confirm("Удалить пользователя?")) return;
+    if (!confirm("Отклонить и удалить пользователя?")) return;
     await rejectUser(id);
-    fetchUsers();
+    fetchData();
   }
 
-  function copyRefLink(code: string) {
-    navigator.clipboard.writeText(`${window.location.origin}/register?ref=${code}`);
-  }
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
+      <div className="text-center" style={{ color: "var(--muted)" }}>
+        <div className="text-3xl mb-3 animate-pulse">⚡</div>
+        <p>Загрузка панели...</p>
+      </div>
+    </div>
+  );
 
-  const pending = users.filter(u => !u.is_active && !u.is_admin);
-  const active = users.filter(u => u.is_active);
+  if (error) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
+      <p className="text-red-400">{error}</p>
+    </div>
+  );
+
+  if (!data) return null;
+
+  const pnlColor = data.drawdown_pct >= 0 ? "#22c97a" : "#ff4d4d";
+  const incomeColor = data.admin_income > 0 ? "#22c97a" : "#888";
+
+  const TABS = [
+    { key: "overview", label: "📊 Обзор" },
+    { key: "investors", label: `👥 Инвесторы (${data.investors_count})` },
+    { key: "referrals", label: `🔗 Рефералы (${data.referrals.length})` },
+    { key: "trades", label: "📋 Сделки" },
+    { key: "ai", label: "🧠 Лента ИИ" },
+  ];
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
+      {/* Шапка */}
       <header className="border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
         <div className="flex items-center gap-3">
           <span className="text-xl">⚙️</span>
-          <h1 className="font-bold text-white">Админ-панель</h1>
+          <div>
+            <h1 className="font-bold text-white text-lg leading-none">Панель администратора</h1>
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
+              background: data.server_online ? "#0d3a20" : "#3a0d0d",
+              color: data.server_online ? "#22c97a" : "#ff4d4d"
+            }}>
+              {data.server_online ? "● Server ONLINE" : "● Server OFFLINE"}
+            </span>
+          </div>
         </div>
-        <a href="/dashboard" className="text-sm text-blue-400 hover:underline">← Дашборд</a>
+        <div className="flex items-center gap-3">
+          <button onClick={fetchData} className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
+            style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+            <RefreshCw size={13} /> Обновить
+          </button>
+          <a href="/dashboard" className="text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
+            style={{ borderColor: "var(--border)", color: "var(--muted)" }}>← Дашборд</a>
+        </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
-        {error && <p className="text-red-400 text-center">{error}</p>}
-        {loading && <p className="text-center" style={{ color: "var(--muted)" }}>Загрузка...</p>}
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         {/* Ожидают одобрения */}
-        {pending.length > 0 && (
-          <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--border)" }}>
+        {data.pending_users.length > 0 && (
+          <div className="rounded-xl border p-4" style={{ background: "#1a1200", borderColor: "#f59e0b55" }}>
+            <div className="flex items-center gap-2 mb-3">
               <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-              <h2 className="font-semibold text-white">Ожидают одобрения ({pending.length})</h2>
+              <h2 className="font-semibold" style={{ color: "#f59e0b" }}>Ожидают одобрения ({data.pending_users.length})</h2>
             </div>
-            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-              {pending.map(u => (
-                <div key={u.id} className="flex items-center justify-between px-5 py-4">
+            <div className="space-y-2">
+              {data.pending_users.map(u => (
+                <div key={u.id} className="flex items-center justify-between rounded-lg px-4 py-3"
+                  style={{ background: "#0d0d00" }}>
                   <div>
                     <p className="text-white font-medium">{u.email}</p>
-                    <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{new Date(u.created_at).toLocaleString("ru")}</p>
+                    <p className="text-xs" style={{ color: "var(--muted)" }}>{new Date(u.created_at).toLocaleString("ru")}</p>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => handleApprove(u.id)}
-                      className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg transition hover:opacity-80"
+                      className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg transition hover:opacity-80"
                       style={{ background: "#0d3a20", color: "#22c97a" }}>
-                      <CheckCircle size={14} /> Одобрить
+                      <CheckCircle size={13} /> Одобрить
                     </button>
                     <button onClick={() => handleReject(u.id)}
-                      className="flex items-center gap-1 text-sm px-3 py-2 rounded-lg transition hover:opacity-80"
+                      className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg transition hover:opacity-80"
                       style={{ background: "#3a0d0d", color: "#ff4d4d" }}>
-                      <XCircle size={14} /> Отклонить
+                      <XCircle size={13} /> Отклонить
                     </button>
                   </div>
                 </div>
@@ -96,40 +146,224 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Активные пользователи */}
-        <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-          <div className="px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-            <h2 className="font-semibold text-white">Активные пользователи ({active.length})</h2>
-          </div>
-          {active.length === 0
-            ? <p className="px-5 py-4 text-sm" style={{ color: "var(--muted)" }}>Нет активных пользователей</p>
-            : <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-              {active.map(u => (
-                <div key={u.id} className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="text-white font-medium flex items-center gap-2">
-                      {u.email}
-                      {u.is_admin && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "#1a3a6e", color: "#4488dd" }}>admin</span>}
-                    </p>
-                    <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Реф. лимит: {u.referral_limit}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => copyRefLink(u.referral_code)}
-                      className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg border transition hover:opacity-80"
-                      style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-                      <Copy size={12} /> Реф. ссылка
-                    </button>
-                    <button onClick={() => router.push(`/admin/users/${u.id}`)}
-                      className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg border transition hover:opacity-80"
-                      style={{ borderColor: "#4488dd", color: "#4488dd" }}>
-                      Открыть →
-                    </button>
-                  </div>
-                </div>
-              ))}
+        {/* Карточки */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { icon: <Wallet size={20} />, label: "Общий пул", value: `${data.pool_total.toFixed(2)} $`, sub: `свободно: ${data.pool_free.toFixed(2)} $`, color: "#4488dd" },
+            { icon: <Activity size={20} />, label: "Пул в позициях", value: `${data.pool_positions_usdt.toFixed(2)} $`, sub: `вложено всего: ${data.total_invested.toFixed(2)} $`, color: "#9966ee" },
+            { icon: <Users size={20} />, label: "Участников", value: `${data.investors_count}`, sub: `общие инвестиции: ${data.total_invested.toFixed(2)} $`, color: "#22c97a" },
+            { icon: data.admin_income >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />, label: "Мой доход (17%)", value: `${data.admin_income >= 0 ? "+" : ""}${data.admin_income.toFixed(2)} $`, sub: `прибыль пула: ${data.pool_profit >= 0 ? "+" : ""}${data.pool_profit.toFixed(2)} $`, color: incomeColor },
+          ].map((c, i) => (
+            <div key={i} className="rounded-xl p-4 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+              <div className="flex items-center gap-2 mb-2" style={{ color: c.color }}>
+                {c.icon}
+                <span className="text-xs" style={{ color: "var(--muted)" }}>{c.label}</span>
+              </div>
+              <p className="text-xl font-bold text-white">{c.value}</p>
+              <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>{c.sub}</p>
             </div>
-          }
+          ))}
         </div>
+
+        {/* Табы */}
+        <div className="flex gap-1 border-b" style={{ borderColor: "var(--border)" }}>
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key as typeof activeTab)}
+              className="px-4 py-2 text-sm font-medium transition rounded-t-lg"
+              style={{
+                color: activeTab === t.key ? "white" : "var(--muted)",
+                background: activeTab === t.key ? "var(--card)" : "transparent",
+                borderBottom: activeTab === t.key ? "2px solid #4488dd" : "2px solid transparent",
+              }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Обзор — позиции */}
+        {activeTab === "overview" && (
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+              <h2 className="font-semibold text-white mb-4">💼 Открытые позиции</h2>
+              {data.positions.length === 0
+                ? <p className="text-sm" style={{ color: "var(--muted)" }}>Позиций нет</p>
+                : <div className="space-y-2">
+                  {data.positions.map((p, i) => (
+                    <div key={i} className="flex justify-between items-center py-2 border-b" style={{ borderColor: "var(--border)" }}>
+                      <span className="font-medium text-white">{p.symbol}</span>
+                      <div className="text-right">
+                        <p className="text-sm text-white">{p.amount.toFixed(6)}</p>
+                        <p className="text-xs" style={{ color: "var(--muted)" }}>avg ${p.avg_price.toFixed(4)} · {p.value.toFixed(2)} $</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              }
+            </div>
+            <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+              <h2 className="font-semibold text-white mb-4">📈 Статистика пула</h2>
+              <div className="space-y-3">
+                {[
+                  { label: "Пул всего", value: `${data.pool_total.toFixed(2)} $` },
+                  { label: "Свободно USDT", value: `${data.pool_free.toFixed(2)} $` },
+                  { label: "В позициях", value: `${data.pool_positions_usdt.toFixed(2)} $` },
+                  { label: "HWM (пик)", value: `${data.hwm.toFixed(2)} $` },
+                  { label: "Изменение от HWM", value: `${data.drawdown_pct >= 0 ? "+" : ""}${data.drawdown_pct.toFixed(2)}%`, color: pnlColor },
+                  { label: "Прибыль пула", value: `${data.pool_profit >= 0 ? "+" : ""}${data.pool_profit.toFixed(2)} $`, color: data.pool_profit >= 0 ? "#22c97a" : "#ff4d4d" },
+                  { label: "Мой доход (17%)", value: `${data.admin_income >= 0 ? "+" : ""}${data.admin_income.toFixed(2)} $`, color: incomeColor },
+                ].map((r, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <span className="text-sm" style={{ color: "var(--muted)" }}>{r.label}</span>
+                    <span className="text-sm font-semibold" style={{ color: r.color || "white" }}>{r.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Инвесторы */}
+        {activeTab === "investors" && (
+          <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                  {["Email", "Инвестировано", "Выведено", "PnL", "Рефералов", "Дата", ""].map((h, i) => (
+                    <th key={i} className="px-4 py-3 text-left font-medium" style={{ color: "var(--muted)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.investors.length === 0
+                  ? <tr><td colSpan={7} className="px-4 py-6 text-center" style={{ color: "var(--muted)" }}>Инвесторов нет</td></tr>
+                  : data.investors.map((u, i) => (
+                    <tr key={u.id} className="border-b hover:bg-white/5 transition" style={{ borderColor: "var(--border)" }}>
+                      <td className="px-4 py-3 text-white font-medium">{u.email}</td>
+                      <td className="px-4 py-3 text-white">{u.investment.toFixed(2)} $</td>
+                      <td className="px-4 py-3" style={{ color: "var(--muted)" }}>{u.withdrawal.toFixed(2)} $</td>
+                      <td className="px-4 py-3 font-semibold" style={{ color: u.pnl >= 0 ? "#22c97a" : "#ff4d4d" }}>
+                        {u.pnl >= 0 ? "+" : ""}{u.pnl.toFixed(2)} $
+                      </td>
+                      <td className="px-4 py-3 text-white">{u.referrals_count}</td>
+                      <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>{new Date(u.created_at).toLocaleDateString("ru")}</td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => router.push(`/admin/users/${u.id}`)}
+                          className="text-xs px-3 py-1 rounded border transition hover:opacity-80"
+                          style={{ borderColor: "#4488dd55", color: "#4488dd" }}>
+                          Открыть →
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Рефералы */}
+        {activeTab === "referrals" && (
+          <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            {data.referrals.length === 0
+              ? <p className="px-5 py-6 text-sm" style={{ color: "var(--muted)" }}>Рефералов пока нет</p>
+              : <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                    {["Email", "Пригласил", "Инвестиции", "Статус"].map((h, i) => (
+                      <th key={i} className="px-4 py-3 text-left font-medium" style={{ color: "var(--muted)" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.referrals.map((r, i) => (
+                    <tr key={r.id} className="border-b hover:bg-white/5 transition" style={{ borderColor: "var(--border)" }}>
+                      <td className="px-4 py-3 text-white">{r.email}</td>
+                      <td className="px-4 py-3 text-sm" style={{ color: "#4488dd" }}>{r.referred_by_email}</td>
+                      <td className="px-4 py-3 text-white">{r.investment.toFixed(2)} $</td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                          background: r.is_active ? "#0d3a20" : "#3a2000",
+                          color: r.is_active ? "#22c97a" : "#f59e0b"
+                        }}>
+                          {r.is_active ? "активен" : "ожидает"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+          </div>
+        )}
+
+        {/* Сделки */}
+        {activeTab === "trades" && (
+          <div className="rounded-xl border overflow-hidden" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            {data.trades.length === 0
+              ? <p className="px-5 py-6 text-sm" style={{ color: "var(--muted)" }}>Сделок нет</p>
+              : <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: "var(--border)" }}>
+                    {["Действие", "Монета", "Цена", "Кол-во", "PnL", "Время"].map((h, i) => (
+                      <th key={i} className="px-4 py-3 text-left font-medium" style={{ color: "var(--muted)" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.trades.map((t, i) => (
+                    <tr key={i} className="border-b hover:bg-white/5 transition" style={{ borderColor: "var(--border)" }}>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded"
+                          style={{ background: ACTION_COLOR[t.action] + "22", color: ACTION_COLOR[t.action] }}>
+                          {t.action}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-white font-medium">{t.symbol}</td>
+                      <td className="px-4 py-3 text-white">${t.price.toFixed(4)}</td>
+                      <td className="px-4 py-3" style={{ color: "var(--muted)" }}>{(t.amount || 0).toFixed(6)}</td>
+                      <td className="px-4 py-3 font-semibold" style={{ color: t.pnl != null ? (t.pnl >= 0 ? "#22c97a" : "#ff4d4d") : "var(--muted)" }}>
+                        {t.pnl != null ? `${t.pnl >= 0 ? "+" : ""}${t.pnl.toFixed(2)} $` : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>{t.timestamp}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+          </div>
+        )}
+
+        {/* Лента ИИ */}
+        {activeTab === "ai" && (
+          <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            {data.ai_feed.length === 0
+              ? <p className="text-sm" style={{ color: "var(--muted)" }}>Решений пока нет</p>
+              : <div className="space-y-3">
+                {data.ai_feed.map((a, i) => (
+                  <div key={i} className="flex gap-3 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+                    <span className="text-xs font-bold px-2 py-1 rounded self-start mt-0.5"
+                      style={{ background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action] }}>
+                      {a.action}
+                    </span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-white text-sm">{a.symbol}</span>
+                        <span className="text-xs" style={{ color: "var(--muted)" }}>{a.timestamp}</span>
+                      </div>
+                      <p className="text-sm" style={{ color: "var(--muted)" }}>{a.reason}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            }
+          </div>
+        )}
+
+        {data.last_updated && (
+          <p className="text-center text-xs pb-4" style={{ color: "var(--muted)" }}>
+            Последнее обновление бота: {new Date(data.last_updated).toLocaleString("ru")}
+          </p>
+        )}
       </main>
     </div>
   );

@@ -32,6 +32,11 @@ export async function getAdminUsers() {
   return res.data;
 }
 
+export async function getAdminOverview() {
+  const res = await api.get("/auth/admin/overview");
+  return res.data;
+}
+
 export async function approveUser(id: string) {
   await api.post(`/auth/admin/approve/${id}`);
 }

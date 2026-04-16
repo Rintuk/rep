@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
-from models import User, UserFinancials
+from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry
 from schemas import RegisterIn, LoginIn, TokenOut
 from security import hash_password, verify_password, create_access_token, get_admin_user
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -153,6 +153,116 @@ async def update_user_financials(
                               withdrawal_usdt=withdrawal_usdt, note=note))
     await db.commit()
     return {"status": "ok"}
+
+
+@router.get("/admin/overview", dependencies=[Depends(get_admin_user)])
+async def admin_overview(db: AsyncSession = Depends(get_db)):
+    """Полный обзор для администратора."""
+    # ── Снимок бота ──────────────────────────────────────────────
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    pool_total = 0.0
+    pool_free = 0.0
+    pool_positions_usdt = 0.0
+    server_online = False
+    positions = []
+    trades = []
+    ai_feed = []
+
+    if snap:
+        server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
+        snap_positions = (await db.execute(
+            select(Position).where(Position.snapshot_id == snap.id)
+        )).scalars().all()
+        pool_positions_usdt = sum(p.amount * p.avg_price for p in snap_positions)
+        pool_free = snap.balance_usdt
+        pool_total = pool_free + pool_positions_usdt
+        positions = [{"symbol": p.symbol, "amount": p.amount, "avg_price": p.avg_price,
+                      "value": round(p.amount * p.avg_price, 2)} for p in snap_positions]
+
+        trades_rows = (await db.execute(
+            select(Trade).order_by(Trade.timestamp.desc()).limit(30)
+        )).scalars().all()
+        trades = [{"symbol": t.symbol, "action": t.action, "amount": t.amount,
+                   "price": t.price, "pnl": t.pnl, "timestamp": t.timestamp} for t in trades_rows]
+
+        ai_rows = (await db.execute(
+            select(AIFeedEntry).order_by(AIFeedEntry.timestamp.desc()).limit(10)
+        )).scalars().all()
+        ai_feed = [{"timestamp": a.timestamp, "action": a.action,
+                    "symbol": a.symbol, "reason": a.reason} for a in ai_rows]
+
+    # ── Пользователи ─────────────────────────────────────────────
+    all_users = (await db.execute(select(User))).scalars().all()
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    fins_map = {f.user_id: f for f in all_fins}
+
+    investors = [u for u in all_users if u.is_active and not u.is_admin]
+    pending = [u for u in all_users if not u.is_active and not u.is_admin]
+
+    total_invested = sum(fins_map[u.id].investment_usdt for u in investors if u.id in fins_map)
+    total_withdrawn = sum(fins_map[u.id].withdrawal_usdt for u in investors if u.id in fins_map)
+
+    # ── Рефералы L1 и L2 ─────────────────────────────────────────
+    investor_ids = {u.id for u in investors}
+    l1_users = [u for u in all_users if u.referred_by in investor_ids or
+                (u.referred_by and any(a.id == u.referred_by for a in all_users if not a.is_admin))]
+
+    # Строим дерево рефералов
+    referrals_l1 = []
+    for u in all_users:
+        if u.referred_by and any(a.id == u.referred_by and not a.is_admin for a in all_users):
+            referrer = next((a for a in all_users if a.id == u.referred_by), None)
+            fin = fins_map.get(u.id)
+            referrals_l1.append({
+                "id": u.id, "email": u.email, "is_active": u.is_active,
+                "referred_by_email": referrer.email if referrer else "",
+                "investment": fin.investment_usdt if fin else 0.0,
+            })
+
+    # ── Мой доход (17% от прибыли пула) ──────────────────────────
+    pool_profit = pool_total - total_invested if total_invested > 0 else 0.0
+    admin_income = round(pool_profit * 0.17, 2) if pool_profit > 0 else 0.0
+
+    # ── Таблица инвесторов ────────────────────────────────────────
+    investors_table = []
+    for u in investors:
+        fin = fins_map.get(u.id)
+        inv = fin.investment_usdt if fin else 0.0
+        refs_count = sum(1 for x in all_users if x.referred_by == u.id)
+        # PnL пропорционально drawdown бота
+        pnl = 0.0
+        if inv > 0 and snap:
+            pnl = round(inv * (snap.drawdown_pct / 100), 2)
+        investors_table.append({
+            "id": u.id, "email": u.email, "created_at": str(u.created_at),
+            "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
+            "pnl": pnl, "referrals_count": refs_count,
+        })
+
+    return {
+        "pool_total": round(pool_total, 2),
+        "pool_free": round(pool_free, 2),
+        "pool_positions_usdt": round(pool_positions_usdt, 2),
+        "server_online": server_online,
+        "drawdown_pct": snap.drawdown_pct if snap else 0.0,
+        "hwm": snap.hwm if snap else 0.0,
+        "last_updated": snap.timestamp.isoformat() if snap else None,
+        "investors_count": len(investors),
+        "pending_count": len(pending),
+        "total_invested": round(total_invested, 2),
+        "total_withdrawn": round(total_withdrawn, 2),
+        "admin_income": admin_income,
+        "pool_profit": round(pool_profit, 2),
+        "positions": positions,
+        "trades": trades,
+        "ai_feed": ai_feed,
+        "investors": investors_table,
+        "referrals": referrals_l1,
+        "pending_users": [{"id": u.id, "email": u.email, "created_at": str(u.created_at)} for u in pending],
+    }
 
 
 @router.delete("/admin/users/{user_id}", dependencies=[Depends(get_admin_user)])
