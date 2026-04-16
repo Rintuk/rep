@@ -10,6 +10,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register")
 async def register(data: RegisterIn, db: AsyncSession = Depends(get_db)):
+    import traceback
+    try:
+        return await _register(data, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"{str(e)} | {traceback.format_exc()}")
+
+async def _register(data: RegisterIn, db: AsyncSession):
     # Проверяем уникальность email
     existing = await db.execute(select(User).where(User.email == data.email))
     if existing.scalar_one_or_none():
