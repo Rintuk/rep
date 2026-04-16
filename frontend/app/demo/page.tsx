@@ -71,35 +71,40 @@ export default function DemoPage() {
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       {/* Шапка */}
-      <header className="border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🤖</span>
-          <div>
-            <h1 className="font-bold text-white text-lg leading-none">AI Маклер</h1>
-            <span className="text-xs" style={{ color: "#f59e0b" }}>Демо счёт · виртуальная торговля</span>
+      <header className="border-b px-4 py-3" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🤖</span>
+            <div>
+              <h1 className="font-bold text-white text-base leading-none">AI Маклер</h1>
+              <span className="text-xs" style={{ color: "#f59e0b" }}>Демо счёт</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Переключатель Реал / Демо */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold hidden sm:inline" style={{ color: "var(--muted)" }}>Реал</span>
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="relative w-12 h-6 rounded-full transition-colors"
+                style={{ background: "#f59e0b44", border: "1px solid #f59e0b88" }}
+                title="Вернуться в реальный счёт"
+              >
+                <span className="absolute left-1 top-1 w-4 h-4 rounded-full transition-transform"
+                  style={{ background: "#f59e0b", transform: "translateX(24px)" }} />
+              </button>
+              <span className="text-xs font-semibold hidden sm:inline" style={{ color: "#f59e0b" }}>Демо</span>
+            </div>
+            {data?.is_started && (
+              <button onClick={handleReset} disabled={resetting}
+                className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80 disabled:opacity-50"
+                style={{ borderColor: "#ff4d4d55", color: "#ff4d4d", background: "#1a0000" }}>
+                <RotateCcw size={14} />
+                <span className="hidden sm:inline">{resetting ? "Сброс..." : "Сбросить"}</span>
+              </button>
+            )}
           </div>
         </div>
-        {/* Переключатель Реал / Демо */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Реал</span>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="relative w-12 h-6 rounded-full transition-colors"
-            style={{ background: "#f59e0b44", border: "1px solid #f59e0b88" }}
-            title="Вернуться в реальный счёт"
-          >
-            <span className="absolute left-1 top-1 w-4 h-4 rounded-full transition-transform"
-              style={{ background: "#f59e0b", transform: "translateX(24px)" }} />
-          </button>
-          <span className="text-xs font-semibold" style={{ color: "#f59e0b" }}>Демо</span>
-        </div>
-        {data?.is_started && (
-          <button onClick={handleReset} disabled={resetting}
-            className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80 disabled:opacity-50"
-            style={{ borderColor: "#ff4d4d55", color: "#ff4d4d", background: "#1a0000" }}>
-            <RotateCcw size={14} /> {resetting ? "Сброс..." : "Сбросить и начать заново"}
-          </button>
-        )}
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
