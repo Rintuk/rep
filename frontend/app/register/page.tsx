@@ -8,19 +8,32 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [refFromUrl, setRefFromUrl] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get("ref");
-    if (ref) setReferralCode(ref);
+    if (ref) {
+      setReferralCode(ref);
+      setRefFromUrl(true);
+    }
   }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (password !== passwordConfirm) {
+      setError("Пароли не совпадают");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Пароль должен быть не менее 6 символов");
+      return;
+    }
     setLoading(true);
     try {
       await register(email, password, referralCode || undefined);
@@ -46,6 +59,8 @@ function RegisterForm() {
     );
   }
 
+  const passwordsMatch = passwordConfirm === "" || password === passwordConfirm;
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--background)" }}>
       <div className="w-full max-w-md rounded-2xl p-8 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
@@ -65,6 +80,7 @@ function RegisterForm() {
               placeholder="you@example.com"
             />
           </div>
+
           <div>
             <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Пароль</label>
             <input
@@ -74,12 +90,42 @@ function RegisterForm() {
               placeholder="••••••••"
             />
           </div>
+
           <div>
-            <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Реферальный код</label>
+            <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>
+              Повторите пароль
+            </label>
+            <input
+              type="password" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} required
+              className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition"
+              style={{
+                background: "#0d0d1a",
+                borderColor: !passwordsMatch ? "#ff4d4d" : passwordConfirm.length > 0 && passwordsMatch ? "#22c97a" : "var(--border)"
+              }}
+              placeholder="••••••••"
+            />
+            {!passwordsMatch && (
+              <p className="text-xs mt-1 text-red-400">Пароли не совпадают</p>
+            )}
+            {passwordConfirm.length > 0 && passwordsMatch && (
+              <p className="text-xs mt-1" style={{ color: "#22c97a" }}>✓ Пароли совпадают</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>
+              Реферальный код
+              {refFromUrl && <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ background: "#0d3a20", color: "#22c97a" }}>✓ из ссылки</span>}
+            </label>
             <input
               type="text" value={referralCode} onChange={e => setReferralCode(e.target.value)}
+              readOnly={refFromUrl}
               className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition"
-              style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
+              style={{
+                background: refFromUrl ? "#0a1a10" : "#0d0d1a",
+                borderColor: refFromUrl ? "#22c97a" : "var(--border)",
+                cursor: refFromUrl ? "default" : "text"
+              }}
               placeholder="Вставьте код из приглашения"
             />
           </div>
@@ -87,7 +133,7 @@ function RegisterForm() {
           {error && <p className="text-sm text-red-400 text-center">{error}</p>}
 
           <button
-            type="submit" disabled={loading}
+            type="submit" disabled={loading || !passwordsMatch}
             className="w-full py-3 rounded-lg font-semibold text-white transition disabled:opacity-50"
             style={{ background: "var(--accent)" }}
           >
