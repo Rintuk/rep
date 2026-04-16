@@ -183,8 +183,11 @@ export default function AdminPage() {
             style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
             <RefreshCw size={13} /> Обновить
           </button>
-          <a href="/dashboard" className="text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
-            style={{ borderColor: "var(--border)", color: "var(--muted)" }}>← Дашборд</a>
+          <button onClick={() => { localStorage.removeItem("token"); router.push("/login"); }}
+            className="text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
+            style={{ borderColor: "#ff4d4d55", color: "#ff4d4d" }}>
+            Выйти
+          </button>
         </div>
       </header>
 
