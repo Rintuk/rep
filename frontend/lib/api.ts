@@ -64,6 +64,10 @@ export async function setReferralLimit(id: string, limit: number) {
   await api.patch(`/auth/admin/referral-limit/${id}`, null, { params: { limit } });
 }
 
+export async function resetUserPassword(id: string, new_password: string) {
+  await api.post(`/auth/admin/users/${id}/reset-password`, null, { params: { new_password } });
+}
+
 export async function getDemoAccount() {
   const res = await api.get("/api/demo/account");
   return res.data;

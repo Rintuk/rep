@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import React from "react";
 import {
   getAdminOverview, approveUser, rejectUser,
-  updateUserFinancials, setReferralLimit, deleteUser, getUserDetail
+  updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword
 } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, Users, CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Trash2, Save } from "lucide-react";
 
@@ -43,6 +43,8 @@ export default function AdminPage() {
   const [forms, setForms] = useState<Record<string, InvestorForm>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<Record<string, string>>({});
+  const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
+  const [resetMsg, setResetMsg] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -120,6 +122,22 @@ export default function AdminPage() {
       setSaveMsg(prev => ({ ...prev, [id]: "✗ Ошибка" }));
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function handleResetPassword(id: string) {
+    const pwd = newPasswords[id]?.trim();
+    if (!pwd || pwd.length < 6) {
+      setResetMsg(prev => ({ ...prev, [id]: "✗ Минимум 6 символов" }));
+      return;
+    }
+    try {
+      await resetUserPassword(id, pwd);
+      setNewPasswords(prev => ({ ...prev, [id]: "" }));
+      setResetMsg(prev => ({ ...prev, [id]: "✓ Пароль изменён" }));
+      setTimeout(() => setResetMsg(prev => ({ ...prev, [id]: "" })), 2000);
+    } catch {
+      setResetMsg(prev => ({ ...prev, [id]: "✗ Ошибка" }));
     }
   }
 
@@ -408,6 +426,28 @@ export default function AdminPage() {
                                     {saveMsg[u.id] && (
                                       <span className="text-sm font-medium" style={{ color: saveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>
                                         {saveMsg[u.id]}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Сброс пароля */}
+                                  <div className="flex items-center gap-3 pt-3 border-t" style={{ borderColor: "var(--border)" }}>
+                                    <input
+                                      type="text"
+                                      value={newPasswords[u.id] || ""}
+                                      onChange={e => setNewPasswords(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                      placeholder="Новый пароль..."
+                                      className="px-3 py-2 rounded-lg text-sm text-white outline-none border focus:border-blue-500 w-48"
+                                      style={{ background: "#0d1a2a", borderColor: "var(--border)" }}
+                                    />
+                                    <button
+                                      onClick={() => handleResetPassword(u.id)}
+                                      className="text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
+                                      style={{ background: "#1a1a3a", color: "#aabbff" }}>
+                                      Сбросить пароль
+                                    </button>
+                                    {resetMsg[u.id] && (
+                                      <span className="text-sm font-medium" style={{ color: resetMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>
+                                        {resetMsg[u.id]}
                                       </span>
                                     )}
                                   </div>

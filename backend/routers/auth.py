@@ -265,6 +265,17 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/admin/users/{user_id}/reset-password", dependencies=[Depends(get_admin_user)])
+async def reset_user_password(user_id: str, new_password: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    user.password_hash = hash_password(new_password)
+    await db.commit()
+    return {"status": "ok"}
+
+
 @router.delete("/admin/users/{user_id}", dependencies=[Depends(get_admin_user)])
 async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
