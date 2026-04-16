@@ -82,4 +82,27 @@ async def bot_update(payload: BotUpdateIn, db: AsyncSession = Depends(get_db)):
                 ))
 
     await db.commit()
+
+    # ── Очистка старых данных ────────────────────────────────────
+    KEEP_SNAPSHOTS = 100
+    KEEP_VIRTUAL_TRADES = 500
+
+    # Удаляем старые снимки (позиции/сделки/AI-лента удалятся каскадно)
+    old_snapshots = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).offset(KEEP_SNAPSHOTS)
+    )).scalars().all()
+    for s in old_snapshots:
+        await db.delete(s)
+
+    # Удаляем старые виртуальные сделки сверх лимита на каждого пользователя
+    va_users = (await db.execute(select(VirtualAccount.user_id))).scalars().all()
+    for uid in va_users:
+        old_vtrades = (await db.execute(
+            select(VirtualTrade).where(VirtualTrade.user_id == uid)
+            .order_by(VirtualTrade.id.desc()).offset(KEEP_VIRTUAL_TRADES)
+        )).scalars().all()
+        for vt in old_vtrades:
+            await db.delete(vt)
+
+    await db.commit()
     return {"status": "ok", "snapshot_id": snapshot.id}
