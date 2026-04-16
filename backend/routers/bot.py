@@ -68,19 +68,18 @@ async def bot_update(payload: BotUpdateIn, db: AsyncSession = Depends(get_db)):
             va.balance_usdt = round(va.start_balance * ratio, 4)
             va.updated_at = datetime.utcnow()
 
-            # Зеркалим новые сделки (масштаб по виртуальному балансу)
+            # Зеркалим все новые сделки (масштаб по виртуальному балансу)
             scale = va.start_balance / va.start_real_total
             for t in new_real_trades:
-                if t.pnl is not None:
-                    db.add(VirtualTrade(
-                        user_id=va.user_id,
-                        symbol=t.symbol,
-                        action=t.action,
-                        amount=round((t.amount or 0) * scale, 6),
-                        price=t.price,
-                        pnl=round(t.pnl * scale, 4),
-                        timestamp=t.timestamp,
-                    ))
+                db.add(VirtualTrade(
+                    user_id=va.user_id,
+                    symbol=t.symbol,
+                    action=t.action,
+                    amount=round((t.amount or 0) * scale, 6),
+                    price=t.price,
+                    pnl=round(t.pnl * scale, 4) if t.pnl is not None else None,
+                    timestamp=t.timestamp,
+                ))
 
     await db.commit()
     return {"status": "ok", "snapshot_id": snapshot.id}
