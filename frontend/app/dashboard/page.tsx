@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDashboard } from "@/lib/api";
-import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, FlaskConical } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, FlaskConical, TestTube } from "lucide-react";
 
 interface Position { symbol: string; amount: number; avg_price: number; }
 interface Trade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }
@@ -131,16 +131,11 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Переключатель Реал / Демо */}
-          <button onClick={toggleDemo}
+          {/* Кнопка перехода в Демо */}
+          <button onClick={() => router.push("/demo")}
             className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg border font-semibold transition hover:opacity-80"
-            style={{
-              borderColor: isDemo ? "#f59e0b" : "var(--border)",
-              background: isDemo ? "#2a1a00" : "transparent",
-              color: isDemo ? "#f59e0b" : "var(--muted)"
-            }}>
-            <FlaskConical size={14} />
-            {isDemo ? "Демо режим" : "Реал"}
+            style={{ borderColor: "#f59e0b55", background: "#1a1000", color: "#f59e0b" }}>
+            <FlaskConical size={14} /> Демо счёт
           </button>
 
           <button onClick={copyRefLink}

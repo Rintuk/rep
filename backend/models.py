@@ -22,8 +22,9 @@ class User(Base):
     referral_limit: Mapped[int]  = mapped_column(Integer, default=3)
     created_at:     Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    referrals:  Mapped[list["User"]]       = relationship("User", foreign_keys=[referred_by])
-    financials: Mapped["UserFinancials | None"] = relationship("UserFinancials", back_populates="user", uselist=False)
+    referrals:       Mapped[list["User"]]            = relationship("User", foreign_keys=[referred_by])
+    financials:      Mapped["UserFinancials | None"]  = relationship("UserFinancials", back_populates="user", uselist=False)
+    virtual_account: Mapped["VirtualAccount | None"]  = relationship("VirtualAccount", back_populates="user", uselist=False)
 
 
 class UserFinancials(Base):
@@ -37,6 +38,39 @@ class UserFinancials(Base):
     updated_at:      Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="financials")
+
+
+DEMO_START_BALANCE = 1000.0
+
+
+class VirtualAccount(Base):
+    """Демо-счёт инвестора — автоматически создаётся, зеркалит реальный бот."""
+    __tablename__ = "virtual_accounts"
+
+    user_id:       Mapped[str]   = mapped_column(String, ForeignKey("users.id"), primary_key=True)
+    balance_usdt:  Mapped[float] = mapped_column(Float, default=DEMO_START_BALANCE)
+    start_balance: Mapped[float] = mapped_column(Float, default=DEMO_START_BALANCE)
+    created_at:    Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:    Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user:   Mapped["User"]              = relationship("User", back_populates="virtual_account")
+    trades: Mapped[list["VirtualTrade"]] = relationship("VirtualTrade", back_populates="account", cascade="all, delete-orphan")
+
+
+class VirtualTrade(Base):
+    """Виртуальная сделка — зеркало реальной, масштабированная под демо-счёт."""
+    __tablename__ = "virtual_trades"
+
+    id:         Mapped[str]   = mapped_column(String, primary_key=True, default=gen_uuid)
+    user_id:    Mapped[str]   = mapped_column(String, ForeignKey("virtual_accounts.user_id"))
+    symbol:     Mapped[str]   = mapped_column(String)
+    action:     Mapped[str]   = mapped_column(String)
+    amount:     Mapped[float] = mapped_column(Float)
+    price:      Mapped[float] = mapped_column(Float)
+    pnl:        Mapped[float | None] = mapped_column(Float, nullable=True)
+    timestamp:  Mapped[str]   = mapped_column(String)
+
+    account: Mapped["VirtualAccount"] = relationship("VirtualAccount", back_populates="trades")
 
 
 class BotSnapshot(Base):

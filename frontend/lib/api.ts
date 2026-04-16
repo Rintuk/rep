@@ -58,3 +58,13 @@ export async function deleteUser(id: string) {
 export async function setReferralLimit(id: string, limit: number) {
   await api.patch(`/auth/admin/referral-limit/${id}`, null, { params: { limit } });
 }
+
+export async function getDemoAccount() {
+  const res = await api.get("/api/demo/account");
+  return res.data;
+}
+
+export async function resetDemoAccount() {
+  const res = await api.post("/api/demo/reset");
+  return res.data;
+}
