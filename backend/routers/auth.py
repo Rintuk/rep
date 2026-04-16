@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 from database import get_db
 from models import User
 from schemas import RegisterIn, LoginIn, TokenOut
-from auth import hash_password, verify_password, create_access_token, get_admin_user
+from security import hash_password, verify_password, create_access_token, get_admin_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

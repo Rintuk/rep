@@ -4,7 +4,7 @@ from sqlalchemy import select
 from database import get_db
 from models import BotSnapshot, Position, Trade, AIFeedEntry
 from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut
-from auth import get_current_user
+from security import get_current_user
 from models import User
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
