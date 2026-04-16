@@ -54,35 +54,33 @@ async def bot_update(payload: BotUpdateIn, db: AsyncSession = Depends(get_db)):
                            action=entry.action, symbol=entry.symbol, reason=entry.reason))
 
     # ── Обновляем виртуальные счета ──────────────────────────────
-    if prev_snap and real_total_now > 0:
-        prev_positions = (await db.execute(
-            select(Position).where(Position.snapshot_id == prev_snap.id)
+    if real_total_now > 0:
+        virtual_accounts = (await db.execute(
+            select(VirtualAccount).where(VirtualAccount.is_started == True)
         )).scalars().all()
-        real_total_prev = prev_snap.balance_usdt + sum(p.amount * p.avg_price for p in prev_positions)
 
-        if real_total_prev > 0:
-            change_pct = (real_total_now - real_total_prev) / real_total_prev
+        for va in virtual_accounts:
+            if va.start_real_total <= 0:
+                continue  # точка отсчёта не зафиксирована — пропускаем
 
-            # Все виртуальные счета
-            virtual_accounts = (await db.execute(select(VirtualAccount))).scalars().all()
-            for va in virtual_accounts:
-                old_balance = va.balance_usdt
-                va.balance_usdt = round(old_balance * (1 + change_pct), 4)
-                va.updated_at = datetime.utcnow()
+            # Пропорциональный расчёт: демо растёт/падает так же как реальный пул
+            ratio = real_total_now / va.start_real_total
+            va.balance_usdt = round(va.start_balance * ratio, 4)
+            va.updated_at = datetime.utcnow()
 
-                # Зеркалим новые сделки в виртуальный счёт (масштабированные)
-                scale = old_balance / real_total_prev if real_total_prev > 0 else 1.0
-                for t in new_real_trades:
-                    if t.pnl is not None:
-                        db.add(VirtualTrade(
-                            user_id=va.user_id,
-                            symbol=t.symbol,
-                            action=t.action,
-                            amount=round((t.amount or 0) * scale, 6),
-                            price=t.price,
-                            pnl=round(t.pnl * scale, 4),
-                            timestamp=t.timestamp,
-                        ))
+            # Зеркалим новые сделки (масштаб по виртуальному балансу)
+            scale = va.start_balance / va.start_real_total
+            for t in new_real_trades:
+                if t.pnl is not None:
+                    db.add(VirtualTrade(
+                        user_id=va.user_id,
+                        symbol=t.symbol,
+                        action=t.action,
+                        amount=round((t.amount or 0) * scale, 6),
+                        price=t.price,
+                        pnl=round(t.pnl * scale, 4),
+                        timestamp=t.timestamp,
+                    ))
 
     await db.commit()
     return {"status": "ok", "snapshot_id": snapshot.id}

@@ -47,12 +47,13 @@ class VirtualAccount(Base):
     """Демо-счёт инвестора — автоматически создаётся, зеркалит реальный бот."""
     __tablename__ = "virtual_accounts"
 
-    user_id:       Mapped[str]   = mapped_column(String, ForeignKey("users.id"), primary_key=True)
-    balance_usdt:  Mapped[float] = mapped_column(Float, default=0.0)
-    start_balance: Mapped[float] = mapped_column(Float, default=0.0)
-    is_started:    Mapped[bool]  = mapped_column(Boolean, default=False)
-    created_at:    Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at:    Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    user_id:          Mapped[str]   = mapped_column(String, ForeignKey("users.id"), primary_key=True)
+    balance_usdt:     Mapped[float] = mapped_column(Float, default=0.0)
+    start_balance:    Mapped[float] = mapped_column(Float, default=0.0)
+    start_real_total: Mapped[float] = mapped_column(Float, default=0.0)  # реальный пул на момент старта
+    is_started:       Mapped[bool]  = mapped_column(Boolean, default=False)
+    created_at:       Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at:       Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user:   Mapped["User"]              = relationship("User", back_populates="virtual_account")
     trades: Mapped[list["VirtualTrade"]] = relationship("VirtualTrade", back_populates="account", cascade="all, delete-orphan")

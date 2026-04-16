@@ -89,6 +89,18 @@ async def start_demo_account(
     db: AsyncSession = Depends(get_db)
 ):
     """Запускает демо-счёт с указанной суммой."""
+    # Фиксируем реальный пул прямо сейчас — это точка отсчёта
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    real_total = 0.0
+    if snap:
+        snap_positions = (await db.execute(
+            select(Position).where(Position.snapshot_id == snap.id)
+        )).scalars().all()
+        real_total = snap.balance_usdt + sum(p.amount * p.avg_price for p in snap_positions)
+
     va = (await db.execute(select(VirtualAccount).where(VirtualAccount.user_id == user.id))).scalar_one_or_none()
 
     if not va:
@@ -96,21 +108,22 @@ async def start_demo_account(
             user_id=user.id,
             balance_usdt=amount,
             start_balance=amount,
+            start_real_total=real_total,
             is_started=True,
         )
         db.add(va)
     else:
         va.balance_usdt = amount
         va.start_balance = amount
+        va.start_real_total = real_total
         va.is_started = True
         va.updated_at = datetime.utcnow()
-        # Очищаем старую историю при перезапуске
         trades = (await db.execute(select(VirtualTrade).where(VirtualTrade.user_id == user.id))).scalars().all()
         for t in trades:
             await db.delete(t)
 
     await db.commit()
-    return {"status": "ok", "balance": amount}
+    return {"status": "ok", "balance": amount, "start_real_total": real_total}
 
 
 @router.post("/reset")

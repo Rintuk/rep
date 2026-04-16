@@ -12,6 +12,7 @@ async def lifespan(app: FastAPI):
         from sqlalchemy import text
         for sql in [
             "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS is_started BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS start_real_total FLOAT DEFAULT 0",
         ]:
             try:
                 await conn.execute(text(sql))
