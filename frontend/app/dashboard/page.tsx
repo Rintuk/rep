@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDashboard, createDepositRequest, getMyDeposits } from "@/lib/api";
-import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 interface Position { symbol: string; amount: number; avg_price: number; }
 interface Trade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const [depositLoading, setDepositLoading] = useState(false);
   const [depositDone, setDepositDone] = useState(false);
   const [myDeposits, setMyDeposits] = useState<{id:string;amount:number;status:string;created_at:string}[]>([]);
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -315,7 +317,7 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
           style={{ background: "rgba(0,0,0,0.7)" }}
           onClick={e => { if (e.target === e.currentTarget) setShowDeposit(false); }}>
-          <div className="rounded-2xl p-6 w-full max-w-sm border" style={{ background: "var(--card)", borderColor: "#22c97a44" }}>
+          <div className="rounded-2xl p-6 w-full max-w-sm border max-h-[90vh] overflow-y-auto" style={{ background: "var(--card)", borderColor: "#22c97a44" }}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-bold text-white text-lg">Пополнение депозита</h2>
               <button onClick={() => setShowDeposit(false)} style={{ color: "var(--muted)" }}><X size={20} /></button>
@@ -336,6 +338,32 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Адрес кошелька */}
+                {process.env.NEXT_PUBLIC_WALLET_ADDRESS && (() => {
+                  const addr = process.env.NEXT_PUBLIC_WALLET_ADDRESS!;
+                  return (
+                    <div className="rounded-xl p-4 border space-y-3" style={{ background: "#0d0d1a", borderColor: "#4488dd44" }}>
+                      <p className="text-xs font-semibold text-center" style={{ color: "#4488dd" }}>
+                        {process.env.NEXT_PUBLIC_WALLET_NETWORK || "USDT TRC20"} — адрес для пополнения
+                      </p>
+                      <div className="flex justify-center">
+                        <div className="p-2 rounded-lg bg-white">
+                          <QRCodeSVG value={addr} size={140} />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: "#111130" }}>
+                        <p className="flex-1 text-xs break-all font-mono" style={{ color: "var(--muted)" }}>{addr}</p>
+                        <button onClick={() => {
+                          navigator.clipboard.writeText(addr);
+                          setCopiedAddress(true);
+                          setTimeout(() => setCopiedAddress(false), 2000);
+                        }} className="shrink-0 transition hover:opacity-80" style={{ color: copiedAddress ? "#22c97a" : "#4488dd" }}>
+                          {copiedAddress ? <CheckCheck size={16} /> : <Copy size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div>
                   <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Сумма (USDT)</label>
                   <input
