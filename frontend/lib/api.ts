@@ -83,8 +83,8 @@ export async function getAdminDeposits() {
   return res.data;
 }
 
-export async function approveDeposit(id: string) {
-  const res = await api.post(`/auth/admin/deposits/${id}/approve`);
+export async function approveDeposit(id: string, actual_amount: number) {
+  const res = await api.post(`/auth/admin/deposits/${id}/approve`, null, { params: { actual_amount } });
   return res.data;
 }
 

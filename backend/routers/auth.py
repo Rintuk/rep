@@ -338,25 +338,27 @@ async def list_deposit_requests(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/admin/deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
-async def approve_deposit(request_id: str, db: AsyncSession = Depends(get_db)):
+async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSession = Depends(get_db)):
+    if actual_amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
     req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id))).scalar_one_or_none()
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="Заявка уже обработана")
 
-    # Прибавляем к investment_usdt
+    # Прибавляем фактически полученную сумму к investment_usdt
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
-        fin.investment_usdt += req.amount
+        fin.investment_usdt += actual_amount
         fin.updated_at = datetime.utcnow()
     else:
-        db.add(UserFinancials(user_id=req.user_id, investment_usdt=req.amount))
+        db.add(UserFinancials(user_id=req.user_id, investment_usdt=actual_amount))
 
     req.status = "approved"
     req.updated_at = datetime.utcnow()
     await db.commit()
-    return {"status": "approved", "amount": req.amount}
+    return {"status": "approved", "amount": actual_amount}
 
 
 @router.post("/admin/deposits/{request_id}/reject", dependencies=[Depends(get_admin_user)])

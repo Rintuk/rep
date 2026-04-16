@@ -47,6 +47,8 @@ export default function AdminPage() {
   const [saveMsg, setSaveMsg] = useState<Record<string, string>>({});
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
   const [resetMsg, setResetMsg] = useState<Record<string, string>>({});
+  const [confirmingDeposit, setConfirmingDeposit] = useState<string | null>(null);
+  const [actualAmounts, setActualAmounts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -69,7 +71,10 @@ export default function AdminPage() {
   }
 
   async function handleApproveDeposit(id: string) {
-    await approveDeposit(id);
+    const amount = parseFloat(actualAmounts[id] || "0");
+    if (!amount || amount <= 0) return;
+    await approveDeposit(id, amount);
+    setConfirmingDeposit(null);
     fetchData();
   }
 
@@ -512,17 +517,50 @@ export default function AdminPage() {
                   <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>{new Date(d.created_at).toLocaleString("ru")}</p>
                 </div>
                 {d.status === "pending" && (
-                  <div className="flex gap-2">
-                    <button onClick={() => handleApproveDeposit(d.id)}
-                      className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
-                      style={{ background: "#0d3a20", color: "#22c97a" }}>
-                      <CheckCircle size={14} /> Подтвердить
-                    </button>
-                    <button onClick={() => handleRejectDeposit(d.id)}
-                      className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
-                      style={{ background: "#3a0d0d", color: "#ff4d4d" }}>
-                      <XCircle size={14} /> Отклонить
-                    </button>
+                  <div className="flex flex-col gap-2 min-w-[200px]">
+                    {confirmingDeposit === d.id ? (
+                      <>
+                        <div>
+                          <label className="text-xs mb-1 block" style={{ color: "var(--muted)" }}>Фактически получено (USDT)</label>
+                          <input
+                            type="number" step="0.01" min="0"
+                            value={actualAmounts[d.id] ?? String(d.amount)}
+                            onChange={e => setActualAmounts(prev => ({ ...prev, [d.id]: e.target.value }))}
+                            className="w-full px-3 py-2 rounded-lg text-white font-bold border outline-none"
+                            style={{ background: "#0d1a2a", borderColor: "#22c97a44" }}
+                            autoFocus
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleApproveDeposit(d.id)}
+                            className="flex-1 flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-lg transition hover:opacity-80"
+                            style={{ background: "#0d3a20", color: "#22c97a" }}>
+                            <CheckCircle size={13} /> Зачислить
+                          </button>
+                          <button onClick={() => setConfirmingDeposit(null)}
+                            className="text-sm px-3 py-2 rounded-lg transition hover:opacity-80"
+                            style={{ background: "#1a1a2a", color: "var(--muted)" }}>
+                            Отмена
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button onClick={() => {
+                          setConfirmingDeposit(d.id);
+                          setActualAmounts(prev => ({ ...prev, [d.id]: String(d.amount) }));
+                        }}
+                          className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
+                          style={{ background: "#0d3a20", color: "#22c97a" }}>
+                          <CheckCircle size={14} /> Подтвердить
+                        </button>
+                        <button onClick={() => handleRejectDeposit(d.id)}
+                          className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
+                          style={{ background: "#3a0d0d", color: "#ff4d4d" }}>
+                          <XCircle size={14} /> Отклонить
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
