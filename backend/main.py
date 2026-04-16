@@ -28,6 +28,21 @@ app.include_router(dashboard.router)
 async def health():
     return {"status": "ok"}
 
+@app.post("/debug/make-admin")
+async def make_admin(email: str):
+    from database import AsyncSessionLocal
+    from models import User
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        if not user:
+            return {"error": "Пользователь не найден"}
+        user.is_admin = True
+        user.is_active = True
+        await session.commit()
+        return {"status": "ok", "email": user.email, "is_admin": True}
+
 @app.get("/debug/register-test")
 async def debug_register():
     import traceback
