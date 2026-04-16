@@ -14,7 +14,7 @@ api.interceptors.request.use((config) => {
 
 export async function login(email: string, password: string) {
   const res = await api.post("/auth/login", { email, password });
-  return res.data as { access_token: string };
+  return res.data as { access_token: string; is_admin: boolean };
 }
 
 export async function register(email: string, password: string, referral_code?: string) {

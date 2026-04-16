@@ -19,7 +19,7 @@ export default function LoginPage() {
     try {
       const data = await login(email, password);
       localStorage.setItem("token", data.access_token);
-      router.push("/dashboard");
+      router.push(data.is_admin ? "/admin" : "/dashboard");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(msg || "Ошибка входа");

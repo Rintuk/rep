@@ -55,7 +55,7 @@ async def login(data: LoginIn, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Аккаунт ожидает одобрения администратора")
-    return TokenOut(access_token=create_access_token(user.id))
+    return TokenOut(access_token=create_access_token(user.id), is_admin=user.is_admin)
 
 
 # ── Админ: управление пользователями ──────────────────────────
