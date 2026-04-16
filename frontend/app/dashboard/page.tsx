@@ -359,8 +359,9 @@ export default function DashboardPage() {
                     style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
                   />
                 </div>
-                <div className="rounded-lg p-3 text-sm" style={{ background: "#1a1200", color: "#f59e0b" }}>
-                  ⏳ Заявка будет обработана администратором в течение суток.
+                <div className="rounded-lg p-3 text-sm space-y-1" style={{ background: "#1a1200", borderLeft: "3px solid #f59e0b" }}>
+                  <p style={{ color: "#f59e0b" }}>⏳ Заявка обрабатывается в течение суток.</p>
+                  <p style={{ color: "#a87a30" }}>⚠️ Учтите комиссию сети — на счёт будет зачислена фактически полученная сумма, которая может быть меньше отправленной.</p>
                 </div>
                 <button
                   onClick={handleDepositSubmit}
