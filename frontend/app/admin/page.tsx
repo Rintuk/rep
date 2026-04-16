@@ -295,7 +295,7 @@ export default function AdminPage() {
                 borderBottom: activeTab === t.key ? "2px solid #4488dd" : "2px solid transparent",
               }}>
               {t.label}
-              {"badge" in t && t.badge > 0 && (
+              {"badge" in t && (t.badge ?? 0) > 0 && (
                 <span className="absolute -top-1 -right-1 text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold"
                   style={{ background: "#f59e0b", color: "#000" }}>{t.badge}</span>
               )}
