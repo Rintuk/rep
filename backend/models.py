@@ -48,8 +48,9 @@ class VirtualAccount(Base):
     __tablename__ = "virtual_accounts"
 
     user_id:       Mapped[str]   = mapped_column(String, ForeignKey("users.id"), primary_key=True)
-    balance_usdt:  Mapped[float] = mapped_column(Float, default=DEMO_START_BALANCE)
-    start_balance: Mapped[float] = mapped_column(Float, default=DEMO_START_BALANCE)
+    balance_usdt:  Mapped[float] = mapped_column(Float, default=0.0)
+    start_balance: Mapped[float] = mapped_column(Float, default=0.0)
+    is_started:    Mapped[bool]  = mapped_column(Boolean, default=False)
     created_at:    Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at:    Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

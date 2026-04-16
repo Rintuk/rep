@@ -70,11 +70,19 @@ class AIFeedOut(BaseModel):
     reason: str
 
 class DashboardOut(BaseModel):
+    # Пул (весь бот)
     balance_usdt: float
+    pool_total_usdt: float
+    pool_positions_usdt: float
     mode: str
     hwm: float
     drawdown_pct: float
+    server_online: bool
     last_updated: str | None
+    # Данные пользователя
+    user_investment: float
+    user_pnl: float
+    user_pnl_pct: float
     positions: list[PositionOut]
     recent_trades: list[TradeOut]
     ai_feed: list[AIFeedOut]

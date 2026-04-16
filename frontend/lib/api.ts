@@ -64,6 +64,11 @@ export async function getDemoAccount() {
   return res.data;
 }
 
+export async function startDemoAccount(amount: number) {
+  const res = await api.post("/api/demo/start", null, { params: { amount } });
+  return res.data;
+}
+
 export async function resetDemoAccount() {
   const res = await api.post("/api/demo/reset");
   return res.data;

@@ -1,23 +1,32 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
-from models import VirtualAccount, VirtualTrade, BotSnapshot, Position, DEMO_START_BALANCE
+from models import VirtualAccount, VirtualTrade, BotSnapshot, Position
 from security import get_current_user
 from models import User
 
 router = APIRouter(prefix="/api/demo", tags=["demo"])
 
+
 @router.get("/account")
 async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Возвращает демо-счёт. Создаёт автоматически если не существует."""
+    """Возвращает демо-счёт. Если не запущен — возвращает is_started=False."""
     va = (await db.execute(select(VirtualAccount).where(VirtualAccount.user_id == user.id))).scalar_one_or_none()
 
-    if not va:
-        va = VirtualAccount(user_id=user.id, balance_usdt=DEMO_START_BALANCE, start_balance=DEMO_START_BALANCE)
-        db.add(va)
-        await db.commit()
-        await db.refresh(va)
+    if not va or not va.is_started:
+        return {
+            "is_started": False,
+            "balance_usdt": 0,
+            "start_balance": 0,
+            "pnl": 0,
+            "pnl_pct": 0,
+            "positions": [],
+            "trades": [],
+            "created_at": None,
+            "updated_at": None,
+        }
 
     # Последний снимок бота для позиций
     snap = (await db.execute(
@@ -41,7 +50,6 @@ async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSess
                     "value": round(p.amount * p.avg_price * scale, 2),
                 })
 
-    # Последние виртуальные сделки
     trades = (await db.execute(
         select(VirtualTrade)
         .where(VirtualTrade.user_id == user.id)
@@ -50,9 +58,10 @@ async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSess
     )).scalars().all()
 
     pnl = va.balance_usdt - va.start_balance
-    pnl_pct = (pnl / va.start_balance) * 100
+    pnl_pct = (pnl / va.start_balance * 100) if va.start_balance > 0 else 0
 
     return {
+        "is_started": True,
         "balance_usdt": round(va.balance_usdt, 2),
         "start_balance": va.start_balance,
         "pnl": round(pnl, 2),
@@ -73,17 +82,48 @@ async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSess
     }
 
 
+@router.post("/start")
+async def start_demo_account(
+    amount: float = Query(..., gt=0, description="Стартовый баланс в USDT"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Запускает демо-счёт с указанной суммой."""
+    va = (await db.execute(select(VirtualAccount).where(VirtualAccount.user_id == user.id))).scalar_one_or_none()
+
+    if not va:
+        va = VirtualAccount(
+            user_id=user.id,
+            balance_usdt=amount,
+            start_balance=amount,
+            is_started=True,
+        )
+        db.add(va)
+    else:
+        va.balance_usdt = amount
+        va.start_balance = amount
+        va.is_started = True
+        va.updated_at = datetime.utcnow()
+        # Очищаем старую историю при перезапуске
+        trades = (await db.execute(select(VirtualTrade).where(VirtualTrade.user_id == user.id))).scalars().all()
+        for t in trades:
+            await db.delete(t)
+
+    await db.commit()
+    return {"status": "ok", "balance": amount}
+
+
 @router.post("/reset")
 async def reset_demo_account(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Сбрасывает демо-счёт до начального баланса."""
+    """Сбрасывает демо-счёт — возвращает в состояние «не запущен»."""
     va = (await db.execute(select(VirtualAccount).where(VirtualAccount.user_id == user.id))).scalar_one_or_none()
     if va:
-        va.balance_usdt = DEMO_START_BALANCE
-        from datetime import datetime
+        va.balance_usdt = 0
+        va.start_balance = 0
+        va.is_started = False
         va.updated_at = datetime.utcnow()
-        # Удаляем историю виртуальных сделок
         trades = (await db.execute(select(VirtualTrade).where(VirtualTrade.user_id == user.id))).scalars().all()
         for t in trades:
             await db.delete(t)
         await db.commit()
-    return {"status": "ok", "balance": DEMO_START_BALANCE}
+    return {"status": "ok"}

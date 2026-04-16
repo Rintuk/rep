@@ -8,6 +8,15 @@ from routers import bot, auth, dashboard, demo
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migrations: add new columns if not exist
+        from sqlalchemy import text
+        for sql in [
+            "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS is_started BOOLEAN DEFAULT FALSE",
+        ]:
+            try:
+                await conn.execute(text(sql))
+            except Exception:
+                pass
     yield
 
 app = FastAPI(title="Makler API", version="1.0.0", lifespan=lifespan)
