@@ -4,3 +4,7 @@ package = "@netlify/plugin-nextjs"
 [build]
   command = "npm run build"
   publish = ".next"
+
+[build.environment]
+  NEXT_PUBLIC_WALLET_ADDRESS = "TWDLBDKEoA8kGdR7bvUkG5f5a2ZLUbvNuw"
+  NEXT_PUBLIC_WALLET_NETWORK = "USDT TRC20"
