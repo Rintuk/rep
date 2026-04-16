@@ -1,8 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAdminOverview, approveUser, rejectUser } from "@/lib/api";
-import { TrendingUp, TrendingDown, Wallet, Activity, Users, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import React from "react";
+import {
+  getAdminOverview, approveUser, rejectUser,
+  updateUserFinancials, setReferralLimit, deleteUser, getUserDetail
+} from "@/lib/api";
+import { TrendingUp, TrendingDown, Wallet, Activity, Users, CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Trash2, Save } from "lucide-react";
 
 const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888" };
 
@@ -20,12 +24,25 @@ interface Overview {
   pending_users: { id: string; email: string; created_at: string }[];
 }
 
+interface InvestorForm {
+  investment_usdt: string;
+  withdrawal_usdt: string;
+  note: string;
+  referral_limit: string;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai">("overview");
+
+  // Inline investor management
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [forms, setForms] = useState<Record<string, InvestorForm>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -55,6 +72,66 @@ export default function AdminPage() {
     if (!confirm("Отклонить и удалить пользователя?")) return;
     await rejectUser(id);
     fetchData();
+  }
+
+  async function toggleExpand(id: string) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(id);
+    // Load detail if not already in forms
+    if (!forms[id]) {
+      try {
+        const detail = await getUserDetail(id);
+        setForms(prev => ({
+          ...prev,
+          [id]: {
+            investment_usdt: String(detail.investment_usdt ?? 0),
+            withdrawal_usdt: String(detail.withdrawal_usdt ?? 0),
+            note: detail.note ?? "",
+            referral_limit: String(detail.referral_limit ?? 5),
+          }
+        }));
+      } catch {
+        setForms(prev => ({
+          ...prev,
+          [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5" }
+        }));
+      }
+    }
+  }
+
+  function updateForm(id: string, field: keyof InvestorForm, value: string) {
+    setForms(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+  }
+
+  async function handleSave(id: string) {
+    const f = forms[id];
+    if (!f) return;
+    setSavingId(id);
+    try {
+      await updateUserFinancials(id, parseFloat(f.investment_usdt) || 0, parseFloat(f.withdrawal_usdt) || 0, f.note);
+      await setReferralLimit(id, parseInt(f.referral_limit) || 5);
+      setSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
+      setTimeout(() => setSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
+      fetchData();
+    } catch {
+      setSaveMsg(prev => ({ ...prev, [id]: "✗ Ошибка" }));
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function handleDelete(id: string, email: string) {
+    if (!confirm(`Удалить пользователя ${email}? Это действие необратимо.`)) return;
+    try {
+      await deleteUser(id);
+      setExpandedId(null);
+      fetchData();
+    } catch {
+      alert("Ошибка удаления");
+    }
   }
 
   if (loading) return (
@@ -236,25 +313,109 @@ export default function AdminPage() {
               <tbody>
                 {data.investors.length === 0
                   ? <tr><td colSpan={7} className="px-4 py-6 text-center" style={{ color: "var(--muted)" }}>Инвесторов нет</td></tr>
-                  : data.investors.map((u, i) => (
-                    <tr key={u.id} className="border-b hover:bg-white/5 transition" style={{ borderColor: "var(--border)" }}>
-                      <td className="px-4 py-3 text-white font-medium">{u.email}</td>
-                      <td className="px-4 py-3 text-white">{u.investment.toFixed(2)} $</td>
-                      <td className="px-4 py-3" style={{ color: "var(--muted)" }}>{u.withdrawal.toFixed(2)} $</td>
-                      <td className="px-4 py-3 font-semibold" style={{ color: u.pnl >= 0 ? "#22c97a" : "#ff4d4d" }}>
-                        {u.pnl >= 0 ? "+" : ""}{u.pnl.toFixed(2)} $
-                      </td>
-                      <td className="px-4 py-3 text-white">{u.referrals_count}</td>
-                      <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>{new Date(u.created_at).toLocaleDateString("ru")}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => router.push(`/admin/users/${u.id}`)}
-                          className="text-xs px-3 py-1 rounded border transition hover:opacity-80"
-                          style={{ borderColor: "#4488dd55", color: "#4488dd" }}>
-                          Открыть →
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  : data.investors.map((u) => {
+                    const isOpen = expandedId === u.id;
+                    const f = forms[u.id];
+                    return (
+                      <React.Fragment key={u.id}>
+                        <tr className="border-b transition"
+                          style={{ borderColor: "var(--border)", background: isOpen ? "#0d1a2a" : "transparent" }}>
+                          <td className="px-4 py-3 text-white font-medium">{u.email}</td>
+                          <td className="px-4 py-3 text-white">{u.investment.toFixed(2)} $</td>
+                          <td className="px-4 py-3" style={{ color: "var(--muted)" }}>{u.withdrawal.toFixed(2)} $</td>
+                          <td className="px-4 py-3 font-semibold" style={{ color: u.pnl >= 0 ? "#22c97a" : "#ff4d4d" }}>
+                            {u.pnl >= 0 ? "+" : ""}{u.pnl.toFixed(2)} $
+                          </td>
+                          <td className="px-4 py-3 text-white">{u.referrals_count}</td>
+                          <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>{new Date(u.created_at).toLocaleDateString("ru")}</td>
+                          <td className="px-4 py-3">
+                            <button onClick={() => toggleExpand(u.id)}
+                              className="flex items-center gap-1 text-xs px-3 py-1 rounded border transition hover:opacity-80"
+                              style={{ borderColor: isOpen ? "#4488dd" : "#4488dd55", color: "#4488dd" }}>
+                              {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                              {isOpen ? "Свернуть" : "Управление"}
+                            </button>
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr style={{ background: "#071420" }}>
+                            <td colSpan={7} className="px-6 py-5">
+                              {!f ? (
+                                <p className="text-sm" style={{ color: "var(--muted)" }}>Загрузка...</p>
+                              ) : (
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div>
+                                      <label className="text-xs block mb-1" style={{ color: "var(--muted)" }}>Инвестировано (USDT)</label>
+                                      <input
+                                        type="number" step="0.01" min="0"
+                                        value={f.investment_usdt}
+                                        onChange={e => updateForm(u.id, "investment_usdt", e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg text-sm text-white outline-none border focus:border-blue-500"
+                                        style={{ background: "#0d1a2a", borderColor: "var(--border)" }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs block mb-1" style={{ color: "var(--muted)" }}>Выведено (USDT)</label>
+                                      <input
+                                        type="number" step="0.01" min="0"
+                                        value={f.withdrawal_usdt}
+                                        onChange={e => updateForm(u.id, "withdrawal_usdt", e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg text-sm text-white outline-none border focus:border-blue-500"
+                                        style={{ background: "#0d1a2a", borderColor: "var(--border)" }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs block mb-1" style={{ color: "var(--muted)" }}>Лимит рефералов</label>
+                                      <input
+                                        type="number" min="0"
+                                        value={f.referral_limit}
+                                        onChange={e => updateForm(u.id, "referral_limit", e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg text-sm text-white outline-none border focus:border-blue-500"
+                                        style={{ background: "#0d1a2a", borderColor: "var(--border)" }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs block mb-1" style={{ color: "var(--muted)" }}>Заметка</label>
+                                      <input
+                                        type="text"
+                                        value={f.note}
+                                        onChange={e => updateForm(u.id, "note", e.target.value)}
+                                        placeholder="Комментарий..."
+                                        className="w-full px-3 py-2 rounded-lg text-sm text-white outline-none border focus:border-blue-500"
+                                        style={{ background: "#0d1a2a", borderColor: "var(--border)" }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <button
+                                      onClick={() => handleSave(u.id)}
+                                      disabled={savingId === u.id}
+                                      className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80 disabled:opacity-50"
+                                      style={{ background: "#0d3a20", color: "#22c97a" }}>
+                                      <Save size={13} />
+                                      {savingId === u.id ? "Сохранение..." : "Сохранить"}
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(u.id, u.email)}
+                                      className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
+                                      style={{ background: "#3a0d0d", color: "#ff4d4d" }}>
+                                      <Trash2 size={13} /> Удалить
+                                    </button>
+                                    {saveMsg[u.id] && (
+                                      <span className="text-sm font-medium" style={{ color: saveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>
+                                        {saveMsg[u.id]}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
                 }
               </tbody>
             </table>
