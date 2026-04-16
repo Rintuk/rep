@@ -27,3 +27,17 @@ app.include_router(dashboard.router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.get("/debug/register-test")
+async def debug_register():
+    import traceback
+    from database import AsyncSessionLocal
+    from models import User
+    from security import hash_password
+    try:
+        async with AsyncSessionLocal() as session:
+            from sqlalchemy import text
+            await session.execute(text("SELECT 1"))
+            return {"db": "ok"}
+    except Exception as e:
+        return {"db": "error", "detail": str(e), "trace": traceback.format_exc()}
