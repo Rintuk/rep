@@ -193,12 +193,12 @@ export default function AdminPage() {
 
   const pendingDeposits = deposits.filter(d => d.status === "pending").length;
   const TABS = [
-    { key: "overview", label: "📊 Обзор" },
-    { key: "investors", label: `👥 Инвесторы (${data.investors_count})` },
-    { key: "deposits", label: "💳 Заявки", badge: pendingDeposits },
-    { key: "referrals", label: `🔗 Рефералы (${data.referrals.length})` },
-    { key: "trades", label: "📋 Сделки" },
-    { key: "ai", label: "🧠 Лента ИИ" },
+    { key: "overview",   label: "📊 Обзор" },
+    { key: "investors",  label: `👥 Инв. (${data.investors_count})` },
+    { key: "deposits",   label: "💳 Заявки", badge: pendingDeposits },
+    { key: "referrals",  label: `🔗 Реф. (${data.referrals.length})` },
+    { key: "trades",     label: "📋 Сделки" },
+    { key: "ai",         label: "🧠 ИИ" },
   ];
 
   return (
@@ -285,10 +285,10 @@ export default function AdminPage() {
         </div>
 
         {/* Табы */}
-        <div className="flex gap-1 border-b" style={{ borderColor: "var(--border)" }}>
+        <div className="flex flex-wrap gap-1 border-b" style={{ borderColor: "var(--border)" }}>
           {TABS.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as typeof activeTab)}
-              className="relative px-4 py-2 text-sm font-medium transition rounded-t-lg"
+              className="relative px-3 py-2 text-xs sm:text-sm font-medium transition rounded-t-lg"
               style={{
                 color: activeTab === t.key ? "white" : "var(--muted)",
                 background: activeTab === t.key ? "var(--card)" : "transparent",
