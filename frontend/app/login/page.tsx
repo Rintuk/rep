@@ -70,8 +70,26 @@ export default function LoginPage() {
 
           <button
             type="submit" disabled={loading}
-            className="w-full py-3 rounded-lg font-semibold text-white transition disabled:opacity-50"
-            style={{ background: "var(--accent)" }}
+            className="w-full py-3 rounded-lg font-semibold text-white disabled:opacity-50"
+            style={{
+              background: "linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)",
+              boxShadow: loading ? "none" : "0 6px 0 #1e3a8a, 0 8px 16px #1d4ed855",
+              transform: loading ? "translateY(4px)" : "translateY(0)",
+              transition: "transform 0.1s ease, box-shadow 0.1s ease",
+              textShadow: "0 1px 2px #00000066",
+            }}
+            onMouseDown={e => {
+              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(4px)";
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 0 #1e3a8a, 0 4px 8px #1d4ed855";
+            }}
+            onMouseUp={e => {
+              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 0 #1e3a8a, 0 8px 16px #1d4ed855";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 0 #1e3a8a, 0 8px 16px #1d4ed855";
+            }}
           >
             {loading ? "Вход..." : "Войти"}
           </button>
