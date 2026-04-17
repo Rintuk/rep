@@ -15,6 +15,14 @@ def verify_bot_key(x_api_key: str = Header(...)):
 
 @router.post("/bot-update", dependencies=[Depends(verify_bot_key)])
 async def bot_update(payload: BotUpdateIn, db: AsyncSession = Depends(get_db)):
+    import traceback as _tb
+    try:
+        return await _bot_update_impl(payload, db)
+    except Exception as e:
+        print(f"[bot-update ERROR] {e}\n{_tb.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     try:
         ts = datetime.fromisoformat(payload.timestamp.replace("Z", "+00:00"))
     except Exception:
