@@ -13,6 +13,7 @@ interface Dashboard {
   mode: string; hwm: number; drawdown_pct: number; server_online: boolean;
   last_updated: string | null;
   user_investment: number; user_pnl: number; user_pnl_pct: number;
+  ref_bonus: number;
   positions: Position[]; recent_trades: Trade[]; ai_feed: AIFeed[];
 }
 
@@ -184,7 +185,7 @@ export default function DashboardPage() {
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
 
         {/* Карточки */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className={`grid gap-4 ${data.ref_bonus > 0 ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2 md:grid-cols-4"}`}>
           {[
             {
               icon: <Wallet size={20} />,
@@ -209,15 +210,22 @@ export default function DashboardPage() {
             },
             {
               icon: data.user_pnl >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />,
-              label: "Ваш PnL",
+              label: "Чистый доход",
               value: data.user_investment > 0
                 ? `${data.user_pnl >= 0 ? "+" : ""}${data.user_pnl.toFixed(2)} $`
                 : `${data.drawdown_pct >= 0 ? "+" : ""}${data.drawdown_pct.toFixed(2)}%`,
               sub: data.user_investment > 0
-                ? `${data.user_pnl_pct >= 0 ? "+" : ""}${data.user_pnl_pct.toFixed(2)}%`
+                ? `${data.user_pnl_pct >= 0 ? "+" : ""}${data.user_pnl_pct.toFixed(2)}% (после комиссий)`
                 : "% пула",
               color: pnlColor
             },
+            ...(data.ref_bonus > 0 ? [{
+              icon: <TrendingUp size={20} />,
+              label: "Реферальный доход",
+              value: `+${data.ref_bonus.toFixed(2)} $`,
+              sub: "3% от прибыли рефералов",
+              color: "#f59e0b"
+            }] : []),
           ].map((c, i) => (
             <div key={i} className="rounded-xl p-4 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
               <div className="flex items-center gap-2 mb-2" style={{ color: c.color }}>

@@ -85,6 +85,7 @@ class DashboardOut(BaseModel):
     user_investment: float
     user_pnl: float
     user_pnl_pct: float
+    ref_bonus: float = 0.0
     positions: list[PositionOut]
     recent_trades: list[TradeOut]
     ai_feed: list[AIFeedOut]
