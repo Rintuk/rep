@@ -155,6 +155,32 @@ async def update_user_financials(
     return {"status": "ok"}
 
 
+@router.get("/admin/pool-history", dependencies=[Depends(get_admin_user)])
+async def admin_pool_history(db: AsyncSession = Depends(get_db)):
+    """История PnL пула — последние 100 снимков для графика."""
+    snaps = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.asc()).limit(100)
+    )).scalars().all()
+
+    result = []
+    for s in snaps:
+        positions = (await db.execute(
+            select(Position).where(Position.snapshot_id == s.id)
+        )).scalars().all()
+        pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
+        pool_total = round(s.balance_usdt + pool_positions, 2)
+        net_inv = s.net_invested if s.net_invested > 0 else (s.real_start_balance if s.real_start_balance > 0 else s.hwm)
+        pnl = round(pool_total - net_inv, 2) if net_inv > 0 else 0.0
+        pnl_pct = round((pnl / net_inv) * 100, 2) if net_inv > 0 else 0.0
+        result.append({
+            "ts": s.timestamp.strftime("%d.%m %H:%M"),
+            "pool_total": pool_total,
+            "pnl": pnl,
+            "pnl_pct": pnl_pct,
+        })
+    return result
+
+
 @router.get("/admin/overview", dependencies=[Depends(get_admin_user)])
 async def admin_overview(db: AsyncSession = Depends(get_db)):
     """Полный обзор для администратора."""

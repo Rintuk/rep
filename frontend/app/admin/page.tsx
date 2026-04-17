@@ -5,8 +5,11 @@ import React from "react";
 import {
   getAdminOverview, approveUser, rejectUser,
   updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword,
-  getAdminDeposits, approveDeposit, rejectDeposit
+  getAdminDeposits, approveDeposit, rejectDeposit, getAdminPoolHistory
 } from "@/lib/api";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
+} from "recharts";
 import { TrendingUp, TrendingDown, Wallet, Activity, Users, CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Trash2, Save } from "lucide-react";
 
 const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888" };
@@ -40,6 +43,7 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits">("overview");
   const [deposits, setDeposits] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
+  const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
 
   // Inline investor management
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -61,9 +65,10 @@ export default function AdminPage() {
 
   async function fetchData() {
     try {
-      const [d, dep] = await Promise.all([getAdminOverview(), getAdminDeposits()]);
+      const [d, dep, hist] = await Promise.all([getAdminOverview(), getAdminDeposits(), getAdminPoolHistory()]);
       setData(d);
       setDeposits(dep);
+      setPoolHistory(hist);
     } catch {
       setError("Нет доступа или ошибка загрузки");
     } finally {
@@ -303,6 +308,51 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
+
+        {/* График PnL пула */}
+        {activeTab === "overview" && poolHistory.length > 1 && (() => {
+          const lastPnl = poolHistory[poolHistory.length - 1]?.pnl ?? 0;
+          const chartColor = lastPnl >= 0 ? "#22c97a" : "#ff4d4d";
+          const minPnl = Math.min(...poolHistory.map(p => p.pnl));
+          const maxPnl = Math.max(...poolHistory.map(p => p.pnl));
+          return (
+            <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-white">📈 Доход от торговли (история)</h2>
+                <div className="flex items-center gap-3 text-sm">
+                  <span style={{ color: "var(--muted)" }}>Точек: {poolHistory.length}</span>
+                  <span className="font-semibold" style={{ color: chartColor }}>
+                    {lastPnl >= 0 ? "+" : ""}{lastPnl.toFixed(2)} $ ({poolHistory[poolHistory.length - 1]?.pnl_pct >= 0 ? "+" : ""}{poolHistory[poolHistory.length - 1]?.pnl_pct.toFixed(2)}%)
+                  </span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={poolHistory} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="pnlGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.25} />
+                      <stop offset="95%" stopColor={chartColor} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
+                  <XAxis dataKey="ts" tick={{ fill: "#6b6b8a", fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={Math.floor(poolHistory.length / 6)} />
+                  <YAxis tick={{ fill: "#6b6b8a", fontSize: 11 }} tickLine={false} axisLine={false}
+                    tickFormatter={v => `${v >= 0 ? "+" : ""}${v.toFixed(1)}$`}
+                    domain={[minPnl - Math.abs(minPnl) * 0.1, maxPnl + Math.abs(maxPnl) * 0.1]} />
+                  <Tooltip
+                    contentStyle={{ background: "#13132a", border: "1px solid #1e1e40", borderRadius: 8, fontSize: 12 }}
+                    labelStyle={{ color: "#6b6b8a" }}
+                    formatter={(v: number) => [`${v >= 0 ? "+" : ""}${v.toFixed(2)} $`, "PnL"]}
+                  />
+                  <ReferenceLine y={0} stroke="#ffffff20" strokeDasharray="4 4" />
+                  <Area type="monotone" dataKey="pnl" stroke={chartColor} strokeWidth={2}
+                    fill="url(#pnlGrad)" dot={false} activeDot={{ r: 4, fill: chartColor }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          );
+        })()}
 
         {/* Обзор — позиции */}
         {activeTab === "overview" && (

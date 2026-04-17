@@ -37,6 +37,11 @@ export async function getAdminOverview() {
   return res.data;
 }
 
+export async function getAdminPoolHistory() {
+  const res = await api.get("/auth/admin/pool-history");
+  return res.data as { ts: string; pool_total: number; pnl: number; pnl_pct: number }[];
+}
+
 export async function approveUser(id: string) {
   await api.post(`/auth/admin/approve/${id}`);
 }
