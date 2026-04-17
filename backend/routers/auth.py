@@ -231,13 +231,23 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
                 "investment": fin.investment_usdt if fin else 0.0,
             })
 
-    # ── Мой доход (17% от прибыли пула) ──────────────────────────
-    pool_pnl_pct_admin = 0.0
-    if snap and total_invested > 0:
+    # ── PnL пула (реальный = pool_total - net_invested) ──────────
+    pool_pnl_usdt = 0.0
+    pool_pnl_pct = 0.0
+    real_start = 0.0
+    net_invested_pool = 0.0
+    if snap:
+        # net_invested учитывает стартовый депозит + пополнения - снятия
+        net_invested_pool = snap.net_invested if snap.net_invested > 0 else (
+            snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        )
         real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        if real_start > 0:
-            pool_pnl_pct_admin = (pool_total - real_start) / real_start * 100
-    pool_profit = round(total_invested * (pool_pnl_pct_admin / 100), 2) if pool_pnl_pct_admin > 0 else 0.0
+        if net_invested_pool > 0:
+            pool_pnl_usdt = round(pool_total - net_invested_pool, 2)
+            pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 2)
+
+    # ── Расчётная прибыль инвесторов + доход админа ───────────────
+    pool_profit = round(total_invested * (pool_pnl_pct / 100), 2) if pool_pnl_pct != 0 else 0.0
     admin_income = round(pool_profit * 0.17, 2) if pool_profit > 0 else 0.0
 
     # ── Таблица инвесторов ────────────────────────────────────────
@@ -272,6 +282,10 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         "total_withdrawn": round(total_withdrawn, 2),
         "admin_income": admin_income,
         "pool_profit": round(pool_profit, 2),
+        "pool_pnl_usdt": pool_pnl_usdt,
+        "pool_pnl_pct": pool_pnl_pct,
+        "real_start_balance": round(real_start, 2),
+        "net_invested_pool": round(net_invested_pool, 2),
         "positions": positions,
         "trades": trades,
         "ai_feed": ai_feed,

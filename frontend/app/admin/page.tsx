@@ -17,6 +17,7 @@ interface Overview {
   investors_count: number; pending_count: number;
   total_invested: number; total_withdrawn: number;
   admin_income: number; pool_profit: number;
+  pool_pnl_usdt: number; pool_pnl_pct: number; real_start_balance: number; net_invested_pool: number;
   positions: { symbol: string; amount: number; avg_price: number; value: number }[];
   trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
   ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
@@ -271,7 +272,7 @@ export default function AdminPage() {
             { icon: <Wallet size={20} />, label: "Общий пул", value: `${data.pool_total.toFixed(2)} $`, sub: `свободно: ${data.pool_free.toFixed(2)} $`, color: "#4488dd" },
             { icon: <Activity size={20} />, label: "Пул в позициях", value: `${data.pool_positions_usdt.toFixed(2)} $`, sub: `вложено всего: ${data.total_invested.toFixed(2)} $`, color: "#9966ee" },
             { icon: <Users size={20} />, label: "Участников", value: `${data.investors_count}`, sub: `общие инвестиции: ${data.total_invested.toFixed(2)} $`, color: "#22c97a" },
-            { icon: data.admin_income >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />, label: "Мой доход (17%)", value: `${data.admin_income >= 0 ? "+" : ""}${data.admin_income.toFixed(2)} $`, sub: `прибыль пула: ${data.pool_profit >= 0 ? "+" : ""}${data.pool_profit.toFixed(2)} $`, color: incomeColor },
+            { icon: data.pool_pnl_usdt >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />, label: "Доход от торговли", value: `${data.pool_pnl_usdt >= 0 ? "+" : ""}${data.pool_pnl_usdt.toFixed(2)} $`, sub: `${data.pool_pnl_pct >= 0 ? "+" : ""}${data.pool_pnl_pct.toFixed(2)}% · мой доход: ${data.admin_income >= 0 ? "+" : ""}${data.admin_income.toFixed(2)} $`, color: data.pool_pnl_usdt >= 0 ? "#22c97a" : "#ff4d4d" },
           ].map((c, i) => (
             <div key={i} className="rounded-xl p-4 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
               <div className="flex items-center gap-2 mb-2" style={{ color: c.color }}>
@@ -332,7 +333,10 @@ export default function AdminPage() {
                   { label: "В позициях", value: `${data.pool_positions_usdt.toFixed(2)} $` },
                   { label: "HWM (пик)", value: `${data.hwm.toFixed(2)} $` },
                   { label: "Изменение от HWM", value: `${data.drawdown_pct >= 0 ? "+" : ""}${data.drawdown_pct.toFixed(2)}%`, color: pnlColor },
-                  { label: "Прибыль пула", value: `${data.pool_profit >= 0 ? "+" : ""}${data.pool_profit.toFixed(2)} $`, color: data.pool_profit >= 0 ? "#22c97a" : "#ff4d4d" },
+                  { label: "Стартовый депозит", value: `${data.real_start_balance.toFixed(2)} $` },
+                  { label: "Чистый вклад (с пополн.)", value: `${data.net_invested_pool.toFixed(2)} $` },
+                  { label: "Доход от торговли", value: `${data.pool_pnl_usdt >= 0 ? "+" : ""}${data.pool_pnl_usdt.toFixed(2)} $ (${data.pool_pnl_pct >= 0 ? "+" : ""}${data.pool_pnl_pct.toFixed(2)}%)`, color: data.pool_pnl_usdt >= 0 ? "#22c97a" : "#ff4d4d" },
+                  { label: "Расч. прибыль инвесторов", value: `${data.pool_profit >= 0 ? "+" : ""}${data.pool_profit.toFixed(2)} $`, color: data.pool_profit >= 0 ? "#4488dd" : "#ff4d4d" },
                   { label: "Мой доход (17%)", value: `${data.admin_income >= 0 ? "+" : ""}${data.admin_income.toFixed(2)} $`, color: incomeColor },
                 ].map((r, i) => (
                   <div key={i} className="flex justify-between items-center">

@@ -102,6 +102,7 @@ class BotSnapshot(Base):
     hwm:                Mapped[float] = mapped_column(Float)
     drawdown_pct:       Mapped[float] = mapped_column(Float)
     real_start_balance: Mapped[float] = mapped_column(Float, default=0.0)
+    net_invested:       Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
 
     positions:    Mapped[list["Position"]] = relationship("Position", back_populates="snapshot", cascade="all, delete-orphan")
     trades:       Mapped[list["Trade"]]    = relationship("Trade",    back_populates="snapshot", cascade="all, delete-orphan")
