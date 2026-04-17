@@ -81,7 +81,11 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
 
         for va in virtual_accounts:
             if va.start_real_total <= 0:
-                continue  # точка отсчёта не зафиксирована — пропускаем
+                # Точка отсчёта не зафиксирована — фиксируем сейчас
+                va.start_real_total = real_total_now
+                va.start_balance = va.balance_usdt if va.balance_usdt > 0 else va.start_balance
+                va.updated_at = datetime.utcnow()
+                continue
 
             # Пропорциональный расчёт: демо растёт/падает так же как реальный пул
             ratio = real_total_now / va.start_real_total
