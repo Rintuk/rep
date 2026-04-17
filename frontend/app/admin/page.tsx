@@ -65,14 +65,20 @@ export default function AdminPage() {
 
   async function fetchData() {
     try {
-      const [d, dep, hist] = await Promise.all([getAdminOverview(), getAdminDeposits(), getAdminPoolHistory()]);
+      const [d, dep] = await Promise.all([getAdminOverview(), getAdminDeposits()]);
       setData(d);
       setDeposits(dep);
-      setPoolHistory(hist);
     } catch {
       setError("Нет доступа или ошибка загрузки");
     } finally {
       setLoading(false);
+    }
+    // График грузим отдельно — его ошибка не должна ломать остальное
+    try {
+      const hist = await getAdminPoolHistory();
+      setPoolHistory(hist);
+    } catch {
+      // график недоступен — не критично
     }
   }
 
@@ -223,7 +229,15 @@ export default function AdminPage() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {pendingDeposits > 0 && (
+            <button onClick={() => setActiveTab("deposits")}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg font-semibold transition hover:opacity-80"
+              style={{ background: "#1a1200", border: "1px solid #f59e0b55", color: "#f59e0b" }}>
+              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse inline-block" />
+              <span>{pendingDeposits} заявк{pendingDeposits === 1 ? "а" : pendingDeposits < 5 ? "и" : ""}</span>
+            </button>
+          )}
           <button onClick={fetchData} className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
             style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
             <RefreshCw size={13} /><span className="hidden sm:inline">Обновить</span>
@@ -294,7 +308,7 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-1 border-b" style={{ borderColor: "var(--border)" }}>
           {TABS.map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key as typeof activeTab)}
-              className="relative px-3 py-2 text-xs sm:text-sm font-medium transition rounded-t-lg"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium transition rounded-t-lg"
               style={{
                 color: activeTab === t.key ? "white" : "var(--muted)",
                 background: activeTab === t.key ? "var(--card)" : "transparent",
@@ -302,7 +316,7 @@ export default function AdminPage() {
               }}>
               {t.label}
               {"badge" in t && (t.badge ?? 0) > 0 && (
-                <span className="absolute -top-1 -right-1 text-xs w-4 h-4 rounded-full flex items-center justify-center font-bold"
+                <span className="text-xs min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center font-bold"
                   style={{ background: "#f59e0b", color: "#000" }}>{t.badge}</span>
               )}
             </button>
