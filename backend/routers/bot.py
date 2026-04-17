@@ -50,7 +50,8 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     await db.flush()
 
     for p in payload.positions:
-        db.add(Position(snapshot_id=snapshot.id, symbol=p.symbol, amount=p.amount, avg_price=p.avg_price))
+        db.add(Position(snapshot_id=snapshot.id, symbol=p.symbol, amount=p.amount,
+                        avg_price=p.avg_price, current_price=p.current_price if p.current_price > 0 else p.avg_price))
 
     new_real_trades = []
     for t in payload.recent_trades:

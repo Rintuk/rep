@@ -58,7 +58,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         select(AIFeedEntry).order_by(AIFeedEntry.timestamp.desc()).limit(20)
     )).scalars().all()
 
-    pool_positions_usdt = sum(p.amount * p.avg_price for p in positions)
+    pool_positions_usdt = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
     pool_total_usdt = snap.balance_usdt + pool_positions_usdt
 
     server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)

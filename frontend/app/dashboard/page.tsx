@@ -5,7 +5,7 @@ import { getDashboard, createDepositRequest, getMyDeposits } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
-interface Position { symbol: string; amount: number; avg_price: number; }
+interface Position { symbol: string; amount: number; avg_price: number; current_price?: number; }
 interface Trade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }
 interface AIFeed { timestamp: string; action: string; symbol: string; reason: string; }
 interface Dashboard {
@@ -251,8 +251,13 @@ export default function DashboardPage() {
                     <div className="text-right">
                       <p className="text-sm text-white">{p.amount.toFixed(6)}</p>
                       <p className="text-xs" style={{ color: "var(--muted)" }}>
-                        avg ${p.avg_price.toFixed(4)} · {(p.amount * p.avg_price).toFixed(2)} $
+                        avg ${p.avg_price.toFixed(4)} · {(p.amount * (p.current_price || p.avg_price)).toFixed(2)} $
                       </p>
+                      {p.current_price && p.current_price !== p.avg_price && (
+                        <p className="text-xs" style={{ color: p.current_price >= p.avg_price ? "#22c97a" : "#ff4d4d" }}>
+                          тек. ${p.current_price.toFixed(4)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}

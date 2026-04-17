@@ -7,6 +7,7 @@ class PositionIn(BaseModel):
     symbol: str
     amount: float
     avg_price: float
+    current_price: float = 0.0
 
 class TradeIn(BaseModel):
     symbol: str
@@ -56,6 +57,7 @@ class PositionOut(BaseModel):
     symbol: str
     amount: float
     avg_price: float
+    current_price: float = 0.0
 
 class TradeOut(BaseModel):
     symbol: str

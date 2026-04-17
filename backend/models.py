@@ -111,11 +111,12 @@ class BotSnapshot(Base):
 class Position(Base):
     __tablename__ = "positions"
 
-    id:          Mapped[str]   = mapped_column(String, primary_key=True, default=gen_uuid)
-    snapshot_id: Mapped[str]   = mapped_column(String, ForeignKey("bot_snapshots.id"))
-    symbol:      Mapped[str]   = mapped_column(String)
-    amount:      Mapped[float] = mapped_column(Float)
-    avg_price:   Mapped[float] = mapped_column(Float)
+    id:            Mapped[str]   = mapped_column(String, primary_key=True, default=gen_uuid)
+    snapshot_id:   Mapped[str]   = mapped_column(String, ForeignKey("bot_snapshots.id"))
+    symbol:        Mapped[str]   = mapped_column(String)
+    amount:        Mapped[float] = mapped_column(Float)
+    avg_price:     Mapped[float] = mapped_column(Float)
+    current_price: Mapped[float] = mapped_column(Float, default=0.0)
 
     snapshot: Mapped["BotSnapshot"] = relationship("BotSnapshot", back_populates="positions")
 
