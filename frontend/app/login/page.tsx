@@ -38,29 +38,31 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Email</label>
-            <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)} required
-              className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition"
-              style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
-              placeholder="investor@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Пароль</label>
-            <div className="relative">
+          <div className="rounded-xl p-4 space-y-4" style={{ background: "#07071299", boxShadow: "0 0 0 1px #ffffff0d, 0 4px 24px #00000066" }}>
+            <div>
+              <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Email</label>
               <input
-                type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required
-                className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition pr-11"
+                type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition"
                 style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
-                placeholder="••••••••"
+                placeholder="investor@example.com"
               />
-              <button type="button" onClick={() => setShowPassword(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 transition hover:opacity-80"
-                style={{ color: "var(--muted)" }}>
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+            </div>
+            <div>
+              <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Пароль</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required
+                  className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition pr-11"
+                  style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
+                  placeholder="••••••••"
+                />
+                <button type="button" onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 transition hover:opacity-80"
+                  style={{ color: "var(--muted)" }}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
           </div>
 
