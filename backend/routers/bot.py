@@ -46,6 +46,16 @@ async def bot_update(payload: BotUpdateIn, db: AsyncSession = Depends(get_db)):
 
     new_real_trades = []
     for t in payload.recent_trades:
+        already = (await db.execute(
+            select(Trade).where(and_(
+                Trade.symbol == t.symbol,
+                Trade.action == t.action,
+                Trade.timestamp == t.timestamp,
+                Trade.price == t.price,
+            ))
+        )).scalar_one_or_none()
+        if already:
+            continue
         db.add(Trade(snapshot_id=snapshot.id, symbol=t.symbol, action=t.action,
                      amount=t.amount, price=t.price, pnl=t.pnl, timestamp=t.timestamp))
         new_real_trades.append(t)

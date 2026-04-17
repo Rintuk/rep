@@ -182,11 +182,19 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         positions = [{"symbol": p.symbol, "amount": p.amount, "avg_price": p.avg_price,
                       "value": round(p.amount * p.avg_price, 2)} for p in snap_positions]
 
-        trades_rows = (await db.execute(
-            select(Trade).order_by(Trade.timestamp.desc()).limit(30)
+        all_trade_rows = (await db.execute(
+            select(Trade).order_by(Trade.timestamp.desc()).limit(500)
         )).scalars().all()
-        trades = [{"symbol": t.symbol, "action": t.action, "amount": t.amount,
-                   "price": t.price, "pnl": t.pnl, "timestamp": t.timestamp} for t in trades_rows]
+        seen_trades = set()
+        trades = []
+        for t in all_trade_rows:
+            key = (t.symbol, t.action, t.timestamp, t.price)
+            if key not in seen_trades:
+                seen_trades.add(key)
+                trades.append({"symbol": t.symbol, "action": t.action, "amount": t.amount,
+                                "price": t.price, "pnl": t.pnl, "timestamp": t.timestamp})
+            if len(trades) >= 30:
+                break
 
         ai_rows = (await db.execute(
             select(AIFeedEntry).order_by(AIFeedEntry.timestamp.desc()).limit(10)

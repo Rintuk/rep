@@ -39,9 +39,20 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         select(Position).where(Position.snapshot_id == snap.id)
     )).scalars().all()
 
-    trades = (await db.execute(
-        select(Trade).order_by(Trade.timestamp.desc()).limit(15)
+    from sqlalchemy import distinct, func
+    # Дедупликация: берём уникальные сделки по (symbol, action, timestamp, price)
+    seen = set()
+    all_trades = (await db.execute(
+        select(Trade).order_by(Trade.timestamp.desc()).limit(200)
     )).scalars().all()
+    trades = []
+    for t in all_trades:
+        key = (t.symbol, t.action, t.timestamp, t.price)
+        if key not in seen:
+            seen.add(key)
+            trades.append(t)
+        if len(trades) >= 15:
+            break
 
     ai_feed = (await db.execute(
         select(AIFeedEntry).order_by(AIFeedEntry.timestamp.desc()).limit(20)
