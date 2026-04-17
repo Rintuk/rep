@@ -231,7 +231,12 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             })
 
     # ── Мой доход (17% от прибыли пула) ──────────────────────────
-    pool_profit = pool_total - total_invested if total_invested > 0 else 0.0
+    pool_pnl_pct_admin = 0.0
+    if snap and total_invested > 0:
+        real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        if real_start > 0:
+            pool_pnl_pct_admin = (pool_total - real_start) / real_start * 100
+    pool_profit = round(total_invested * (pool_pnl_pct_admin / 100), 2) if pool_pnl_pct_admin > 0 else 0.0
     admin_income = round(pool_profit * 0.17, 2) if pool_profit > 0 else 0.0
 
     # ── Таблица инвесторов ────────────────────────────────────────
