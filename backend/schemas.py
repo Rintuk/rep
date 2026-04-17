@@ -32,6 +32,7 @@ class BotUpdateIn(BaseModel):
     mode: str = "NORMAL"
     hwm: float = 0.0
     drawdown_pct: float = 0.0
+    real_start_balance: float = 0.0
 
 
 # ── Авторизация ────────────────────────────────────────────────

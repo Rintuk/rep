@@ -36,6 +36,7 @@ async def bot_update(payload: BotUpdateIn, db: AsyncSession = Depends(get_db)):
         mode=payload.mode,
         hwm=payload.hwm,
         drawdown_pct=payload.drawdown_pct,
+        real_start_balance=payload.real_start_balance,
     )
     db.add(snapshot)
     await db.flush()

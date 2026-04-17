@@ -49,9 +49,16 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     # Сервер онлайн если последний снимок не старше 30 минут
     server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
 
-    # PnL пользователя: пропорционально drawdown_pct бота
-    user_pnl = round(user_investment * (snap.drawdown_pct / 100), 2) if user_investment > 0 else 0.0
-    user_pnl_pct = round(snap.drawdown_pct, 2)
+    # PnL пула: (текущий пул - стартовый баланс бота) / стартовый баланс
+    real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+    if real_start > 0:
+        pool_pnl_pct = round((pool_total_usdt - real_start) / real_start * 100, 2)
+    else:
+        pool_pnl_pct = round(snap.drawdown_pct, 2)
+
+    # PnL инвестора пропорционально росту пула
+    user_pnl = round(user_investment * (pool_pnl_pct / 100), 2) if user_investment > 0 else 0.0
+    user_pnl_pct = pool_pnl_pct
 
     return DashboardOut(
         balance_usdt=snap.balance_usdt,

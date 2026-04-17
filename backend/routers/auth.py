@@ -232,10 +232,12 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         fin = fins_map.get(u.id)
         inv = fin.investment_usdt if fin else 0.0
         refs_count = sum(1 for x in all_users if x.referred_by == u.id)
-        # PnL пропорционально drawdown бота
+        # PnL пропорционально реальному росту пула от стартового баланса
         pnl = 0.0
         if inv > 0 and snap:
-            pnl = round(inv * (snap.drawdown_pct / 100), 2)
+            real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+            pool_pnl_pct = ((pool_total - real_start) / real_start * 100) if real_start > 0 else snap.drawdown_pct
+            pnl = round(inv * (pool_pnl_pct / 100), 2)
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,

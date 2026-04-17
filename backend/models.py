@@ -94,13 +94,14 @@ class BotSnapshot(Base):
     """Снимок состояния бота — сохраняется каждый цикл сканирования."""
     __tablename__ = "bot_snapshots"
 
-    id:           Mapped[str]   = mapped_column(String, primary_key=True, default=gen_uuid)
-    bot_id:       Mapped[str]   = mapped_column(String, index=True)
-    timestamp:    Mapped[datetime] = mapped_column(DateTime, index=True)
-    balance_usdt: Mapped[float] = mapped_column(Float)
-    mode:         Mapped[str]   = mapped_column(String)
-    hwm:          Mapped[float] = mapped_column(Float)
-    drawdown_pct: Mapped[float] = mapped_column(Float)
+    id:                 Mapped[str]   = mapped_column(String, primary_key=True, default=gen_uuid)
+    bot_id:             Mapped[str]   = mapped_column(String, index=True)
+    timestamp:          Mapped[datetime] = mapped_column(DateTime, index=True)
+    balance_usdt:       Mapped[float] = mapped_column(Float)
+    mode:               Mapped[str]   = mapped_column(String)
+    hwm:                Mapped[float] = mapped_column(Float)
+    drawdown_pct:       Mapped[float] = mapped_column(Float)
+    real_start_balance: Mapped[float] = mapped_column(Float, default=0.0)
 
     positions:    Mapped[list["Position"]] = relationship("Position", back_populates="snapshot", cascade="all, delete-orphan")
     trades:       Mapped[list["Trade"]]    = relationship("Trade",    back_populates="snapshot", cascade="all, delete-orphan")
