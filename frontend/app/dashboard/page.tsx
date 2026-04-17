@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDashboard, createDepositRequest, getMyDeposits } from "@/lib/api";
-import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 interface Position { symbol: string; amount: number; avg_price: number; }
@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [depositDone, setDepositDone] = useState(false);
   const [myDeposits, setMyDeposits] = useState<{id:string;amount:number;status:string;created_at:string}[]>([]);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -119,40 +120,64 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Переключатель Реал / Демо */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-white hidden sm:inline">Реал</span>
-            <button
-              onClick={() => router.push("/demo")}
-              className="relative w-12 h-6 rounded-full transition-colors"
-              style={{ background: "#2a2a2a", border: "1px solid #444" }}
-              title="Перейти в Демо счёт"
-            >
-              <span className="absolute left-1 top-1 w-4 h-4 rounded-full transition-transform"
-                style={{ background: "#666", transform: "translateX(0)" }} />
-            </button>
-            <span className="text-xs font-semibold hidden sm:inline" style={{ color: "var(--muted)" }}>Демо</span>
-          </div>
+        {/* Шестерёнка — меню */}
+        <div className="relative">
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            className="p-2 rounded-lg border transition hover:opacity-80"
+            style={{ borderColor: menuOpen ? "#4488dd" : "var(--border)", color: menuOpen ? "#4488dd" : "var(--muted)" }}>
+            <Settings size={20} />
+          </button>
 
-          <button onClick={() => { setShowDeposit(true); setDepositDone(false); }}
-            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
-            style={{ borderColor: "#22c97a55", color: "#22c97a" }}>
-            <PlusCircle size={14} />
-            <span className="hidden sm:inline">Пополнить</span>
-          </button>
-          <button onClick={copyRefLink}
-            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
-            style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-            <Copy size={14} />
-            <span className="hidden sm:inline">{copied ? "Скопировано!" : "Реф. ссылка"}</span>
-          </button>
-          <button onClick={logout}
-            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition hover:opacity-80"
-            style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-            <LogOut size={14} />
-            <span className="hidden sm:inline">Выйти</span>
-          </button>
+          {menuOpen && (
+            <>
+              {/* Оверлей для закрытия по клику вне */}
+              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-11 z-50 w-56 rounded-xl border shadow-xl overflow-hidden"
+                style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+
+                {/* Реал / Демо */}
+                <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
+                  <span className="text-sm text-white">Режим</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-white">Реал</span>
+                    <button
+                      onClick={() => { setMenuOpen(false); router.push("/demo"); }}
+                      className="relative w-11 h-6 rounded-full"
+                      style={{ background: "#2a2a2a", border: "1px solid #444" }}>
+                      <span className="absolute left-1 top-1 w-4 h-4 rounded-full"
+                        style={{ background: "#666" }} />
+                    </button>
+                    <span className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Демо</span>
+                  </div>
+                </div>
+
+                {/* Пополнить */}
+                <button
+                  onClick={() => { setMenuOpen(false); setShowDeposit(true); setDepositDone(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5 border-b"
+                  style={{ borderColor: "var(--border)", color: "#22c97a" }}>
+                  <PlusCircle size={16} /> Пополнить счёт
+                </button>
+
+                {/* Реферальная ссылка */}
+                <button
+                  onClick={() => { setMenuOpen(false); copyRefLink(); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5 border-b"
+                  style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+                  <Copy size={16} /> {copied ? "Скопировано!" : "Реф. ссылка"}
+                </button>
+
+                {/* Выйти */}
+                <button
+                  onClick={() => { setMenuOpen(false); logout(); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5"
+                  style={{ color: "#ff4d4d" }}>
+                  <LogOut size={16} /> Выйти
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
