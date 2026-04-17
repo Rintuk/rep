@@ -357,7 +357,7 @@ export default function AdminPage() {
                   <Tooltip
                     contentStyle={{ background: "#13132a", border: "1px solid #1e1e40", borderRadius: 8, fontSize: 12 }}
                     labelStyle={{ color: "#6b6b8a" }}
-                    formatter={(v: number) => [`${v >= 0 ? "+" : ""}${v.toFixed(2)} $`, "PnL"]}
+                    formatter={(v) => { const n = Number(v); return [`${n >= 0 ? "+" : ""}${n.toFixed(2)} $`, "PnL"]; }}
                   />
                   <ReferenceLine y={0} stroke="#ffffff20" strokeDasharray="4 4" />
                   <Area type="monotone" dataKey="pnl" stroke={chartColor} strokeWidth={2}
