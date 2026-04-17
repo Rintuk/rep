@@ -157,20 +157,33 @@ async def update_user_financials(
 
 @router.get("/admin/pool-history", dependencies=[Depends(get_admin_user)])
 async def admin_pool_history(db: AsyncSession = Depends(get_db)):
-    """История PnL пула — последние 100 снимков для графика."""
+    """История PnL пула — последние 100 снимков для графика.
+    Считается только с того момента когда бот имеет валидный real_start_balance.
+    PnL = pool_total - net_invested (база фиксируется по первому валидному снимку).
+    """
     snaps = (await db.execute(
         select(BotSnapshot).order_by(BotSnapshot.timestamp.asc()).limit(100)
     )).scalars().all()
 
+    # Берём только снимки с валидным стартовым балансом
+    valid_snaps = [s for s in snaps if s.real_start_balance > 0]
+    if not valid_snaps:
+        return []
+
+    # База — net_invested из первого валидного снимка (или real_start_balance)
+    base_snap = valid_snaps[0]
+    base_inv = base_snap.net_invested if base_snap.net_invested > 0 else base_snap.real_start_balance
+
     result = []
-    for s in snaps:
+    for s in valid_snaps:
         positions = (await db.execute(
             select(Position).where(Position.snapshot_id == s.id)
         )).scalars().all()
         pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
         pool_total = round(s.balance_usdt + pool_positions, 2)
-        net_inv = s.net_invested if s.net_invested > 0 else (s.real_start_balance if s.real_start_balance > 0 else s.hwm)
-        pnl = round(pool_total - net_inv, 2) if net_inv > 0 else 0.0
+        # net_invested из снимка если есть, иначе из базы
+        net_inv = s.net_invested if s.net_invested > 0 else base_inv
+        pnl = round(pool_total - net_inv, 2)
         pnl_pct = round((pnl / net_inv) * 100, 2) if net_inv > 0 else 0.0
         result.append({
             "ts": s.timestamp.strftime("%d.%m %H:%M"),
