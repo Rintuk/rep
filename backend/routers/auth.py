@@ -170,18 +170,21 @@ async def admin_pool_history(db: AsyncSession = Depends(get_db)):
     if not valid_snaps:
         return []
 
-    # База — net_invested из первого валидного снимка (или real_start_balance)
-    base_snap = valid_snaps[0]
-    base_inv = base_snap.net_invested if base_snap.net_invested > 0 else base_snap.real_start_balance
+    # Актуальный стартовый баланс — из последнего снимка
+    latest = valid_snaps[-1]
+    current_start = latest.real_start_balance
+    base_inv = latest.net_invested if latest.net_invested > 0 else current_start
+
+    # Только снимки с тем же real_start_balance (одна сессия бота)
+    session_snaps = [s for s in valid_snaps if abs(s.real_start_balance - current_start) < 0.01]
 
     result = []
-    for s in valid_snaps:
+    for s in session_snaps:
         positions = (await db.execute(
             select(Position).where(Position.snapshot_id == s.id)
         )).scalars().all()
         pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
         pool_total = round(s.balance_usdt + pool_positions, 2)
-        # net_invested из снимка если есть, иначе из базы
         net_inv = s.net_invested if s.net_invested > 0 else base_inv
         pnl = round(pool_total - net_inv, 2)
         pnl_pct = round((pnl / net_inv) * 100, 2) if net_inv > 0 else 0.0
