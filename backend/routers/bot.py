@@ -61,7 +61,7 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                 Trade.timestamp == t.timestamp,
                 Trade.price == t.price,
             ))
-        )).scalar_one_or_none()
+        )).scalars().first()
         if already:
             continue
         db.add(Trade(snapshot_id=snapshot.id, symbol=t.symbol, action=t.action,
@@ -98,7 +98,7 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                         VirtualTrade.timestamp == t.timestamp,
                         VirtualTrade.price == t.price,
                     ))
-                )).scalar_one_or_none()
+                )).scalars().first()
                 if exists:
                     continue
                 db.add(VirtualTrade(
