@@ -170,24 +170,40 @@ async def admin_pool_history(db: AsyncSession = Depends(get_db)):
     if not valid_snaps:
         return []
 
-    # Актуальный стартовый баланс — из последнего снимка
+    # Используем последний снимок как эталон net_invested
     latest = valid_snaps[-1]
-    current_start = latest.real_start_balance
-    base_inv = latest.net_invested if latest.net_invested > 0 else current_start
+    net_inv = latest.net_invested if latest.net_invested > 0 else latest.real_start_balance
 
-    # Только снимки с тем же real_start_balance (одна сессия бота)
-    session_snaps = [s for s in valid_snaps if abs(s.real_start_balance - current_start) < 0.01]
-
-    result = []
-    for s in session_snaps:
+    # Считаем pool_total для каждого снимка
+    pool_totals = []
+    for s in valid_snaps:
         positions = (await db.execute(
             select(Position).where(Position.snapshot_id == s.id)
         )).scalars().all()
         pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
-        pool_total = round(s.balance_usdt + pool_positions, 2)
-        net_inv = s.net_invested if s.net_invested > 0 else base_inv
-        pnl = round(pool_total - net_inv, 2)
-        pnl_pct = round((pnl / net_inv) * 100, 2) if net_inv > 0 else 0.0
+        pool_totals.append((s, round(s.balance_usdt + pool_positions, 2)))
+
+    # База = net_invested из последнего снимка (самый актуальный)
+    # Первая точка графика = pool_total первого снимка - net_inv (может быть != 0)
+    # Но нормализуем: если первая точка аномально далека от net_inv — сдвигаем базу
+    first_pool = pool_totals[0][1] if pool_totals else net_inv
+    last_pool = pool_totals[-1][1] if pool_totals else net_inv
+    last_pnl = round(last_pool - net_inv, 2)
+
+    # Если первая точка отличается от последней более чем в 3 раза — аномалия,
+    # используем net_inv как базу только для последних снимков (где net_invested заполнен)
+    valid_session = [
+        (s, pt) for s, pt in pool_totals
+        if s.net_invested > 0 or abs(pt - net_inv) < net_inv * 2
+    ]
+    if not valid_session:
+        valid_session = pool_totals[-20:]  # fallback: последние 20
+
+    result = []
+    for s, pool_total in valid_session:
+        snap_net_inv = s.net_invested if s.net_invested > 0 else net_inv
+        pnl = round(pool_total - snap_net_inv, 2)
+        pnl_pct = round((pnl / snap_net_inv) * 100, 2) if snap_net_inv > 0 else 0.0
         result.append({
             "ts": s.timestamp.strftime("%d.%m %H:%M"),
             "pool_total": pool_total,
