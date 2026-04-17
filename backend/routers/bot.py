@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from datetime import datetime
 from config import settings
 from database import get_db
@@ -69,9 +69,20 @@ async def bot_update(payload: BotUpdateIn, db: AsyncSession = Depends(get_db)):
             va.balance_usdt = round(va.start_balance * ratio, 4)
             va.updated_at = datetime.utcnow()
 
-            # Зеркалим все новые сделки (масштаб по виртуальному балансу)
+            # Зеркалим только новые сделки (дедупликация по timestamp+symbol+action+price)
             scale = va.start_balance / va.start_real_total
             for t in new_real_trades:
+                exists = (await db.execute(
+                    select(VirtualTrade).where(and_(
+                        VirtualTrade.user_id == va.user_id,
+                        VirtualTrade.symbol == t.symbol,
+                        VirtualTrade.action == t.action,
+                        VirtualTrade.timestamp == t.timestamp,
+                        VirtualTrade.price == t.price,
+                    ))
+                )).scalar_one_or_none()
+                if exists:
+                    continue
                 db.add(VirtualTrade(
                     user_id=va.user_id,
                     symbol=t.symbol,
