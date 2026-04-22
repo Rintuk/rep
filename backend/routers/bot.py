@@ -33,8 +33,11 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
 
-    # Реальный итог текущего снимка
-    real_total_now = payload.balance_usdt + sum(p.amount * p.avg_price for p in payload.positions)
+    # Реальный итог текущего снимка (current_price как на дашборде, fallback avg_price)
+    real_total_now = payload.balance_usdt + sum(
+        p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
+        for p in payload.positions
+    )
 
     # Сохраняем снимок
     snapshot = BotSnapshot(
