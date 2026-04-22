@@ -74,6 +74,11 @@ class AIFeedOut(BaseModel):
     symbol: str
     reason: str
 
+class ReferralInfo(BaseModel):
+    email: str          # замаскированный email
+    investment_usdt: float
+    bonus_usdt: float   # сколько реферер зарабатывает с этого человека
+
 class DashboardOut(BaseModel):
     # Пул (весь бот)
     balance_usdt: float
@@ -89,6 +94,8 @@ class DashboardOut(BaseModel):
     user_pnl: float
     user_pnl_pct: float
     ref_bonus: float = 0.0
+    referral_code: str = ""
+    referrals: list[ReferralInfo] = []
     positions: list[PositionOut]
     recent_trades: list[TradeOut]
     ai_feed: list[AIFeedOut]

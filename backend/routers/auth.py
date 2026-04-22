@@ -247,11 +247,6 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     total_invested = sum(fins_map[u.id].investment_usdt for u in investors if u.id in fins_map)
     total_withdrawn = sum(fins_map[u.id].withdrawal_usdt for u in investors if u.id in fins_map)
 
-    # ── Рефералы L1 и L2 ─────────────────────────────────────────
-    investor_ids = {u.id for u in investors}
-    l1_users = [u for u in all_users if u.referred_by in investor_ids or
-                (u.referred_by and any(a.id == u.referred_by for a in all_users if not a.is_admin))]
-
     # Строим дерево рефералов
     referrals_l1 = []
     for u in all_users:
@@ -281,7 +276,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
 
     # ── Расчётная прибыль инвесторов + доход админа ───────────────
     pool_profit = round(total_invested * (pool_pnl_pct / 100), 2) if pool_pnl_pct != 0 else 0.0
-    admin_income = round(pool_profit * 0.17, 2) if pool_profit > 0 else 0.0
+    admin_income = round(pool_profit * 0.20, 2) if pool_profit > 0 else 0.0
 
     # ── Таблица инвесторов ────────────────────────────────────────
     investors_table = []
@@ -289,12 +284,12 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         fin = fins_map.get(u.id)
         inv = fin.investment_usdt if fin else 0.0
         refs_count = sum(1 for x in all_users if x.referred_by == u.id)
-        # PnL пропорционально реальному росту пула от стартового баланса
+        # Gross PnL инвестора пропорционально росту пула
         pnl = 0.0
         if inv > 0 and snap:
-            real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-            pool_pnl_pct = ((pool_total - real_start) / real_start * 100) if real_start > 0 else snap.drawdown_pct
-            pnl = round(inv * (pool_pnl_pct / 100), 2)
+            _rs = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+            _pct = (((pool_total - _rs) / _rs) * 100) if _rs > 0 else snap.drawdown_pct
+            pnl = round(inv * (_pct / 100), 2)
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,

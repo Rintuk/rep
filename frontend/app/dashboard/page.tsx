@@ -8,12 +8,15 @@ import { QRCodeSVG } from "qrcode.react";
 interface Position { symbol: string; amount: number; avg_price: number; current_price?: number; }
 interface Trade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }
 interface AIFeed { timestamp: string; action: string; symbol: string; reason: string; }
+interface ReferralInfo { email: string; investment_usdt: number; bonus_usdt: number; }
 interface Dashboard {
   balance_usdt: number; pool_total_usdt: number; pool_positions_usdt: number;
   mode: string; hwm: number; drawdown_pct: number; server_online: boolean;
   last_updated: string | null;
   user_investment: number; user_pnl: number; user_pnl_pct: number;
   ref_bonus: number;
+  referral_code: string;
+  referrals: ReferralInfo[];
   positions: Position[]; recent_trades: Trade[]; ai_feed: AIFeed[];
 }
 
@@ -37,10 +40,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      setReferralCode(payload.sub || "");
-    } catch {}
     fetchData();
     getMyDeposits().then(setMyDeposits).catch(() => {});
     const interval = setInterval(fetchData, 60000);
@@ -51,6 +50,7 @@ export default function DashboardPage() {
     try {
       const d = await getDashboard();
       setData(d);
+      if (d.referral_code) setReferralCode(d.referral_code);
     } catch {
       setError("Ошибка загрузки. Возможно сессия истекла.");
     }
@@ -237,6 +237,50 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* Рефералы */}
+        {data.referrals.length > 0 && (
+          <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+            <h2 className="font-semibold text-white mb-1">👥 Мои рефералы</h2>
+            <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
+              Вы получаете 3% от прибыли каждого приглашённого
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ color: "var(--muted)" }}>
+                    <th className="text-left pb-2 font-normal">Email</th>
+                    <th className="text-right pb-2 font-normal">Инвестиция</th>
+                    <th className="text-right pb-2 font-normal">Ваш бонус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.referrals.map((r, i) => (
+                    <tr key={i} className="border-t" style={{ borderColor: "var(--border)" }}>
+                      <td className="py-2 text-white">{r.email}</td>
+                      <td className="py-2 text-right text-white">
+                        {r.investment_usdt > 0 ? `${r.investment_usdt.toFixed(2)} $` : "—"}
+                      </td>
+                      <td className="py-2 text-right font-semibold" style={{ color: r.bonus_usdt > 0 ? "#f59e0b" : "var(--muted)" }}>
+                        {r.bonus_usdt > 0 ? `+${r.bonus_usdt.toFixed(2)} $` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {data.ref_bonus > 0 && (
+                  <tfoot>
+                    <tr className="border-t" style={{ borderColor: "var(--border)" }}>
+                      <td colSpan={2} className="pt-2 text-sm" style={{ color: "var(--muted)" }}>Итого бонус</td>
+                      <td className="pt-2 text-right font-bold" style={{ color: "#f59e0b" }}>
+                        +{data.ref_bonus.toFixed(2)} $
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Открытые позиции */}

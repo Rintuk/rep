@@ -4,14 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
 from models import BotSnapshot, Position, Trade, AIFeedEntry, UserFinancials, User
-from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut
+from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo
 from security import get_current_user
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
-ADMIN_FEE   = 0.17   # 17% — доход администратора
-L1_REF_FEE  = 0.03   # 3%  — доход реферера L1
-INVESTOR_SHARE = 1.0 - ADMIN_FEE - L1_REF_FEE  # 80%
+POOL_FEE    = 0.20   # 20% — доход пула (управляющий)
+L1_REF_FEE  = 0.03   # 3%  — доход реферера L1 (если есть)
+INVESTOR_SHARE = 1.0 - POOL_FEE - L1_REF_FEE  # 77%
 
 @router.get("/dashboard", response_model=DashboardOut)
 async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -31,7 +31,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             mode="OFFLINE", hwm=0, drawdown_pct=0, server_online=False,
             last_updated=None,
             user_investment=user_investment, user_pnl=0, user_pnl_pct=0,
-            ref_bonus=0,
+            ref_bonus=0, referral_code=user.referral_code, referrals=[],
             positions=[], recent_trades=[], ai_feed=[],
         )
 
@@ -67,23 +67,28 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
     pool_pnl_pct = round((pool_total_usdt - real_start) / real_start * 100, 2) if real_start > 0 else round(snap.drawdown_pct, 2)
 
-    # Чистый PnL инвестора: 80% от его доли роста пула
+    # Чистый PnL инвестора: 77% от его доли роста пула
     gross_pnl = user_investment * (pool_pnl_pct / 100) if user_investment > 0 else 0.0
     user_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
     user_pnl_pct = round(pool_pnl_pct * INVESTOR_SHARE, 2)
 
     # Реферальный доход: 3% от прибыли каждого приглашённого
     ref_bonus = 0.0
-    if pool_pnl_pct > 0:
-        referrals = (await db.execute(
-            select(User).where(User.referred_by == user.id, User.is_active == True)
-        )).scalars().all()
-        for ref in referrals:
-            ref_fin = (await db.execute(
-                select(UserFinancials).where(UserFinancials.user_id == ref.id)
-            )).scalar_one_or_none()
-            ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
-            ref_bonus += ref_inv * (pool_pnl_pct / 100) * L1_REF_FEE
+    referrals_info: list[ReferralInfo] = []
+    all_referrals = (await db.execute(
+        select(User).where(User.referred_by == user.id, User.is_active == True)
+    )).scalars().all()
+    for ref in all_referrals:
+        ref_fin = (await db.execute(
+            select(UserFinancials).where(UserFinancials.user_id == ref.id)
+        )).scalar_one_or_none()
+        ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
+        bonus = round(ref_inv * (pool_pnl_pct / 100) * L1_REF_FEE, 2) if pool_pnl_pct > 0 else 0.0
+        ref_bonus += bonus
+        # Маскируем email: a***@gmail.com
+        parts = ref.email.split("@")
+        masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else ref.email
+        referrals_info.append(ReferralInfo(email=masked, investment_usdt=ref_inv, bonus_usdt=bonus))
     ref_bonus = round(ref_bonus, 2)
 
     return DashboardOut(
@@ -99,6 +104,8 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         user_pnl=user_pnl,
         user_pnl_pct=user_pnl_pct,
         ref_bonus=ref_bonus,
+        referral_code=user.referral_code,
+        referrals=referrals_info,
         positions=[PositionOut(symbol=p.symbol, amount=p.amount, avg_price=p.avg_price) for p in positions],
         recent_trades=[TradeOut(symbol=t.symbol, action=t.action, amount=t.amount,
                                 price=t.price, pnl=t.pnl, timestamp=t.timestamp) for t in trades],
