@@ -9,6 +9,8 @@ from models import User
 
 router = APIRouter(prefix="/api/demo", tags=["demo"])
 
+INVESTOR_SHARE = 0.77  # 77% инвестору, как и на реальном дашборде
+
 
 @router.get("/account")
 async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -57,15 +59,18 @@ async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSess
         .limit(20)
     )).scalars().all()
 
-    pnl = va.balance_usdt - va.start_balance
-    pnl_pct = (pnl / va.start_balance * 100) if va.start_balance > 0 else 0
+    # Применяем долю инвестора 77% — как на реальном дашборде
+    gross_pnl = va.balance_usdt - va.start_balance
+    net_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
+    net_balance = round(va.start_balance + net_pnl, 2)
+    pnl_pct = round((net_pnl / va.start_balance * 100) if va.start_balance > 0 else 0, 2)
 
     return {
         "is_started": True,
-        "balance_usdt": round(va.balance_usdt, 2),
+        "balance_usdt": net_balance,
         "start_balance": va.start_balance,
-        "pnl": round(pnl, 2),
-        "pnl_pct": round(pnl_pct, 2),
+        "pnl": net_pnl,
+        "pnl_pct": pnl_pct,
         "positions": positions,
         "trades": [
             {
