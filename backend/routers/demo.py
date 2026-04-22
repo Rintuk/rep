@@ -35,32 +35,42 @@ async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSess
         select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
 
-    # Считаем net_balance до позиций — scale должен быть от нетто
-    gross_pnl = va.balance_usdt - va.start_balance
-    net_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
-    net_balance = round(va.start_balance + net_pnl, 2)
-
     positions = []
+    gross_balance = va.balance_usdt  # fallback
+
     if snap:
         real_positions = (await db.execute(
             select(Position).where(Position.snapshot_id == snap.id)
         )).scalars().all()
 
-        # Используем текущую цену (как дашборд), fallback на avg_price
         real_total = snap.balance_usdt + sum(
             p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
             for p in real_positions
         )
-        if real_total > 0:
-            scale = net_balance / real_total  # нетто-баланс для корректного масштаба
-            for p in real_positions:
-                cur_price = p.current_price if p.current_price > 0 else p.avg_price
-                positions.append({
-                    "symbol": p.symbol,
-                    "amount": round(p.amount * scale, 6),
-                    "avg_price": p.avg_price,
-                    "value": round(p.amount * cur_price * scale, 2),
-                })
+
+        # Считаем gross-баланс на лету — не ждём следующего обновления от бота
+        # Та же формула что на дашборде: (pool_total - net_invested) / net_invested
+        if snap.net_invested > 0 and real_total > 0:
+            pool_pnl_pct = (real_total - snap.net_invested) / snap.net_invested
+            gross_balance = va.start_balance * (1 + pool_pnl_pct)
+        elif real_total > 0 and va.start_real_total > 0:
+            gross_balance = va.start_balance * (real_total / va.start_real_total)
+
+    # Применяем долю инвестора 77%
+    gross_pnl = gross_balance - va.start_balance
+    net_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
+    net_balance = round(va.start_balance + net_pnl, 2)
+
+    if snap and real_total > 0:
+        scale = net_balance / real_total
+        for p in real_positions:
+            cur_price = p.current_price if p.current_price > 0 else p.avg_price
+            positions.append({
+                "symbol": p.symbol,
+                "amount": round(p.amount * scale, 6),
+                "avg_price": p.avg_price,
+                "value": round(p.amount * cur_price * scale, 2),
+            })
 
     trades = (await db.execute(
         select(VirtualTrade)
