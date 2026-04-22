@@ -91,9 +91,12 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                 va.updated_at = datetime.utcnow()
                 continue
 
-            # Пропорциональный расчёт: демо растёт/падает так же как реальный пул
-            ratio = real_total_now / va.start_real_total
-            va.balance_usdt = round(va.start_balance * ratio, 4)
+            # Используем net_invested как базу — пополнения не искажают торговый PnL
+            # Та же логика что на реальном дашборде: (pool_total - net_invested) / net_invested
+            net_inv = snapshot.net_invested if snapshot.net_invested > 0 else va.start_real_total
+            if net_inv > 0:
+                pool_pnl_pct = (real_total_now - net_inv) / net_inv
+                va.balance_usdt = round(va.start_balance * (1 + pool_pnl_pct), 4)
             va.updated_at = datetime.utcnow()
 
             # Зеркалим только новые сделки (дедупликация по timestamp+symbol+action+price)
