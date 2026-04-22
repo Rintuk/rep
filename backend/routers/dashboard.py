@@ -6,12 +6,9 @@ from database import get_db
 from models import BotSnapshot, Position, Trade, AIFeedEntry, UserFinancials, User
 from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo
 from security import get_current_user
+from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
-
-POOL_FEE    = 0.20   # 20% — доход пула (управляющий)
-L1_REF_FEE  = 0.03   # 3%  — доход реферера L1 (если есть)
-INVESTOR_SHARE = 1.0 - POOL_FEE - L1_REF_FEE  # 77%
 
 @router.get("/dashboard", response_model=DashboardOut)
 async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -63,9 +60,11 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
 
     server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
 
-    # % роста пула от стартового баланса бота
-    real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-    pool_pnl_pct = round((pool_total_usdt - real_start) / real_start * 100, 2) if real_start > 0 else round(snap.drawdown_pct, 2)
+    # % роста пула от net_invested (совпадает с формулой в auth.py/_get_pool_pnl_pct)
+    net_inv = snap.net_invested if snap.net_invested > 0 else (
+        snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+    )
+    pool_pnl_pct = round((pool_total_usdt - net_inv) / net_inv * 100, 2) if net_inv > 0 else round(snap.drawdown_pct, 2)
 
     # Чистый PnL инвестора: 77% от роста пула С МОМЕНТА ЕГО ВХОДА
     entry_pnl_pct = fin.entry_pool_pnl_pct if fin else 0.0
@@ -85,7 +84,9 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             select(UserFinancials).where(UserFinancials.user_id == ref.id)
         )).scalar_one_or_none()
         ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
-        bonus = round(ref_inv * (pool_pnl_pct / 100) * L1_REF_FEE, 2) if pool_pnl_pct > 0 else 0.0
+        ref_entry_pct = ref_fin.entry_pool_pnl_pct if ref_fin else 0.0
+        ref_incremental_pct = pool_pnl_pct - ref_entry_pct
+        bonus = round(ref_inv * (ref_incremental_pct / 100) * L1_REF_FEE, 2) if ref_incremental_pct > 0 else 0.0
         ref_bonus += bonus
         # Маскируем email: a***@gmail.com
         parts = ref.email.split("@")

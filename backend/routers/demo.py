@@ -6,10 +6,9 @@ from database import get_db
 from models import VirtualAccount, VirtualTrade, BotSnapshot, Position
 from security import get_current_user
 from models import User
+from constants import INVESTOR_SHARE
 
 router = APIRouter(prefix="/api/demo", tags=["demo"])
-
-INVESTOR_SHARE = 0.77  # 77% инвестору, как и на реальном дашборде
 
 
 @router.get("/account")
@@ -120,7 +119,10 @@ async def start_demo_account(
         snap_positions = (await db.execute(
             select(Position).where(Position.snapshot_id == snap.id)
         )).scalars().all()
-        real_total = snap.balance_usdt + sum(p.amount * p.avg_price for p in snap_positions)
+        real_total = snap.balance_usdt + sum(
+            p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
+            for p in snap_positions
+        )
 
     va = (await db.execute(select(VirtualAccount).where(VirtualAccount.user_id == user.id))).scalar_one_or_none()
 

@@ -171,11 +171,12 @@ async def update_user_financials(
         if investment_usdt > 0 and old_inv != investment_usdt:
             if old_inv <= 0:
                 fin.entry_pool_pnl_pct = current_pnl_pct
-            else:
-                # Средневзвешенная точка входа
+            elif investment_usdt > old_inv:
+                # Взвешенная точка входа только при увеличении суммы
                 fin.entry_pool_pnl_pct = round(
                     (old_inv * fin.entry_pool_pnl_pct + (investment_usdt - old_inv) * current_pnl_pct) / investment_usdt, 4
                 )
+            # При уменьшении суммы — точку входа не меняем
         fin.investment_usdt = investment_usdt
         fin.withdrawal_usdt = withdrawal_usdt
         fin.note = note
@@ -311,27 +312,28 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             pool_pnl_usdt = round(pool_total - net_invested_pool, 2)
             pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 2)
 
-    # ── Расчётная прибыль инвесторов + доход админа ───────────────
-    pool_profit = round(total_invested * (pool_pnl_pct / 100), 2) if pool_pnl_pct != 0 else 0.0
-    admin_income = round(pool_profit * 0.20, 2) if pool_profit > 0 else 0.0
-
-    # ── Таблица инвесторов ────────────────────────────────────────
+    # ── Таблица инвесторов + реальный доход админа ───────────────
+    total_gross_pnl = 0.0
     investors_table = []
     for u in investors:
         fin = fins_map.get(u.id)
         inv = fin.investment_usdt if fin else 0.0
         refs_count = sum(1 for x in all_users if x.referred_by == u.id)
-        # PnL инвестора с момента его входа (entry_pool_pnl_pct)
         pnl = 0.0
         if inv > 0 and snap and pool_pnl_pct != 0:
             entry_pct = fin.entry_pool_pnl_pct if fin else 0.0
             incremental = pool_pnl_pct - entry_pct
-            pnl = round(inv * (incremental / 100) * 0.77, 2)
+            gross_pnl = inv * (incremental / 100)
+            pnl = round(gross_pnl * 0.77, 2)
+            total_gross_pnl += gross_pnl
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
             "pnl": pnl, "referrals_count": refs_count,
         })
+
+    pool_profit = round(total_gross_pnl, 2)
+    admin_income = round(total_gross_pnl * 0.20, 2) if total_gross_pnl > 0 else 0.0
 
     return {
         "pool_total": round(pool_total, 2),
