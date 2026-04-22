@@ -9,6 +9,26 @@ from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+
+async def _get_pool_pnl_pct(db: AsyncSession) -> float:
+    """Текущий PnL% пула от net_invested — используется как точка входа инвестора."""
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not snap:
+        return 0.0
+    positions = (await db.execute(
+        select(Position).where(Position.snapshot_id == snap.id)
+    )).scalars().all()
+    pool_total = snap.balance_usdt + sum(
+        p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
+        for p in positions
+    )
+    ref = snap.net_invested if snap.net_invested > 0 else (
+        snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+    )
+    return round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+
 @router.post("/register")
 async def register(data: RegisterIn, db: AsyncSession = Depends(get_db)):
     import traceback
@@ -142,15 +162,32 @@ async def update_user_financials(
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
+    current_pnl_pct = await _get_pool_pnl_pct(db)
+
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
     if fin:
+        # Взвешенная точка входа при изменении суммы инвестиции
+        old_inv = fin.investment_usdt
+        if investment_usdt > 0 and old_inv != investment_usdt:
+            if old_inv <= 0:
+                fin.entry_pool_pnl_pct = current_pnl_pct
+            else:
+                # Средневзвешенная точка входа
+                fin.entry_pool_pnl_pct = round(
+                    (old_inv * fin.entry_pool_pnl_pct + (investment_usdt - old_inv) * current_pnl_pct) / investment_usdt, 4
+                )
         fin.investment_usdt = investment_usdt
         fin.withdrawal_usdt = withdrawal_usdt
         fin.note = note
         fin.updated_at = datetime.utcnow()
     else:
-        db.add(UserFinancials(user_id=user_id, investment_usdt=investment_usdt,
-                              withdrawal_usdt=withdrawal_usdt, note=note))
+        db.add(UserFinancials(
+            user_id=user_id,
+            investment_usdt=investment_usdt,
+            withdrawal_usdt=withdrawal_usdt,
+            note=note,
+            entry_pool_pnl_pct=current_pnl_pct if investment_usdt > 0 else 0.0,
+        ))
     await db.commit()
     return {"status": "ok"}
 
@@ -284,12 +321,12 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         fin = fins_map.get(u.id)
         inv = fin.investment_usdt if fin else 0.0
         refs_count = sum(1 for x in all_users if x.referred_by == u.id)
-        # Gross PnL инвестора пропорционально росту пула
+        # PnL инвестора с момента его входа (entry_pool_pnl_pct)
         pnl = 0.0
-        if inv > 0 and snap:
-            _rs = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-            _pct = (((pool_total - _rs) / _rs) * 100) if _rs > 0 else snap.drawdown_pct
-            pnl = round(inv * (_pct / 100), 2)
+        if inv > 0 and snap and pool_pnl_pct != 0:
+            entry_pct = fin.entry_pool_pnl_pct if fin else 0.0
+            incremental = pool_pnl_pct - entry_pct
+            pnl = round(inv * (incremental / 100) * 0.77, 2)
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
@@ -406,12 +443,26 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
         raise HTTPException(status_code=400, detail="Заявка уже обработана")
 
     # Прибавляем фактически полученную сумму к investment_usdt
+    current_pnl_pct = await _get_pool_pnl_pct(db)
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
-        fin.investment_usdt += actual_amount
+        old_inv = fin.investment_usdt
+        # Взвешенная точка входа: старая доля + новый депозит по текущей цене пула
+        new_inv = old_inv + actual_amount
+        if old_inv <= 0:
+            fin.entry_pool_pnl_pct = current_pnl_pct
+        else:
+            fin.entry_pool_pnl_pct = round(
+                (old_inv * fin.entry_pool_pnl_pct + actual_amount * current_pnl_pct) / new_inv, 4
+            )
+        fin.investment_usdt = new_inv
         fin.updated_at = datetime.utcnow()
     else:
-        db.add(UserFinancials(user_id=req.user_id, investment_usdt=actual_amount))
+        db.add(UserFinancials(
+            user_id=req.user_id,
+            investment_usdt=actual_amount,
+            entry_pool_pnl_pct=current_pnl_pct,
+        ))
 
     req.status = "approved"
     req.updated_at = datetime.utcnow()

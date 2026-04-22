@@ -31,11 +31,12 @@ class UserFinancials(Base):
     """Финансовые данные инвестора — вводятся вручную администратором."""
     __tablename__ = "user_financials"
 
-    user_id:         Mapped[str]   = mapped_column(String, ForeignKey("users.id"), primary_key=True)
-    investment_usdt: Mapped[float] = mapped_column(Float, default=0.0)
-    withdrawal_usdt: Mapped[float] = mapped_column(Float, default=0.0)
-    note:            Mapped[str]   = mapped_column(Text, default="")
-    updated_at:      Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    user_id:              Mapped[str]   = mapped_column(String, ForeignKey("users.id"), primary_key=True)
+    investment_usdt:      Mapped[float] = mapped_column(Float, default=0.0)
+    withdrawal_usdt:      Mapped[float] = mapped_column(Float, default=0.0)
+    note:                 Mapped[str]   = mapped_column(Text, default="")
+    entry_pool_pnl_pct:   Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    updated_at:           Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="financials")
 

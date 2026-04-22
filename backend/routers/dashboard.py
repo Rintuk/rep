@@ -67,10 +67,12 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
     pool_pnl_pct = round((pool_total_usdt - real_start) / real_start * 100, 2) if real_start > 0 else round(snap.drawdown_pct, 2)
 
-    # Чистый PnL инвестора: 77% от его доли роста пула
-    gross_pnl = user_investment * (pool_pnl_pct / 100) if user_investment > 0 else 0.0
+    # Чистый PnL инвестора: 77% от роста пула С МОМЕНТА ЕГО ВХОДА
+    entry_pnl_pct = fin.entry_pool_pnl_pct if fin else 0.0
+    incremental_pnl_pct = pool_pnl_pct - entry_pnl_pct
+    gross_pnl = user_investment * (incremental_pnl_pct / 100) if user_investment > 0 else 0.0
     user_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
-    user_pnl_pct = round(pool_pnl_pct * INVESTOR_SHARE, 2)
+    user_pnl_pct = round(incremental_pnl_pct * INVESTOR_SHARE, 2)
 
     # Реферальный доход: 3% от прибыли каждого приглашённого
     ref_bonus = 0.0
