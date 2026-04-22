@@ -6,6 +6,7 @@ from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEnt
 from schemas import RegisterIn, LoginIn, TokenOut
 from security import hash_password, verify_password, create_access_token, get_admin_user
 from datetime import datetime, timedelta
+from constants import INVESTOR_SHARE, POOL_FEE
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -324,7 +325,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             entry_pct = fin.entry_pool_pnl_pct if fin else 0.0
             incremental = pool_pnl_pct - entry_pct
             gross_pnl = inv * (incremental / 100)
-            pnl = round(gross_pnl * 0.77, 2)
+            pnl = round(gross_pnl * INVESTOR_SHARE, 2)
             total_gross_pnl += gross_pnl
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
@@ -333,7 +334,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         })
 
     pool_profit = round(total_gross_pnl, 2)
-    admin_income = round(total_gross_pnl * 0.20, 2) if total_gross_pnl > 0 else 0.0
+    admin_income = round(total_gross_pnl * POOL_FEE, 2) if total_gross_pnl > 0 else 0.0
 
     return {
         "pool_total": round(pool_total, 2),
