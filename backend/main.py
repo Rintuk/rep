@@ -15,6 +15,7 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS start_real_total FLOAT DEFAULT 0",
             "ALTER TABLE bot_snapshots ADD COLUMN IF NOT EXISTS real_start_balance FLOAT DEFAULT 0",
             "ALTER TABLE positions ADD COLUMN IF NOT EXISTS current_price FLOAT DEFAULT 0",
+            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS entry_pool_pnl_pct FLOAT DEFAULT 0",
             """CREATE TABLE IF NOT EXISTS deposit_requests (
                 id TEXT PRIMARY KEY,
                 user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
