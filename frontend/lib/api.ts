@@ -98,6 +98,31 @@ export async function rejectDeposit(id: string) {
   return res.data;
 }
 
+export async function createWithdrawalRequest(amount: number, comment: string) {
+  const res = await api.post("/auth/withdrawals/request", null, { params: { amount, comment } });
+  return res.data;
+}
+
+export async function getMyWithdrawals() {
+  const res = await api.get("/auth/withdrawals/my");
+  return res.data;
+}
+
+export async function getAdminWithdrawals() {
+  const res = await api.get("/auth/admin/withdrawals");
+  return res.data;
+}
+
+export async function approveWithdrawal(id: string, actual_amount: number) {
+  const res = await api.post(`/auth/admin/withdrawals/${id}/approve`, null, { params: { actual_amount } });
+  return res.data;
+}
+
+export async function rejectWithdrawal(id: string) {
+  const res = await api.post(`/auth/admin/withdrawals/${id}/reject`);
+  return res.data;
+}
+
 export async function getDemoAccount() {
   const res = await api.get("/api/demo/account");
   return res.data;

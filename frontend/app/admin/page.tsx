@@ -5,7 +5,8 @@ import React from "react";
 import {
   getAdminOverview, approveUser, rejectUser,
   updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword,
-  getAdminDeposits, approveDeposit, rejectDeposit, getAdminPoolHistory
+  getAdminDeposits, approveDeposit, rejectDeposit, getAdminPoolHistory,
+  getAdminWithdrawals, approveWithdrawal, rejectWithdrawal
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -41,8 +42,9 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits" | "withdrawals">("overview");
   const [deposits, setDeposits] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
+  const [withdrawals, setWithdrawals] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
 
   // Inline investor management
@@ -54,6 +56,8 @@ export default function AdminPage() {
   const [resetMsg, setResetMsg] = useState<Record<string, string>>({});
   const [confirmingDeposit, setConfirmingDeposit] = useState<string | null>(null);
   const [actualAmounts, setActualAmounts] = useState<Record<string, string>>({});
+  const [confirmingWithdrawal, setConfirmingWithdrawal] = useState<string | null>(null);
+  const [actualWithdrawAmounts, setActualWithdrawAmounts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -65,9 +69,10 @@ export default function AdminPage() {
 
   async function fetchData() {
     try {
-      const [d, dep] = await Promise.all([getAdminOverview(), getAdminDeposits()]);
+      const [d, dep, wdr] = await Promise.all([getAdminOverview(), getAdminDeposits(), getAdminWithdrawals()]);
       setData(d);
       setDeposits(dep);
+      setWithdrawals(wdr);
     } catch {
       setError("Нет доступа или ошибка загрузки");
     } finally {
@@ -87,6 +92,20 @@ export default function AdminPage() {
     if (!amount || amount <= 0) return;
     await approveDeposit(id, amount);
     setConfirmingDeposit(null);
+    fetchData();
+  }
+
+  async function handleApproveWithdrawal(id: string) {
+    const amount = parseFloat(actualWithdrawAmounts[id] || "0");
+    if (!amount || amount <= 0) return;
+    await approveWithdrawal(id, amount);
+    setConfirmingWithdrawal(null);
+    fetchData();
+  }
+
+  async function handleRejectWithdrawal(id: string) {
+    if (!confirm("Отклонить заявку на вывод?")) return;
+    await rejectWithdrawal(id);
     fetchData();
   }
 
@@ -204,12 +223,14 @@ export default function AdminPage() {
   const incomeColor = data.admin_income > 0 ? "#22c97a" : "#888";
 
   const pendingDeposits = deposits.filter(d => d.status === "pending").length;
+  const pendingWithdrawals = withdrawals.filter(w => w.status === "pending").length;
   const TABS = [
-    { key: "overview",   label: "📊 Обзор" },
-    { key: "investors",  label: `👥 Инв. (${data.investors_count})` },
-    { key: "deposits",   label: "💳 Заявки", badge: pendingDeposits },
-    { key: "referrals",  label: `🔗 Реф. (${data.referrals.length})` },
-    { key: "trades",     label: "📋 Сделки" },
+    { key: "overview",     label: "📊 Обзор" },
+    { key: "investors",    label: `👥 Инв. (${data.investors_count})` },
+    { key: "deposits",     label: "💳 Пополнения", badge: pendingDeposits },
+    { key: "withdrawals",  label: "💸 Выводы", badge: pendingWithdrawals },
+    { key: "referrals",    label: `🔗 Реф. (${data.referrals.length})` },
+    { key: "trades",       label: "📋 Сделки" },
     { key: "ai",         label: "🧠 ИИ" },
   ];
 
@@ -626,6 +647,82 @@ export default function AdminPage() {
                           <CheckCircle size={14} /> Подтвердить
                         </button>
                         <button onClick={() => handleRejectDeposit(d.id)}
+                          className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
+                          style={{ background: "#3a0d0d", color: "#ff4d4d" }}>
+                          <XCircle size={14} /> Отклонить
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Заявки на вывод */}
+        {activeTab === "withdrawals" && (
+          <div className="space-y-3">
+            {withdrawals.length === 0 ? (
+              <div className="rounded-xl p-8 text-center border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
+                <p style={{ color: "var(--muted)" }}>Заявок пока нет</p>
+              </div>
+            ) : withdrawals.map(w => (
+              <div key={w.id} className="rounded-xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                style={{ background: "var(--card)", borderColor: w.status === "pending" ? "#ff994444" : "var(--border)" }}>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white font-semibold">{w.email}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
+                      background: w.status === "approved" ? "#0d3a20" : w.status === "rejected" ? "#3a0d0d" : "#1a0d00",
+                      color: w.status === "approved" ? "#22c97a" : w.status === "rejected" ? "#ff4d4d" : "#ff9944"
+                    }}>
+                      {w.status === "approved" ? "✓ Выплачено" : w.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
+                    </span>
+                  </div>
+                  <p className="text-xl font-bold mt-1" style={{ color: "#ff9944" }}>{w.amount.toFixed(2)} USDT</p>
+                  {w.comment && <p className="text-sm mt-0.5" style={{ color: "var(--muted)" }}>💬 {w.comment}</p>}
+                  <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>{new Date(w.created_at).toLocaleString("ru")}</p>
+                </div>
+                {w.status === "pending" && (
+                  <div className="flex flex-col gap-2 min-w-[200px]">
+                    {confirmingWithdrawal === w.id ? (
+                      <>
+                        <div>
+                          <label className="text-xs mb-1 block" style={{ color: "var(--muted)" }}>Фактически выплачено (USDT)</label>
+                          <input
+                            type="number" step="0.01" min="0"
+                            value={actualWithdrawAmounts[w.id] ?? String(w.amount)}
+                            onChange={e => setActualWithdrawAmounts(prev => ({ ...prev, [w.id]: e.target.value }))}
+                            className="w-full px-3 py-2 rounded-lg text-white font-bold border outline-none"
+                            style={{ background: "#0d1a2a", borderColor: "#ff994444" }}
+                            autoFocus
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleApproveWithdrawal(w.id)}
+                            className="flex-1 flex items-center justify-center gap-1.5 text-sm px-3 py-2 rounded-lg transition hover:opacity-80"
+                            style={{ background: "#1a0d00", color: "#ff9944" }}>
+                            <CheckCircle size={13} /> Подтвердить вывод
+                          </button>
+                          <button onClick={() => setConfirmingWithdrawal(null)}
+                            className="text-sm px-3 py-2 rounded-lg transition hover:opacity-80"
+                            style={{ background: "#1a1a2a", color: "var(--muted)" }}>
+                            Отмена
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button onClick={() => {
+                          setConfirmingWithdrawal(w.id);
+                          setActualWithdrawAmounts(prev => ({ ...prev, [w.id]: String(w.amount) }));
+                        }}
+                          className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
+                          style={{ background: "#1a0d00", color: "#ff9944" }}>
+                          <CheckCircle size={14} /> Выплачено
+                        </button>
+                        <button onClick={() => handleRejectWithdrawal(w.id)}
                           className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg transition hover:opacity-80"
                           style={{ background: "#3a0d0d", color: "#ff4d4d" }}>
                           <XCircle size={14} /> Отклонить

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDashboard, createDepositRequest, getMyDeposits } from "@/lib/api";
+import { getDashboard, createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -34,6 +34,12 @@ export default function DashboardPage() {
   const [depositLoading, setDepositLoading] = useState(false);
   const [depositDone, setDepositDone] = useState(false);
   const [myDeposits, setMyDeposits] = useState<{id:string;amount:number;status:string;created_at:string}[]>([]);
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawComment, setWithdrawComment] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawDone, setWithdrawDone] = useState(false);
+  const [myWithdrawals, setMyWithdrawals] = useState<{id:string;amount:number;status:string;created_at:string}[]>([]);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -42,6 +48,7 @@ export default function DashboardPage() {
     if (!token) { router.push("/login"); return; }
     fetchData();
     getMyDeposits().then(setMyDeposits).catch(() => {});
+    getMyWithdrawals().then(setMyWithdrawals).catch(() => {});
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -74,6 +81,22 @@ export default function DashboardPage() {
       setMyDeposits(updated);
     } finally {
       setDepositLoading(false);
+    }
+  }
+
+  async function handleWithdrawSubmit() {
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount <= 0) return;
+    setWithdrawLoading(true);
+    try {
+      await createWithdrawalRequest(amount, withdrawComment);
+      setWithdrawDone(true);
+      setWithdrawAmount("");
+      setWithdrawComment("");
+      const updated = await getMyWithdrawals();
+      setMyWithdrawals(updated);
+    } finally {
+      setWithdrawLoading(false);
     }
   }
 
@@ -159,6 +182,14 @@ export default function DashboardPage() {
                   className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5 border-b"
                   style={{ borderColor: "var(--border)", color: "#22c97a" }}>
                   <PlusCircle size={16} /> Пополнить счёт
+                </button>
+
+                {/* Вывести */}
+                <button
+                  onClick={() => { setMenuOpen(false); setShowWithdraw(true); setWithdrawDone(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5 border-b"
+                  style={{ borderColor: "var(--border)", color: "#ff9944" }}>
+                  <Wallet size={16} /> Вывести средства
                 </button>
 
                 {/* Реферальная ссылка */}
@@ -480,6 +511,78 @@ export default function DashboardPage() {
                   style={{ background: "#22c97a" }}>
                   {depositLoading ? "Отправка..." : "Отправить заявку"}
                 </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно — Вывод средств */}
+      {showWithdraw && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}
+          onClick={e => { if (e.target === e.currentTarget) setShowWithdraw(false); }}>
+          <div className="rounded-2xl p-6 w-full max-w-sm border max-h-[90vh] overflow-y-auto" style={{ background: "var(--card)", borderColor: "#ff994444" }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-bold text-white text-lg">Вывод средств</h2>
+              <button onClick={() => setShowWithdraw(false)} style={{ color: "var(--muted)" }}><X size={20} /></button>
+            </div>
+
+            {withdrawDone ? (
+              <div className="text-center py-6 space-y-3">
+                <div className="text-4xl">✅</div>
+                <p className="font-bold text-white">Заявка отправлена</p>
+                <p className="text-sm" style={{ color: "var(--muted)" }}>Администратор обработает её в течение суток.</p>
+                <button onClick={() => setShowWithdraw(false)} className="w-full py-3 rounded-lg font-bold text-white" style={{ background: "#ff9944" }}>Закрыть</button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Сумма вывода (USDT)</label>
+                  <input
+                    type="number" min="1" step="0.01"
+                    value={withdrawAmount}
+                    onChange={e => setWithdrawAmount(e.target.value)}
+                    placeholder="100"
+                    className="w-full rounded-lg px-4 py-3 text-white border outline-none"
+                    style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Адрес кошелька / комментарий</label>
+                  <input
+                    type="text"
+                    value={withdrawComment}
+                    onChange={e => setWithdrawComment(e.target.value)}
+                    placeholder="TRC20 адрес или примечание..."
+                    className="w-full rounded-lg px-4 py-3 text-white border outline-none"
+                    style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
+                  />
+                </div>
+                <div className="rounded-lg p-3 text-sm" style={{ background: "#1a0d00", borderLeft: "3px solid #ff9944" }}>
+                  <p style={{ color: "#ff9944" }}>⏳ Заявка обрабатывается в течение суток.</p>
+                </div>
+                <button
+                  onClick={handleWithdrawSubmit}
+                  disabled={withdrawLoading || !withdrawAmount || parseFloat(withdrawAmount) <= 0}
+                  className="w-full py-3 rounded-lg font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ background: "#ff9944" }}>
+                  {withdrawLoading ? "Отправка..." : "Отправить заявку"}
+                </button>
+
+                {myWithdrawals.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+                    <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>МОИ ЗАЯВКИ НА ВЫВОД</p>
+                    {myWithdrawals.map(w => (
+                      <div key={w.id} className="flex justify-between text-xs py-1">
+                        <span style={{ color: "var(--muted)" }}>{new Date(w.created_at).toLocaleDateString("ru")}</span>
+                        <span className="text-white">{w.amount} USDT</span>
+                        <span style={{ color: w.status === "approved" ? "#22c97a" : w.status === "rejected" ? "#ff4d4d" : "#f59e0b" }}>
+                          {w.status === "approved" ? "Выплачено" : w.status === "rejected" ? "Отклонено" : "Ожидает"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
