@@ -231,10 +231,10 @@ async def admin_pool_history(db: AsyncSession = Depends(get_db)):
         return []
 
     # Используем последний снимок как эталон net_invested.
-    # Фильтруем артефакты: снимки где net_invested выходит за диапазон [50%, 150%] от эталона.
-    # Это отсекает и «пустые» снимки (слишком мало) и демо-снимки (слишком много).
+    # Фильтруем артефакты: снимки где net_invested выходит за диапазон [50%, 110%] от эталона.
+    # 110% верхняя граница отсекает демо-снимки (VIRTUAL_START_BALANCE=1000 при реальном ~867).
     ref_net = valid[-1].net_invested
-    clean_snaps = [s for s in valid if ref_net * 0.5 <= s.net_invested <= ref_net * 1.5]
+    clean_snaps = [s for s in valid if ref_net * 0.5 <= s.net_invested <= ref_net * 1.1]
     if not clean_snaps:
         return []
 
@@ -423,7 +423,7 @@ async def cleanup_demo_snapshots(db: AsyncSession = Depends(get_db)):
     deleted_snaps = 0
     if last_snap and last_snap.net_invested > 0:
         ref = last_snap.net_invested
-        lo, hi = ref * 0.5, ref * 1.5
+        lo, hi = ref * 0.5, ref * 1.1
         bad_snaps = (await db.execute(
             select(BotSnapshot).where(
                 (BotSnapshot.net_invested < lo) | (BotSnapshot.net_invested > hi)
