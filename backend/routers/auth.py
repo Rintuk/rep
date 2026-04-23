@@ -204,8 +204,15 @@ async def admin_pool_history(db: AsyncSession = Depends(get_db)):
         select(BotSnapshot).order_by(BotSnapshot.timestamp.asc()).limit(100)
     )).scalars().all()
 
-    # Только снимки с net_invested > 0 (отправлены ботом после обновления)
-    clean_snaps = [s for s in snaps if s.net_invested > 0]
+    # Только снимки с net_invested > 0
+    valid = [s for s in snaps if s.net_invested > 0]
+    if not valid:
+        return []
+
+    # Используем последний снимок как эталон net_invested.
+    # Фильтруем артефакты: снимки где net_invested < 50% от эталона — явно некорректные данные.
+    ref_net = valid[-1].net_invested
+    clean_snaps = [s for s in valid if s.net_invested >= ref_net * 0.5]
     if not clean_snaps:
         return []
 
