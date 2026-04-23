@@ -231,9 +231,10 @@ async def admin_pool_history(db: AsyncSession = Depends(get_db)):
         return []
 
     # Используем последний снимок как эталон net_invested.
-    # Фильтруем артефакты: снимки где net_invested < 50% от эталона — явно некорректные данные.
+    # Фильтруем артефакты: снимки где net_invested выходит за диапазон [50%, 150%] от эталона.
+    # Это отсекает и «пустые» снимки (слишком мало) и демо-снимки (слишком много).
     ref_net = valid[-1].net_invested
-    clean_snaps = [s for s in valid if s.net_invested >= ref_net * 0.5]
+    clean_snaps = [s for s in valid if ref_net * 0.5 <= s.net_invested <= ref_net * 1.5]
     if not clean_snaps:
         return []
 
