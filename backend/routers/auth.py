@@ -6,7 +6,7 @@ from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEnt
 from schemas import RegisterIn, LoginIn, TokenOut
 from security import hash_password, verify_password, create_access_token, get_admin_user
 from datetime import datetime, timedelta
-from constants import INVESTOR_SHARE, POOL_FEE
+from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -322,6 +322,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
 
     # ── Таблица инвесторов + реальный доход админа ───────────────
     total_gross_pnl = 0.0
+    total_admin_pnl = 0.0
     investors_table = []
     for u in investors:
         fin = fins_map.get(u.id)
@@ -334,6 +335,13 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             gross_pnl = inv * (incremental / 100)
             pnl = round(gross_pnl * INVESTOR_SHARE, 2)
             total_gross_pnl += gross_pnl
+            # Если нет активного реферера — его 3% тоже идут администратору
+            has_referrer = u.referred_by is not None and any(
+                x.id == u.referred_by and x.is_active and not x.is_admin
+                for x in all_users
+            )
+            admin_fee = POOL_FEE if has_referrer else POOL_FEE + L1_REF_FEE
+            total_admin_pnl += gross_pnl * admin_fee
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
@@ -341,7 +349,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         })
 
     pool_profit = round(total_gross_pnl, 2)
-    admin_income = round(total_gross_pnl * POOL_FEE, 2) if total_gross_pnl > 0 else 0.0
+    admin_income = round(total_admin_pnl, 2) if total_admin_pnl > 0 else 0.0
 
     # Собственный капитал администратора = всё что в пуле минус деньги инвесторов
     admin_own_capital = round(max(net_invested_pool - total_invested, 0.0), 2)
