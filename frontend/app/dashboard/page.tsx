@@ -244,10 +244,10 @@ export default function DashboardPage() {
               label: "Чистый доход",
               value: data.user_investment > 0
                 ? `${data.user_pnl >= 0 ? "+" : ""}${data.user_pnl.toFixed(2)} $`
-                : `${data.drawdown_pct >= 0 ? "+" : ""}${data.drawdown_pct.toFixed(2)}%`,
+                : "—",
               sub: data.user_investment > 0
                 ? `${data.user_pnl_pct >= 0 ? "+" : ""}${data.user_pnl_pct.toFixed(2)}% (после комиссий)`
-                : "% пула",
+                : "нет вложений",
               color: pnlColor
             },
             ...(data.ref_bonus > 0 ? [{
