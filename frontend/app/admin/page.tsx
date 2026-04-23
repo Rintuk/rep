@@ -6,7 +6,8 @@ import {
   getAdminOverview, approveUser, rejectUser,
   updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword,
   getAdminDeposits, approveDeposit, rejectDeposit, getAdminPoolHistory,
-  getAdminWithdrawals, approveWithdrawal, rejectWithdrawal, getUserHistory
+  getAdminWithdrawals, approveWithdrawal, rejectWithdrawal, getUserHistory,
+  cleanupDemoSnapshots
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -60,6 +61,8 @@ export default function AdminPage() {
   const [actualWithdrawAmounts, setActualWithdrawAmounts] = useState<Record<string, string>>({});
   const [historyUser, setHistoryUser] = useState<{email:string;id:string} | null>(null);
   const [historyData, setHistoryData] = useState<{deposits:{id:string;amount:number;comment:string;status:string;created_at:string}[];withdrawals:{id:string;amount:number;comment:string;status:string;created_at:string}[]} | null>(null);
+  const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -442,6 +445,39 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Очистка демо-данных */}
+        {activeTab === "overview" && (
+          <div className="rounded-xl p-4 border mt-2" style={{ background: "var(--card)", borderColor: "#ff4d4d44" }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">🧹 Очистка демо-снимков</p>
+                <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
+                  Удаляет аномальные снимки из БД и сбрасывает точки входа инвесторов. Запускать один раз после работы в демо-режиме.
+                </p>
+                {cleanupMsg && <p className="text-xs mt-1 text-green-400">{cleanupMsg}</p>}
+              </div>
+              <button
+                onClick={async () => {
+                  if (!confirm("Удалить демо-снимки и сбросить точки входа инвесторов?")) return;
+                  setCleanupLoading(true);
+                  setCleanupMsg(null);
+                  try {
+                    const r = await cleanupDemoSnapshots();
+                    setCleanupMsg(r.message);
+                    fetchData();
+                  } catch { setCleanupMsg("Ошибка"); }
+                  finally { setCleanupLoading(false); }
+                }}
+                disabled={cleanupLoading}
+                className="ml-4 px-4 py-2 rounded-lg text-xs font-semibold"
+                style={{ background: "#7f1d1d", color: "#fca5a5", opacity: cleanupLoading ? 0.5 : 1 }}
+              >
+                {cleanupLoading ? "..." : "Очистить"}
+              </button>
             </div>
           </div>
         )}

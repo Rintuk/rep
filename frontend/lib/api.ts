@@ -131,6 +131,11 @@ export async function rejectWithdrawal(id: string) {
   return res.data;
 }
 
+export async function cleanupDemoSnapshots() {
+  const res = await api.post("/auth/admin/cleanup-demo-snapshots");
+  return res.data as { deleted_snapshots: number; reset_investors: number; message: string };
+}
+
 export async function getDemoAccount() {
   const res = await api.get("/api/demo/account");
   return res.data;

@@ -408,6 +408,45 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/admin/cleanup-demo-snapshots", dependencies=[Depends(get_admin_user)])
+async def cleanup_demo_snapshots(db: AsyncSession = Depends(get_db)):
+    """Удаляет демо-снимки из БД и сбрасывает точки входа инвесторов.
+    Демо-снимки определяются по net_invested вне диапазона [50%, 150%] от последнего реального снимка.
+    """
+    from sqlalchemy import delete as sa_delete
+
+    # Находим последний снимок как эталон
+    last_snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    deleted_snaps = 0
+    if last_snap and last_snap.net_invested > 0:
+        ref = last_snap.net_invested
+        lo, hi = ref * 0.5, ref * 1.5
+        bad_snaps = (await db.execute(
+            select(BotSnapshot).where(
+                (BotSnapshot.net_invested < lo) | (BotSnapshot.net_invested > hi)
+            )
+        )).scalars().all()
+        for s in bad_snaps:
+            await db.delete(s)
+        deleted_snaps = len(bad_snaps)
+
+    # Сбрасываем entry_pool_pnl_pct всем инвесторам → 0
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    for fin in all_fins:
+        fin.entry_pool_pnl_pct = 0.0
+    reset_count = len(all_fins)
+
+    await db.commit()
+    return {
+        "deleted_snapshots": deleted_snaps,
+        "reset_investors": reset_count,
+        "message": f"Удалено {deleted_snaps} демо-снимков, сброшено точек входа: {reset_count}",
+    }
+
+
 @router.post("/admin/users/{user_id}/reset-password", dependencies=[Depends(get_admin_user)])
 async def reset_user_password(user_id: str, new_password: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
