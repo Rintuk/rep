@@ -343,6 +343,11 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     pool_profit = round(total_gross_pnl, 2)
     admin_income = round(total_gross_pnl * POOL_FEE, 2) if total_gross_pnl > 0 else 0.0
 
+    # Собственный капитал администратора = всё что в пуле минус деньги инвесторов
+    admin_own_capital = round(max(net_invested_pool - total_invested, 0.0), 2)
+    admin_own_pnl = round(admin_own_capital * (pool_pnl_pct / 100), 2) if admin_own_capital > 0 else 0.0
+    admin_total_income = round(admin_income + admin_own_pnl, 2)
+
     return {
         "pool_total": round(pool_total, 2),
         "pool_free": round(pool_free, 2),
@@ -356,6 +361,9 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         "total_invested": round(total_invested, 2),
         "total_withdrawn": round(total_withdrawn, 2),
         "admin_income": admin_income,
+        "admin_own_capital": admin_own_capital,
+        "admin_own_pnl": admin_own_pnl,
+        "admin_total_income": admin_total_income,
         "pool_profit": round(pool_profit, 2),
         "pool_pnl_usdt": pool_pnl_usdt,
         "pool_pnl_pct": pool_pnl_pct,
