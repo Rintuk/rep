@@ -151,6 +151,27 @@ async def get_user_detail(user_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.get("/admin/users/{user_id}/history", dependencies=[Depends(get_admin_user)])
+async def get_user_history(user_id: str, db: AsyncSession = Depends(get_db)):
+    """История пополнений и выводов конкретного инвестора."""
+    deposits = (await db.execute(
+        select(DepositRequest).where(DepositRequest.user_id == user_id)
+        .order_by(DepositRequest.created_at.desc())
+    )).scalars().all()
+
+    withdrawals = (await db.execute(
+        select(WithdrawalRequest).where(WithdrawalRequest.user_id == user_id)
+        .order_by(WithdrawalRequest.created_at.desc())
+    )).scalars().all()
+
+    return {
+        "deposits": [{"id": r.id, "amount": r.amount, "comment": r.comment,
+                      "status": r.status, "created_at": str(r.created_at)} for r in deposits],
+        "withdrawals": [{"id": r.id, "amount": r.amount, "comment": r.comment,
+                         "status": r.status, "created_at": str(r.created_at)} for r in withdrawals],
+    }
+
+
 @router.patch("/admin/users/{user_id}/financials", dependencies=[Depends(get_admin_user)])
 async def update_user_financials(
     user_id: str,

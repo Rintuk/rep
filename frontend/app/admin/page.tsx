@@ -6,7 +6,7 @@ import {
   getAdminOverview, approveUser, rejectUser,
   updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword,
   getAdminDeposits, approveDeposit, rejectDeposit, getAdminPoolHistory,
-  getAdminWithdrawals, approveWithdrawal, rejectWithdrawal
+  getAdminWithdrawals, approveWithdrawal, rejectWithdrawal, getUserHistory
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -58,6 +58,8 @@ export default function AdminPage() {
   const [actualAmounts, setActualAmounts] = useState<Record<string, string>>({});
   const [confirmingWithdrawal, setConfirmingWithdrawal] = useState<string | null>(null);
   const [actualWithdrawAmounts, setActualWithdrawAmounts] = useState<Record<string, string>>({});
+  const [historyUser, setHistoryUser] = useState<{email:string;id:string} | null>(null);
+  const [historyData, setHistoryData] = useState<{deposits:{id:string;amount:number;comment:string;status:string;created_at:string}[];withdrawals:{id:string;amount:number;comment:string;status:string;created_at:string}[]} | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -93,6 +95,13 @@ export default function AdminPage() {
     await approveDeposit(id, amount);
     setConfirmingDeposit(null);
     fetchData();
+  }
+
+  async function openHistory(userId: string, email: string) {
+    setHistoryUser({ id: userId, email });
+    setHistoryData(null);
+    const data = await getUserHistory(userId);
+    setHistoryData(data);
   }
 
   async function handleApproveWithdrawal(id: string) {
@@ -468,12 +477,19 @@ export default function AdminPage() {
                           <td className="px-4 py-3 text-white">{u.referrals_count}</td>
                           <td className="px-4 py-3 text-xs" style={{ color: "var(--muted)" }}>{new Date(u.created_at).toLocaleDateString("ru")}</td>
                           <td className="px-4 py-3">
-                            <button onClick={() => toggleExpand(u.id)}
-                              className="flex items-center gap-1 text-xs px-3 py-1 rounded border transition hover:opacity-80"
-                              style={{ borderColor: isOpen ? "#4488dd" : "#4488dd55", color: "#4488dd" }}>
-                              {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                              {isOpen ? "Свернуть" : "Управление"}
-                            </button>
+                            <div className="flex gap-2">
+                              <button onClick={() => toggleExpand(u.id)}
+                                className="flex items-center gap-1 text-xs px-3 py-1 rounded border transition hover:opacity-80"
+                                style={{ borderColor: isOpen ? "#4488dd" : "#4488dd55", color: "#4488dd" }}>
+                                {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                {isOpen ? "Свернуть" : "Управление"}
+                              </button>
+                              <button onClick={() => openHistory(u.id, u.email)}
+                                className="flex items-center gap-1 text-xs px-3 py-1 rounded border transition hover:opacity-80"
+                                style={{ borderColor: "#ff994455", color: "#ff9944" }}>
+                                📋 История
+                              </button>
+                            </div>
                           </td>
                         </tr>
                         {isOpen && (
@@ -840,6 +856,78 @@ export default function AdminPage() {
           </p>
         )}
       </main>
+
+      {/* Модальное окно — история инвестора */}
+      {historyUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}
+          onClick={e => { if (e.target === e.currentTarget) setHistoryUser(null); }}>
+          <div className="rounded-2xl p-6 w-full max-w-lg border max-h-[85vh] overflow-y-auto" style={{ background: "var(--card)", borderColor: "#ff994444" }}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="font-bold text-white text-lg">История операций</h2>
+                <p className="text-sm mt-0.5" style={{ color: "var(--muted)" }}>{historyUser.email}</p>
+              </div>
+              <button onClick={() => setHistoryUser(null)} style={{ color: "var(--muted)" }}><XCircle size={22} /></button>
+            </div>
+
+            {!historyData ? (
+              <p className="text-center py-8" style={{ color: "var(--muted)" }}>Загрузка...</p>
+            ) : (
+              <div className="space-y-6">
+                {/* Пополнения */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2" style={{ color: "#22c97a" }}>💳 Пополнения</h3>
+                  {historyData.deposits.length === 0
+                    ? <p className="text-sm" style={{ color: "var(--muted)" }}>Нет записей</p>
+                    : <div className="space-y-2">
+                      {historyData.deposits.map(d => (
+                        <div key={d.id} className="flex items-center justify-between py-2 border-b" style={{ borderColor: "var(--border)" }}>
+                          <div>
+                            <p className="text-white font-semibold">+{d.amount.toFixed(2)} USDT</p>
+                            {d.comment && <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{d.comment}</p>}
+                            <p className="text-xs" style={{ color: "var(--muted)" }}>{new Date(d.created_at).toLocaleString("ru")}</p>
+                          </div>
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                            background: d.status === "approved" ? "#0d3a20" : d.status === "rejected" ? "#3a0d0d" : "#1a1200",
+                            color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b"
+                          }}>
+                            {d.status === "approved" ? "✓ Зачислено" : d.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  }
+                </div>
+
+                {/* Выводы */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2" style={{ color: "#ff9944" }}>💸 Выводы</h3>
+                  {historyData.withdrawals.length === 0
+                    ? <p className="text-sm" style={{ color: "var(--muted)" }}>Нет записей</p>
+                    : <div className="space-y-2">
+                      {historyData.withdrawals.map(w => (
+                        <div key={w.id} className="flex items-center justify-between py-2 border-b" style={{ borderColor: "var(--border)" }}>
+                          <div>
+                            <p className="text-white font-semibold">-{w.amount.toFixed(2)} USDT</p>
+                            {w.comment && <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{w.comment}</p>}
+                            <p className="text-xs" style={{ color: "var(--muted)" }}>{new Date(w.created_at).toLocaleString("ru")}</p>
+                          </div>
+                          <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                            background: w.status === "approved" ? "#0d3a20" : w.status === "rejected" ? "#3a0d0d" : "#1a0d00",
+                            color: w.status === "approved" ? "#22c97a" : w.status === "rejected" ? "#ff4d4d" : "#ff9944"
+                          }}>
+                            {w.status === "approved" ? "✓ Выплачено" : w.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  }
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

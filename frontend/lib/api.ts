@@ -55,6 +55,14 @@ export async function getUserDetail(id: string) {
   return res.data;
 }
 
+export async function getUserHistory(id: string) {
+  const res = await api.get(`/auth/admin/users/${id}/history`);
+  return res.data as {
+    deposits: {id:string;amount:number;comment:string;status:string;created_at:string}[];
+    withdrawals: {id:string;amount:number;comment:string;status:string;created_at:string}[];
+  };
+}
+
 export async function updateUserFinancials(id: string, investment_usdt: number, withdrawal_usdt: number, note: string) {
   await api.patch(`/auth/admin/users/${id}/financials`, null, {
     params: { investment_usdt, withdrawal_usdt, note }
