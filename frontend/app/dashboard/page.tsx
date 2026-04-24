@@ -320,22 +320,27 @@ export default function DashboardPage() {
             {data.positions.length === 0
               ? <p className="text-sm" style={{ color: "var(--muted)" }}>Позиций нет</p>
               : <div className="space-y-2">
-                {data.positions.map((p, i) => (
-                  <div key={i} className="flex justify-between items-center py-2 border-b" style={{ borderColor: "var(--border)" }}>
-                    <span className="font-medium text-white">{p.symbol}</span>
-                    <div className="text-right">
-                      <p className="text-sm text-white">{p.amount.toFixed(6)}</p>
-                      <p className="text-xs" style={{ color: "var(--muted)" }}>
-                        avg ${p.avg_price.toFixed(4)} · {(p.amount * (p.current_price || p.avg_price)).toFixed(2)} $
-                      </p>
-                      {p.current_price && p.current_price !== p.avg_price && (
-                        <p className="text-xs" style={{ color: p.current_price >= p.avg_price ? "#22c97a" : "#ff4d4d" }}>
-                          тек. ${p.current_price.toFixed(4)}
+                {data.positions.map((p, i) => {
+                  const cur = p.current_price || p.avg_price;
+                  const value = p.amount * cur;
+                  const pnl = p.amount * (cur - p.avg_price);
+                  const pnlPct = ((cur - p.avg_price) / p.avg_price) * 100;
+                  const pnlColor = pnl >= 0 ? "#22c97a" : "#ff4d4d";
+                  return (
+                    <div key={i} className="flex justify-between items-center py-2 border-b" style={{ borderColor: "var(--border)" }}>
+                      <span className="font-medium text-white">{p.symbol}</span>
+                      <div className="text-right">
+                        <p className="text-sm text-white">{value.toFixed(2)} $</p>
+                        <p className="text-xs" style={{ color: "var(--muted)" }}>
+                          avg ${p.avg_price.toFixed(4)} · тек. ${cur.toFixed(4)}
                         </p>
-                      )}
+                        <p className="text-xs font-semibold" style={{ color: pnlColor }}>
+                          {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} $ ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             }
           </div>
