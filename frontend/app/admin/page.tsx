@@ -23,7 +23,7 @@ interface Overview {
   total_invested: number; total_withdrawn: number;
   admin_income: number; admin_own_capital: number; admin_own_pnl: number; admin_total_income: number; pool_profit: number;
   pool_pnl_usdt: number; pool_pnl_pct: number; real_start_balance: number; net_invested_pool: number;
-  positions: { symbol: string; amount: number; avg_price: number; value: number }[];
+  positions: { symbol: string; amount: number; avg_price: number; current_price: number; value: number }[];
   trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
   ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
   investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number }[];
@@ -409,15 +409,24 @@ export default function AdminPage() {
               {data.positions.length === 0
                 ? <p className="text-sm" style={{ color: "var(--muted)" }}>Позиций нет</p>
                 : <div className="space-y-2">
-                  {data.positions.map((p, i) => (
-                    <div key={i} className="flex justify-between items-center py-2 border-b" style={{ borderColor: "var(--border)" }}>
-                      <span className="font-medium text-white">{p.symbol}</span>
-                      <div className="text-right">
-                        <p className="text-sm text-white">{p.amount.toFixed(6)}</p>
-                        <p className="text-xs" style={{ color: "var(--muted)" }}>avg ${p.avg_price.toFixed(4)} · {p.value.toFixed(2)} $</p>
+                  {data.positions.map((p, i) => {
+                    const cur = p.current_price > 0 ? p.current_price : p.avg_price;
+                    const pnl = p.amount * (cur - p.avg_price);
+                    const pnlPct = ((cur - p.avg_price) / p.avg_price) * 100;
+                    const pnlColor = pnl >= 0 ? "#22c97a" : "#ff4d4d";
+                    return (
+                      <div key={i} className="flex justify-between items-center py-2 border-b" style={{ borderColor: "var(--border)" }}>
+                        <span className="font-medium text-white">{p.symbol}</span>
+                        <div className="text-right">
+                          <p className="text-sm text-white">{p.value.toFixed(2)} $</p>
+                          <p className="text-xs" style={{ color: "var(--muted)" }}>avg ${p.avg_price.toFixed(4)} · тек. ${cur.toFixed(4)}</p>
+                          <p className="text-xs font-semibold" style={{ color: pnlColor }}>
+                            {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} $ ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               }
             </div>
