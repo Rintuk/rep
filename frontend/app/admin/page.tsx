@@ -416,7 +416,7 @@ export default function AdminPage() {
                     const pnlColor = pnl >= 0 ? "#22c97a" : "#ff4d4d";
                     return (
                       <div key={i} className="flex justify-between items-center py-2 border-b" style={{ borderColor: "var(--border)" }}>
-                        <span className="font-medium text-white">{p.symbol}</span>
+                        <a href={`https://www.tradingview.com/chart/?symbol=BYBIT:${p.symbol}`} target="_blank" rel="noopener noreferrer" className="font-medium text-white hover:text-blue-400 cursor-pointer">{p.symbol}</a>
                         <div className="text-right">
                           <p className="text-sm text-white">{p.value.toFixed(2)} $</p>
                           <p className="text-xs" style={{ color: "var(--muted)" }}>avg ${p.avg_price.toFixed(4)} · тек. ${cur.toFixed(4)}</p>
