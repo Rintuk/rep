@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getDashboard, createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings } from "lucide-react";
@@ -14,13 +14,84 @@ interface Dashboard {
   mode: string; hwm: number; drawdown_pct: number; server_online: boolean;
   last_updated: string | null;
   user_investment: number; user_pnl: number; user_pnl_pct: number;
-  ref_bonus: number;
-  referral_code: string;
-  referrals: ReferralInfo[];
+  ref_bonus: number; referral_code: string; referrals: ReferralInfo[];
   positions: Position[]; recent_trades: Trade[]; ai_feed: AIFeed[];
 }
 
 const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888" };
+
+// ─── Circuit board background ─────────────────────────────────────────────────
+function CircuitBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    resize();
+    window.addEventListener("resize", resize);
+    const COLS = 18, ROWS = 12;
+    type Edge = { to: number; mx: number; my: number };
+    type CNode = { x: number; y: number; edges: Edge[] };
+    const nodes: CNode[] = [];
+    const jitter = () => (Math.random() - 0.5) * 60;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        nodes.push({ x: (canvas.width / (COLS - 1)) * c + jitter(), y: (canvas.height / (ROWS - 1)) * r + jitter(), edges: [] });
+    nodes.forEach((n, i) => {
+      [i + 1, i + COLS, i + COLS + 1, i + COLS - 1].forEach(j => {
+        if (j < nodes.length && Math.random() > 0.35) {
+          const t = nodes[j];
+          const mx = Math.random() > 0.5 ? t.x : n.x;
+          const my = mx === t.x ? n.y : t.y;
+          n.edges.push({ to: j, mx, my });
+        }
+      });
+    });
+    type Pulse = { from: CNode; to: CNode; t: number; speed: number };
+    const newPulse = (): Pulse => {
+      const n = nodes[Math.floor(Math.random() * nodes.length)];
+      const e = n.edges.length ? n.edges[Math.floor(Math.random() * n.edges.length)] : null;
+      return { from: n, to: e ? nodes[e.to] : n, t: 0, speed: 0.004 + Math.random() * 0.006 };
+    };
+    const pulses: Pulse[] = Array.from({ length: 18 }, newPulse);
+    let raf: number;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(0,180,255,0.07)";
+      nodes.forEach(n => n.edges.forEach(e => {
+        const t = nodes[e.to];
+        ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(e.mx, e.my); ctx.lineTo(t.x, t.y); ctx.stroke();
+      }));
+      ctx.fillStyle = "rgba(0,200,255,0.12)";
+      nodes.forEach(n => { ctx.beginPath(); ctx.arc(n.x, n.y, 2, 0, Math.PI * 2); ctx.fill(); });
+      pulses.forEach((p, i) => {
+        p.t += p.speed;
+        if (p.t >= 1) { pulses[i] = newPulse(); return; }
+        const x = p.from.x + (p.to.x - p.from.x) * p.t;
+        const y = p.from.y + (p.to.y - p.from.y) * p.t;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 7);
+        g.addColorStop(0, "rgba(0,220,255,0.8)"); g.addColorStop(1, "rgba(0,220,255,0)");
+        ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fillStyle = "rgba(180,240,255,0.9)"; ctx.fill();
+      });
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+  }, []);
+  return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }} />;
+}
+
+// ─── Shared card style ────────────────────────────────────────────────────────
+const card: React.CSSProperties = {
+  background: "rgba(8,12,35,0.82)",
+  border: "1px solid rgba(0,180,255,0.15)",
+  borderRadius: 14,
+  backdropFilter: "blur(12px)",
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -58,15 +129,10 @@ export default function DashboardPage() {
       const d = await getDashboard();
       setData(d);
       if (d.referral_code) setReferralCode(d.referral_code);
-    } catch {
-      setError("Ошибка загрузки. Возможно сессия истекла.");
-    }
+    } catch { setError("Ошибка загрузки. Возможно сессия истекла."); }
   }
 
-  function logout() {
-    localStorage.removeItem("token");
-    router.push("/login");
-  }
+  function logout() { localStorage.removeItem("token"); router.push("/login"); }
 
   async function handleDepositSubmit() {
     const amount = parseFloat(depositAmount);
@@ -74,14 +140,9 @@ export default function DashboardPage() {
     setDepositLoading(true);
     try {
       await createDepositRequest(amount, depositComment);
-      setDepositDone(true);
-      setDepositAmount("");
-      setDepositComment("");
-      const updated = await getMyDeposits();
-      setMyDeposits(updated);
-    } finally {
-      setDepositLoading(false);
-    }
+      setDepositDone(true); setDepositAmount(""); setDepositComment("");
+      setMyDeposits(await getMyDeposits());
+    } finally { setDepositLoading(false); }
   }
 
   async function handleWithdrawSubmit() {
@@ -90,36 +151,31 @@ export default function DashboardPage() {
     setWithdrawLoading(true);
     try {
       await createWithdrawalRequest(amount, withdrawComment);
-      setWithdrawDone(true);
-      setWithdrawAmount("");
-      setWithdrawComment("");
-      const updated = await getMyWithdrawals();
-      setMyWithdrawals(updated);
-    } finally {
-      setWithdrawLoading(false);
-    }
+      setWithdrawDone(true); setWithdrawAmount(""); setWithdrawComment("");
+      setMyWithdrawals(await getMyWithdrawals());
+    } finally { setWithdrawLoading(false); }
   }
 
   function copyRefLink() {
-    const link = `${window.location.origin}/register?ref=${referralCode}`;
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(`${window.location.origin}/register?ref=${referralCode}`);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
 
   if (error) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
-      <div className="text-center">
-        <p className="text-red-400 mb-4">{error}</p>
-        <a href="/login" className="text-blue-400 hover:underline">Войти снова</a>
+    <div style={{ minHeight: "100vh", background: "#050a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <CircuitBackground />
+      <div style={{ ...card, padding: 32, textAlign: "center", position: "relative", zIndex: 1 }}>
+        <p style={{ color: "#ff5555", marginBottom: 16 }}>{error}</p>
+        <a href="/login" style={{ color: "#4488dd" }}>Войти снова</a>
       </div>
     </div>
   );
 
   if (!data) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
-      <div className="text-center" style={{ color: "var(--muted)" }}>
-        <div className="text-3xl mb-3 animate-pulse">⚡</div>
+    <div style={{ minHeight: "100vh", background: "#050a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <CircuitBackground />
+      <div style={{ position: "relative", zIndex: 1, textAlign: "center", color: "#4a6a9a" }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⚡</div>
         <p>Загрузка данных...</p>
       </div>
     </div>
@@ -128,183 +184,146 @@ export default function DashboardPage() {
   const pnlColor = data.user_pnl >= 0 ? "#22c97a" : "#ff4d4d";
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      {/* Шапка */}
-      <header className="border-b px-4 py-3 flex items-center justify-between" style={{ borderColor: "var(--border)", background: "var(--card)" }}>
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🤖</span>
+    <div style={{ minHeight: "100vh", background: "#050a1a" }}>
+      <CircuitBackground />
+
+      {/* ── Шапка ─────────────────────────────────────────────────────────── */}
+      <header style={{
+        position: "sticky", top: 0, zIndex: 10,
+        background: "rgba(5,8,25,0.92)",
+        borderBottom: "1px solid rgba(0,180,255,0.15)",
+        backdropFilter: "blur(16px)",
+        padding: "12px 20px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 26 }}>🤖</span>
           <div>
-            <h1 className="font-bold text-white text-base leading-none">AI Маклер</h1>
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
-              background: data.server_online ? "#0d3a20" : "#3a0d0d",
-              color: data.server_online ? "#22c97a" : "#ff4d4d"
+            <h1 style={{ color: "#fff", fontWeight: 800, fontSize: 16, lineHeight: 1, letterSpacing: 0.5 }}>AI Маклер</h1>
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20,
+              background: data.server_online ? "rgba(34,201,122,0.12)" : "rgba(255,77,77,0.12)",
+              color: data.server_online ? "#22c97a" : "#ff4d4d",
+              border: `1px solid ${data.server_online ? "rgba(34,201,122,0.3)" : "rgba(255,77,77,0.3)"}`,
             }}>
-              {data.server_online ? "● ONLINE" : "● OFFLINE"}
+              ● {data.server_online ? "ONLINE" : "OFFLINE"}
             </span>
           </div>
         </div>
 
-        {/* Шестерёнка — меню */}
-        <div className="relative">
-          <button
-            onClick={() => setMenuOpen(v => !v)}
-            className="p-2 rounded-lg border transition hover:opacity-80"
-            style={{ borderColor: menuOpen ? "#4488dd" : "var(--border)", color: menuOpen ? "#4488dd" : "var(--muted)" }}>
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setMenuOpen(v => !v)} style={{
+            padding: "8px", borderRadius: 10, cursor: "pointer",
+            background: menuOpen ? "rgba(0,180,255,0.1)" : "transparent",
+            border: `1px solid ${menuOpen ? "rgba(0,180,255,0.4)" : "rgba(0,180,255,0.15)"}`,
+            color: menuOpen ? "#00cfff" : "#4a6a9a", transition: "all 0.2s",
+          }}>
             <Settings size={20} />
           </button>
 
           {menuOpen && (
             <>
-              {/* Оверлей для закрытия по клику вне */}
-              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-11 z-50 w-56 rounded-xl border shadow-xl overflow-hidden"
-                style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-
-                {/* Реал / Демо */}
-                <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
-                  <span className="text-sm text-white">Режим</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-white">Реал</span>
-                    <button
-                      onClick={() => { setMenuOpen(false); router.push("/demo"); }}
-                      className="relative w-11 h-6 rounded-full"
-                      style={{ background: "#2a2a2a", border: "1px solid #444" }}>
-                      <span className="absolute left-1 top-1 w-4 h-4 rounded-full"
-                        style={{ background: "#666" }} />
-                    </button>
-                    <span className="text-xs font-semibold" style={{ color: "var(--muted)" }}>Демо</span>
+              <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
+              <div style={{
+                position: "absolute", right: 0, top: 44, zIndex: 50, width: 220,
+                ...card, overflow: "hidden",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              }}>
+                {[
+                  { label: "Реал / Демо", special: "toggle" },
+                  { label: "Пополнить счёт", color: "#22c97a", icon: <PlusCircle size={15}/>, action: () => { setMenuOpen(false); setShowDeposit(true); setDepositDone(false); } },
+                  { label: "Вывести средства", color: "#ff9944", icon: <Wallet size={15}/>, action: () => { setMenuOpen(false); setShowWithdraw(true); setWithdrawDone(false); } },
+                  { label: copied ? "Скопировано!" : "Реф. ссылка", color: "#6b8ab0", icon: <Copy size={15}/>, action: () => { setMenuOpen(false); copyRefLink(); } },
+                  { label: "Выйти", color: "#ff4d4d", icon: <LogOut size={15}/>, action: () => { setMenuOpen(false); logout(); } },
+                ].map((item, i) => item.special === "toggle" ? (
+                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
+                    <span style={{ color: "#fff", fontSize: 13 }}>Режим</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "#fff", fontSize: 11, fontWeight: 600 }}>Реал</span>
+                      <button onClick={() => { setMenuOpen(false); router.push("/demo"); }}
+                        style={{ width: 44, height: 24, borderRadius: 12, background: "#1a2040", border: "1px solid rgba(0,180,255,0.2)", cursor: "pointer", position: "relative" }}>
+                        <span style={{ position: "absolute", left: 4, top: 4, width: 14, height: 14, borderRadius: "50%", background: "#4a6a9a" }} />
+                      </button>
+                      <span style={{ color: "#4a6a9a", fontSize: 11, fontWeight: 600 }}>Демо</span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Пополнить */}
-                <button
-                  onClick={() => { setMenuOpen(false); setShowDeposit(true); setDepositDone(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5 border-b"
-                  style={{ borderColor: "var(--border)", color: "#22c97a" }}>
-                  <PlusCircle size={16} /> Пополнить счёт
-                </button>
-
-                {/* Вывести */}
-                <button
-                  onClick={() => { setMenuOpen(false); setShowWithdraw(true); setWithdrawDone(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5 border-b"
-                  style={{ borderColor: "var(--border)", color: "#ff9944" }}>
-                  <Wallet size={16} /> Вывести средства
-                </button>
-
-                {/* Реферальная ссылка */}
-                <button
-                  onClick={() => { setMenuOpen(false); copyRefLink(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5 border-b"
-                  style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-                  <Copy size={16} /> {copied ? "Скопировано!" : "Реф. ссылка"}
-                </button>
-
-                {/* Выйти */}
-                <button
-                  onClick={() => { setMenuOpen(false); logout(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/5"
-                  style={{ color: "#ff4d4d" }}>
-                  <LogOut size={16} /> Выйти
-                </button>
+                ) : (
+                  <button key={i} onClick={item.action} style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "12px 16px", color: item.color, fontSize: 13, cursor: "pointer",
+                    background: "none", border: "none", borderBottom: i < 4 ? "1px solid rgba(0,180,255,0.08)" : "none",
+                    textAlign: "left", transition: "background 0.15s",
+                  }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                  >
+                    {item.icon} {item.label}
+                  </button>
+                ))}
               </div>
             </>
           )}
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
 
-        {/* Карточки */}
-        <div className={`grid gap-4 ${data.ref_bonus > 0 ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2 md:grid-cols-4"}`}>
+        {/* ── Карточки метрик ───────────────────────────────────────────────── */}
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.ref_bonus > 0 ? 5 : 4}, 1fr)`, gap: 12 }} className="metrics-grid">
+          <style>{`
+            @media (max-width: 768px) { .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+            input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
+              -webkit-box-shadow: 0 0 0 1000px rgba(5,10,30,0.95) inset !important;
+              -webkit-text-fill-color: #e0e8ff !important; caret-color: #e0e8ff;
+            }
+          `}</style>
+
           {[
-            {
-              icon: <Wallet size={20} />,
-              label: "Общий пул (USDT)",
-              value: `${data.pool_total_usdt.toFixed(2)} $`,
-              sub: `свободно: ${data.balance_usdt.toFixed(2)} $`,
-              color: "#4488dd"
-            },
-            {
-              icon: <Activity size={20} />,
-              label: "Пул в позициях",
-              value: `${data.pool_positions_usdt.toFixed(2)} $`,
-              sub: null,
-              color: "#9966ee"
-            },
-            {
-              icon: <TrendingUp size={20} />,
-              label: "Ваш баланс",
-              value: data.user_investment > 0 ? `${data.user_investment.toFixed(2)} $` : "—",
-              sub: data.user_investment > 0 ? "инвестировано" : "нет данных",
-              color: "#22c97a"
-            },
-            {
-              icon: data.user_pnl >= 0 ? <TrendingUp size={20} /> : <TrendingDown size={20} />,
-              label: "Чистый доход",
-              value: data.user_investment > 0
-                ? `${data.user_pnl >= 0 ? "+" : ""}${data.user_pnl.toFixed(2)} $`
-                : "—",
-              sub: data.user_investment > 0
-                ? `${data.user_pnl_pct >= 0 ? "+" : ""}${data.user_pnl_pct.toFixed(2)}% (после комиссий)`
-                : "нет вложений",
-              color: pnlColor
-            },
-            ...(data.ref_bonus > 0 ? [{
-              icon: <TrendingUp size={20} />,
-              label: "Реферальный доход",
-              value: `+${data.ref_bonus.toFixed(2)} $`,
-              sub: "3% от прибыли рефералов",
-              color: "#f59e0b"
-            }] : []),
+            { icon: <Wallet size={18}/>, label: "Общий пул", value: `${data.pool_total_usdt.toFixed(2)} $`, sub: `свободно: ${data.balance_usdt.toFixed(2)} $`, color: "#4488dd" },
+            { icon: <Activity size={18}/>, label: "Пул в позициях", value: `${data.pool_positions_usdt.toFixed(2)} $`, sub: null, color: "#9966ee" },
+            { icon: <TrendingUp size={18}/>, label: "Ваш баланс", value: data.user_investment > 0 ? `${data.user_investment.toFixed(2)} $` : "—", sub: data.user_investment > 0 ? "инвестировано" : "нет данных", color: "#22c97a" },
+            { icon: data.user_pnl >= 0 ? <TrendingUp size={18}/> : <TrendingDown size={18}/>, label: "Чистый доход", value: data.user_investment > 0 ? `${data.user_pnl >= 0 ? "+" : ""}${data.user_pnl.toFixed(2)} $` : "—", sub: data.user_investment > 0 ? `${data.user_pnl_pct >= 0 ? "+" : ""}${data.user_pnl_pct.toFixed(2)}%` : "нет вложений", color: pnlColor },
+            ...(data.ref_bonus > 0 ? [{ icon: <TrendingUp size={18}/>, label: "Реф. доход", value: `+${data.ref_bonus.toFixed(2)} $`, sub: "3% от прибыли", color: "#f59e0b" }] : []),
           ].map((c, i) => (
-            <div key={i} className="rounded-xl p-4 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-              <div className="flex items-center gap-2 mb-2" style={{ color: c.color }}>
+            <div key={i} style={{ ...card, padding: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: c.color }}>
                 {c.icon}
-                <span className="text-xs" style={{ color: "var(--muted)" }}>{c.label}</span>
+                <span style={{ color: "#4a6a9a", fontSize: 11 }}>{c.label}</span>
               </div>
-              <p className="text-xl font-bold text-white">{c.value}</p>
-              {c.sub && <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>{c.sub}</p>}
+              <p style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>{c.value}</p>
+              {c.sub && <p style={{ color: "#4a6a9a", fontSize: 11, marginTop: 4 }}>{c.sub}</p>}
             </div>
           ))}
         </div>
 
-        {/* Рефералы */}
+        {/* ── Рефералы ─────────────────────────────────────────────────────── */}
         {data.referrals.length > 0 && (
-          <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <h2 className="font-semibold text-white mb-1">👥 Мои рефералы</h2>
-            <p className="text-xs mb-4" style={{ color: "var(--muted)" }}>
-              Вы получаете 3% от прибыли каждого приглашённого
-            </p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+          <div style={{ ...card, padding: 20 }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Мои рефералы</h2>
+            <p style={{ color: "#4a6a9a", fontSize: 12, marginBottom: 16 }}>Вы получаете 3% от прибыли каждого приглашённого</p>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
                 <thead>
-                  <tr style={{ color: "var(--muted)" }}>
-                    <th className="text-left pb-2 font-normal">Email</th>
-                    <th className="text-right pb-2 font-normal">Инвестиция</th>
-                    <th className="text-right pb-2 font-normal">Ваш бонус</th>
+                  <tr style={{ color: "#4a6a9a" }}>
+                    <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 400 }}>Email</th>
+                    <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Инвестиция</th>
+                    <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Ваш бонус</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.referrals.map((r, i) => (
-                    <tr key={i} className="border-t" style={{ borderColor: "var(--border)" }}>
-                      <td className="py-2 text-white">{r.email}</td>
-                      <td className="py-2 text-right text-white">
-                        {r.investment_usdt > 0 ? `${r.investment_usdt.toFixed(2)} $` : "—"}
-                      </td>
-                      <td className="py-2 text-right font-semibold" style={{ color: r.bonus_usdt > 0 ? "#f59e0b" : "var(--muted)" }}>
-                        {r.bonus_usdt > 0 ? `+${r.bonus_usdt.toFixed(2)} $` : "—"}
-                      </td>
+                    <tr key={i} style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
+                      <td style={{ padding: "8px 0", color: "#fff" }}>{r.email}</td>
+                      <td style={{ padding: "8px 0", textAlign: "right", color: "#fff" }}>{r.investment_usdt > 0 ? `${r.investment_usdt.toFixed(2)} $` : "—"}</td>
+                      <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600, color: r.bonus_usdt > 0 ? "#f59e0b" : "#4a6a9a" }}>{r.bonus_usdt > 0 ? `+${r.bonus_usdt.toFixed(2)} $` : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
                 {data.ref_bonus > 0 && (
                   <tfoot>
-                    <tr className="border-t" style={{ borderColor: "var(--border)" }}>
-                      <td colSpan={2} className="pt-2 text-sm" style={{ color: "var(--muted)" }}>Итого бонус</td>
-                      <td className="pt-2 text-right font-bold" style={{ color: "#f59e0b" }}>
-                        +{data.ref_bonus.toFixed(2)} $
-                      </td>
+                    <tr style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
+                      <td colSpan={2} style={{ paddingTop: 8, color: "#4a6a9a", fontSize: 12 }}>Итого бонус</td>
+                      <td style={{ paddingTop: 8, textAlign: "right", fontWeight: 700, color: "#f59e0b" }}>+{data.ref_bonus.toFixed(2)} $</td>
                     </tr>
                   </tfoot>
                 )}
@@ -313,207 +332,157 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Открытые позиции */}
-          <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <h2 className="font-semibold text-white mb-4">💼 Открытые позиции</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }} className="two-col">
+          <style>{`.two-col { @media (max-width:640px) { grid-template-columns: 1fr !important; } }`}</style>
+
+          {/* ── Позиции ────────────────────────────────────────────────────── */}
+          <div style={{ ...card, padding: 20 }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>💼 Открытые позиции</h2>
             {data.positions.length === 0
-              ? <p className="text-sm" style={{ color: "var(--muted)" }}>Позиций нет</p>
-              : <div className="space-y-2">
-                {data.positions.map((p, i) => {
-                  const cur = p.current_price || p.avg_price;
-                  const value = p.amount * cur;
-                  const pnl = p.amount * (cur - p.avg_price);
-                  const pnlPct = ((cur - p.avg_price) / p.avg_price) * 100;
-                  const pnlColor = pnl >= 0 ? "#22c97a" : "#ff4d4d";
-                  return (
-                    <div key={i} className="flex justify-between items-center py-2 border-b" style={{ borderColor: "var(--border)" }}>
-                      <a href={`https://www.tradingview.com/chart/?symbol=BYBIT:${p.symbol}`} target="_blank" rel="noopener noreferrer" className="font-medium text-white hover:text-blue-400 cursor-pointer">{p.symbol}</a>
-                      <div className="text-right">
-                        <p className="text-sm text-white">{value.toFixed(2)} $</p>
-                        <p className="text-xs" style={{ color: "var(--muted)" }}>
-                          avg ${p.avg_price.toFixed(4)} · тек. ${cur.toFixed(4)}
-                        </p>
-                        <p className="text-xs font-semibold" style={{ color: pnlColor }}>
-                          {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} $ ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
-                        </p>
-                      </div>
+              ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Позиций нет</p>
+              : data.positions.map((p, i) => {
+                const cur = p.current_price || p.avg_price;
+                const value = p.amount * cur;
+                const pnl = p.amount * (cur - p.avg_price);
+                const pnlPct = ((cur - p.avg_price) / p.avg_price) * 100;
+                const c = pnl >= 0 ? "#22c97a" : "#ff4d4d";
+                return (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
+                    <a href={`https://www.tradingview.com/chart/?symbol=BYBIT:${p.symbol}`} target="_blank" rel="noopener noreferrer"
+                      style={{ color: "#00cfff", fontWeight: 600, fontSize: 14, textDecoration: "none" }}>{p.symbol}</a>
+                    <div style={{ textAlign: "right" }}>
+                      <p style={{ color: "#fff", fontSize: 13 }}>{value.toFixed(2)} $</p>
+                      <p style={{ color: "#4a6a9a", fontSize: 11 }}>avg ${p.avg_price.toFixed(4)} · тек. ${cur.toFixed(4)}</p>
+                      <p style={{ color: c, fontSize: 11, fontWeight: 600 }}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} $ ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)</p>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })
             }
           </div>
 
-          {/* Последние сделки */}
-          <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <h2 className="font-semibold text-white mb-4">📋 Последние сделки</h2>
+          {/* ── Последние сделки ───────────────────────────────────────────── */}
+          <div style={{ ...card, padding: 20 }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>📋 Последние сделки</h2>
             {data.recent_trades.length === 0
-              ? <p className="text-sm" style={{ color: "var(--muted)" }}>Сделок нет</p>
-              : <div className="space-y-2">
-                {data.recent_trades.slice(0, 8).map((t, i) => (
-                  <div key={i} className="flex justify-between items-center py-2 border-b" style={{ borderColor: "var(--border)" }}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded"
-                        style={{ background: ACTION_COLOR[t.action] + "22", color: ACTION_COLOR[t.action] }}>
-                        {t.action}
-                      </span>
-                      <span className="text-sm text-white">{t.symbol}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-white">${t.price.toFixed(4)}</p>
-                      {t.pnl != null && (
-                        <p className="text-xs" style={{ color: t.pnl >= 0 ? "#22c97a" : "#ff4d4d" }}>
-                          {t.pnl >= 0 ? "+" : ""}{t.pnl.toFixed(2)}$
-                        </p>
-                      )}
-                    </div>
+              ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Сделок нет</p>
+              : data.recent_trades.slice(0, 8).map((t, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: ACTION_COLOR[t.action] + "22", color: ACTION_COLOR[t.action] }}>{t.action}</span>
+                    <span style={{ color: "#fff", fontSize: 13 }}>{t.symbol}</span>
                   </div>
-                ))}
-              </div>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ color: "#fff", fontSize: 13 }}>${t.price.toFixed(4)}</p>
+                    {t.pnl != null && <p style={{ color: t.pnl >= 0 ? "#22c97a" : "#ff4d4d", fontSize: 11 }}>{t.pnl >= 0 ? "+" : ""}{t.pnl.toFixed(2)}$</p>}
+                  </div>
+                </div>
+              ))
             }
           </div>
         </div>
 
-        {/* Лента ИИ */}
-        <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-          <h2 className="font-semibold text-white mb-4">🧠 Лента решений ИИ</h2>
+        {/* ── Лента ИИ ─────────────────────────────────────────────────────── */}
+        <div style={{ ...card, padding: 20 }}>
+          <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>🧠 Лента решений ИИ</h2>
           {data.ai_feed.length === 0
-            ? <p className="text-sm" style={{ color: "var(--muted)" }}>Решений пока нет</p>
-            : <div className="space-y-3">
-              {data.ai_feed.map((a, i) => (
-                <div key={i} className="flex gap-3 py-3 border-b" style={{ borderColor: "var(--border)" }}>
-                  <span className="text-xs font-bold px-2 py-1 rounded self-start mt-0.5"
-                    style={{ background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action] }}>
-                    {a.action}
-                  </span>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-white text-sm">{a.symbol}</span>
-                      <span className="text-xs" style={{ color: "var(--muted)" }}>{a.timestamp}</span>
-                    </div>
-                    <p className="text-sm" style={{ color: "var(--muted)" }}>{a.reason}</p>
+            ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Решений пока нет</p>
+            : data.ai_feed.map((a, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action], alignSelf: "flex-start", marginTop: 2, whiteSpace: "nowrap" }}>{a.action}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{a.symbol}</span>
+                    <span style={{ color: "#4a6a9a", fontSize: 11 }}>{a.timestamp}</span>
                   </div>
+                  <p style={{ color: "#4a6a9a", fontSize: 12, lineHeight: 1.5 }}>{a.reason}</p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))
           }
         </div>
 
-        {/* История заявок */}
+        {/* ── Заявки на пополнение ─────────────────────────────────────────── */}
         {myDeposits.length > 0 && (
-          <div className="rounded-xl p-5 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-            <h2 className="font-semibold text-white mb-4">💳 Заявки на пополнение</h2>
-            <div className="space-y-2">
-              {myDeposits.map(d => (
-                <div key={d.id} className="flex items-center justify-between py-2 border-b" style={{ borderColor: "var(--border)" }}>
-                  <div>
-                    <p className="text-white font-medium">{d.amount.toFixed(2)} USDT</p>
-                    <p className="text-xs" style={{ color: "var(--muted)" }}>{new Date(d.created_at).toLocaleString("ru")}</p>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
-                    background: d.status === "approved" ? "#0d3a20" : d.status === "rejected" ? "#3a0d0d" : "#1a1200",
-                    color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b"
-                  }}>
-                    {d.status === "approved" ? "✓ Подтверждено" : d.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
-                  </span>
+          <div style={{ ...card, padding: 20 }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>💳 Заявки на пополнение</h2>
+            {myDeposits.map(d => (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
+                <div>
+                  <p style={{ color: "#fff", fontWeight: 600 }}>{d.amount.toFixed(2)} USDT</p>
+                  <p style={{ color: "#4a6a9a", fontSize: 11 }}>{new Date(d.created_at).toLocaleString("ru")}</p>
                 </div>
-              ))}
-            </div>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20,
+                  background: d.status === "approved" ? "rgba(34,201,122,0.12)" : d.status === "rejected" ? "rgba(255,77,77,0.12)" : "rgba(245,158,11,0.12)",
+                  color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b",
+                  border: `1px solid ${d.status === "approved" ? "rgba(34,201,122,0.3)" : d.status === "rejected" ? "rgba(255,77,77,0.3)" : "rgba(245,158,11,0.3)"}`,
+                }}>
+                  {d.status === "approved" ? "✓ Подтверждено" : d.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
         {data.last_updated && (
-          <p className="text-center text-xs pb-4" style={{ color: "var(--muted)" }}>
+          <p style={{ textAlign: "center", color: "#2a3a5a", fontSize: 11, paddingBottom: 16 }}>
             Последнее обновление: {new Date(data.last_updated).toLocaleString("ru")}
           </p>
         )}
       </main>
 
-      {/* Модальное окно пополнения */}
+      {/* ── Модал: Пополнение ────────────────────────────────────────────────── */}
       {showDeposit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
-          style={{ background: "rgba(0,0,0,0.7)" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.75)" }}
           onClick={e => { if (e.target === e.currentTarget) setShowDeposit(false); }}>
-          <div className="rounded-2xl p-6 w-full max-w-sm border max-h-[90vh] overflow-y-auto" style={{ background: "var(--card)", borderColor: "#22c97a44" }}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold text-white text-lg">Пополнение депозита</h2>
-              <button onClick={() => setShowDeposit(false)} style={{ color: "var(--muted)" }}><X size={20} /></button>
+          <div style={{ ...card, padding: 24, width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", border: "1px solid rgba(34,201,122,0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>Пополнение депозита</h2>
+              <button onClick={() => setShowDeposit(false)} style={{ color: "#4a6a9a", background: "none", border: "none", cursor: "pointer" }}><X size={20}/></button>
             </div>
-
             {depositDone ? (
-              <div className="text-center py-6 space-y-3">
-                <div className="text-4xl">✅</div>
-                <p className="text-white font-semibold">Заявка принята!</p>
-                <p className="text-sm" style={{ color: "var(--muted)" }}>
-                  Ваш депозит будет обработан администратором <span style={{ color: "#22c97a" }}>в течение суток.</span>
-                </p>
-                <button onClick={() => setShowDeposit(false)}
-                  className="w-full py-2 rounded-lg font-semibold text-white mt-2 transition hover:opacity-90"
-                  style={{ background: "#22c97a33", color: "#22c97a" }}>
-                  Закрыть
-                </button>
+              <div style={{ textAlign: "center", padding: "24px 0" }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+                <p style={{ color: "#fff", fontWeight: 600, marginBottom: 8 }}>Заявка принята!</p>
+                <p style={{ color: "#4a6a9a", fontSize: 13, marginBottom: 20 }}>Депозит будет обработан <span style={{ color: "#22c97a" }}>в течение суток.</span></p>
+                <button onClick={() => setShowDeposit(false)} style={{ width: "100%", padding: "10px", borderRadius: 10, background: "rgba(34,201,122,0.12)", color: "#22c97a", border: "1px solid rgba(34,201,122,0.3)", cursor: "pointer", fontWeight: 600 }}>Закрыть</button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {/* Адрес кошелька */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {process.env.NEXT_PUBLIC_WALLET_ADDRESS && (() => {
                   const addr = process.env.NEXT_PUBLIC_WALLET_ADDRESS!;
                   return (
-                    <div className="rounded-xl p-4 border space-y-3" style={{ background: "#0d0d1a", borderColor: "#4488dd44" }}>
-                      <p className="text-xs font-semibold text-center" style={{ color: "#4488dd" }}>
-                        {process.env.NEXT_PUBLIC_WALLET_NETWORK || "USDT TRC20"} — адрес для пополнения
-                      </p>
-                      <div className="flex justify-center">
-                        <div className="p-2 rounded-lg bg-white">
-                          <QRCodeSVG value={addr} size={140} />
-                        </div>
+                    <div style={{ background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.2)", borderRadius: 12, padding: 16 }}>
+                      <p style={{ color: "#4488dd", fontSize: 12, fontWeight: 600, textAlign: "center", marginBottom: 12 }}>{process.env.NEXT_PUBLIC_WALLET_NETWORK || "USDT TRC20"}</p>
+                      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+                        <div style={{ background: "#fff", padding: 8, borderRadius: 8 }}><QRCodeSVG value={addr} size={130}/></div>
                       </div>
-                      <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: "#111130" }}>
-                        <p className="flex-1 text-xs break-all font-mono" style={{ color: "var(--muted)" }}>{addr}</p>
-                        <button onClick={() => {
-                          navigator.clipboard.writeText(addr);
-                          setCopiedAddress(true);
-                          setTimeout(() => setCopiedAddress(false), 2000);
-                        }} className="shrink-0 transition hover:opacity-80" style={{ color: copiedAddress ? "#22c97a" : "#4488dd" }}>
-                          {copiedAddress ? <CheckCheck size={16} /> : <Copy size={16} />}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(0,0,20,0.5)", borderRadius: 8, padding: "8px 12px" }}>
+                        <p style={{ flex: 1, color: "#4a6a9a", fontSize: 11, wordBreak: "break-all", fontFamily: "monospace" }}>{addr}</p>
+                        <button onClick={() => { navigator.clipboard.writeText(addr); setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2000); }} style={{ color: copiedAddress ? "#22c97a" : "#4488dd", background: "none", border: "none", cursor: "pointer" }}>
+                          {copiedAddress ? <CheckCheck size={15}/> : <Copy size={15}/>}
                         </button>
                       </div>
                     </div>
                   );
                 })()}
                 <div>
-                  <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Сумма (USDT)</label>
-                  <input
-                    type="number" min="1" step="0.01"
-                    value={depositAmount}
-                    onChange={e => setDepositAmount(e.target.value)}
-                    placeholder="100"
-                    className="w-full rounded-lg px-4 py-3 text-white text-xl font-bold border outline-none"
-                    style={{ background: "#0d0d1a", borderColor: "#22c97a44" }}
-                    autoFocus
-                  />
+                  <label style={{ color: "#4a6a9a", fontSize: 12, display: "block", marginBottom: 6 }}>Сумма (USDT)</label>
+                  <input type="number" min="1" step="0.01" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="100" autoFocus
+                    style={{ width: "100%", boxSizing: "border-box", background: "rgba(5,10,30,0.8)", border: "1px solid rgba(34,201,122,0.3)", borderRadius: 10, padding: "12px 14px", color: "#e0e8ff", fontSize: 20, fontWeight: 700, outline: "none" }} />
                 </div>
                 <div>
-                  <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Комментарий / TXID (необязательно)</label>
-                  <input
-                    type="text"
-                    value={depositComment}
-                    onChange={e => setDepositComment(e.target.value)}
-                    placeholder="Хэш транзакции или примечание..."
-                    className="w-full rounded-lg px-4 py-3 text-white border outline-none"
-                    style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
-                  />
+                  <label style={{ color: "#4a6a9a", fontSize: 12, display: "block", marginBottom: 6 }}>Комментарий / TXID (необязательно)</label>
+                  <input type="text" value={depositComment} onChange={e => setDepositComment(e.target.value)} placeholder="Хэш транзакции или примечание..."
+                    style={{ width: "100%", boxSizing: "border-box", background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.2)", borderRadius: 10, padding: "10px 14px", color: "#e0e8ff", fontSize: 13, outline: "none" }} />
                 </div>
-                <div className="rounded-lg p-3 text-sm space-y-1" style={{ background: "#1a1200", borderLeft: "3px solid #f59e0b" }}>
-                  <p style={{ color: "#f59e0b" }}>⏳ Заявка обрабатывается в течение суток.</p>
-                  <p style={{ color: "#a87a30" }}>⚠️ Учтите комиссию сети — на счёт будет зачислена фактически полученная сумма, которая может быть меньше отправленной.</p>
+                <div style={{ background: "rgba(245,158,11,0.08)", borderLeft: "3px solid #f59e0b", borderRadius: 4, padding: 12, fontSize: 12 }}>
+                  <p style={{ color: "#f59e0b", marginBottom: 4 }}>⏳ Заявка обрабатывается в течение суток.</p>
+                  <p style={{ color: "#a87a30" }}>⚠️ Учтите комиссию сети — на счёт зачислится фактически полученная сумма.</p>
                 </div>
-                <button
-                  onClick={handleDepositSubmit}
-                  disabled={depositLoading || !depositAmount || parseFloat(depositAmount) <= 0}
-                  className="w-full py-3 rounded-lg font-bold text-white transition hover:opacity-90 disabled:opacity-50"
-                  style={{ background: "#22c97a" }}>
+                <button onClick={handleDepositSubmit} disabled={depositLoading || !depositAmount || parseFloat(depositAmount) <= 0}
+                  style={{ padding: "13px", borderRadius: 10, background: "linear-gradient(180deg,#22c97a,#16a360)", color: "#fff", fontWeight: 700, fontSize: 15, border: "none", cursor: "pointer", opacity: depositLoading || !depositAmount ? 0.5 : 1 }}>
                   {depositLoading ? "Отправка..." : "Отправить заявку"}
                 </button>
               </div>
@@ -522,65 +491,48 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Модальное окно — Вывод средств */}
+      {/* ── Модал: Вывод ─────────────────────────────────────────────────────── */}
       {showWithdraw && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.75)" }}
           onClick={e => { if (e.target === e.currentTarget) setShowWithdraw(false); }}>
-          <div className="rounded-2xl p-6 w-full max-w-sm border max-h-[90vh] overflow-y-auto" style={{ background: "var(--card)", borderColor: "#ff994444" }}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-bold text-white text-lg">Вывод средств</h2>
-              <button onClick={() => setShowWithdraw(false)} style={{ color: "var(--muted)" }}><X size={20} /></button>
+          <div style={{ ...card, padding: 24, width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", border: "1px solid rgba(255,153,68,0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>Вывод средств</h2>
+              <button onClick={() => setShowWithdraw(false)} style={{ color: "#4a6a9a", background: "none", border: "none", cursor: "pointer" }}><X size={20}/></button>
             </div>
-
             {withdrawDone ? (
-              <div className="text-center py-6 space-y-3">
-                <div className="text-4xl">✅</div>
-                <p className="font-bold text-white">Заявка отправлена</p>
-                <p className="text-sm" style={{ color: "var(--muted)" }}>Администратор обработает её в течение суток.</p>
-                <button onClick={() => setShowWithdraw(false)} className="w-full py-3 rounded-lg font-bold text-white" style={{ background: "#ff9944" }}>Закрыть</button>
+              <div style={{ textAlign: "center", padding: "24px 0" }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+                <p style={{ color: "#fff", fontWeight: 700, marginBottom: 8 }}>Заявка отправлена</p>
+                <p style={{ color: "#4a6a9a", fontSize: 13, marginBottom: 20 }}>Администратор обработает её в течение суток.</p>
+                <button onClick={() => setShowWithdraw(false)} style={{ width: "100%", padding: "13px", borderRadius: 10, background: "linear-gradient(180deg,#ff9944,#cc6600)", color: "#fff", fontWeight: 700, border: "none", cursor: "pointer" }}>Закрыть</button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div>
-                  <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Сумма вывода (USDT)</label>
-                  <input
-                    type="number" min="1" step="0.01"
-                    value={withdrawAmount}
-                    onChange={e => setWithdrawAmount(e.target.value)}
-                    placeholder="100"
-                    className="w-full rounded-lg px-4 py-3 text-white border outline-none"
-                    style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
-                  />
+                  <label style={{ color: "#4a6a9a", fontSize: 12, display: "block", marginBottom: 6 }}>Сумма вывода (USDT)</label>
+                  <input type="number" min="1" step="0.01" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} placeholder="100"
+                    style={{ width: "100%", boxSizing: "border-box", background: "rgba(5,10,30,0.8)", border: "1px solid rgba(255,153,68,0.3)", borderRadius: 10, padding: "12px 14px", color: "#e0e8ff", fontSize: 14, outline: "none" }} />
                 </div>
                 <div>
-                  <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Адрес кошелька / комментарий</label>
-                  <input
-                    type="text"
-                    value={withdrawComment}
-                    onChange={e => setWithdrawComment(e.target.value)}
-                    placeholder="TRC20 адрес или примечание..."
-                    className="w-full rounded-lg px-4 py-3 text-white border outline-none"
-                    style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
-                  />
+                  <label style={{ color: "#4a6a9a", fontSize: 12, display: "block", marginBottom: 6 }}>Адрес кошелька / комментарий</label>
+                  <input type="text" value={withdrawComment} onChange={e => setWithdrawComment(e.target.value)} placeholder="TRC20 адрес или примечание..."
+                    style={{ width: "100%", boxSizing: "border-box", background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.2)", borderRadius: 10, padding: "10px 14px", color: "#e0e8ff", fontSize: 13, outline: "none" }} />
                 </div>
-                <div className="rounded-lg p-3 text-sm" style={{ background: "#1a0d00", borderLeft: "3px solid #ff9944" }}>
+                <div style={{ background: "rgba(255,153,68,0.08)", borderLeft: "3px solid #ff9944", borderRadius: 4, padding: 12, fontSize: 12 }}>
                   <p style={{ color: "#ff9944" }}>⏳ Заявка обрабатывается в течение суток.</p>
                 </div>
-                <button
-                  onClick={handleWithdrawSubmit}
-                  disabled={withdrawLoading || !withdrawAmount || parseFloat(withdrawAmount) <= 0}
-                  className="w-full py-3 rounded-lg font-bold text-white transition hover:opacity-90 disabled:opacity-50"
-                  style={{ background: "#ff9944" }}>
+                <button onClick={handleWithdrawSubmit} disabled={withdrawLoading || !withdrawAmount || parseFloat(withdrawAmount) <= 0}
+                  style={{ padding: "13px", borderRadius: 10, background: "linear-gradient(180deg,#ff9944,#cc6600)", color: "#fff", fontWeight: 700, fontSize: 15, border: "none", cursor: "pointer", opacity: withdrawLoading || !withdrawAmount ? 0.5 : 1 }}>
                   {withdrawLoading ? "Отправка..." : "Отправить заявку"}
                 </button>
-
                 {myWithdrawals.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
-                    <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>МОИ ЗАЯВКИ НА ВЫВОД</p>
+                  <div style={{ borderTop: "1px solid rgba(0,180,255,0.08)", paddingTop: 12 }}>
+                    <p style={{ color: "#4a6a9a", fontSize: 11, fontWeight: 600, marginBottom: 8 }}>МОИ ЗАЯВКИ НА ВЫВОД</p>
                     {myWithdrawals.map(w => (
-                      <div key={w.id} className="flex justify-between text-xs py-1">
-                        <span style={{ color: "var(--muted)" }}>{new Date(w.created_at).toLocaleDateString("ru")}</span>
-                        <span className="text-white">{w.amount} USDT</span>
+                      <div key={w.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0" }}>
+                        <span style={{ color: "#4a6a9a" }}>{new Date(w.created_at).toLocaleDateString("ru")}</span>
+                        <span style={{ color: "#fff" }}>{w.amount} USDT</span>
                         <span style={{ color: w.status === "approved" ? "#22c97a" : w.status === "rejected" ? "#ff4d4d" : "#f59e0b" }}>
                           {w.status === "approved" ? "Выплачено" : w.status === "rejected" ? "Отклонено" : "Ожидает"}
                         </span>
