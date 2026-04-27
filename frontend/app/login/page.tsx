@@ -24,64 +24,60 @@ function CircuitBackground() {
     // Generate circuit nodes
     const COLS = 18;
     const ROWS = 12;
-    type CNode = { x: number; y: number; connected: number[] };
+    // Edge with pre-computed 90-degree routing direction
+    type Edge = { to: number; mx: number; my: number };
+    type CNode = { x: number; y: number; edges: Edge[] };
     const nodes: CNode[] = [];
 
     const jitter = () => (Math.random() - 0.5) * 60;
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        nodes.push({
-          x: (canvas.width / (COLS - 1)) * c + jitter(),
-          y: (canvas.height / (ROWS - 1)) * r + jitter(),
-          connected: [],
-        });
-      }
-    }
-    // Connect neighbours with some randomness
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        nodes.push({ x: (canvas.width / (COLS - 1)) * c + jitter(), y: (canvas.height / (ROWS - 1)) * r + jitter(), edges: [] });
+
     nodes.forEach((n, i) => {
-      const candidates = [i + 1, i + COLS, i + COLS + 1, i + COLS - 1];
-      candidates.forEach(j => {
-        if (j < nodes.length && Math.random() > 0.35) n.connected.push(j);
+      [i + 1, i + COLS, i + COLS + 1, i + COLS - 1].forEach(j => {
+        if (j < nodes.length && Math.random() > 0.35) {
+          const t = nodes[j];
+          // routing direction fixed at init — no random in draw loop
+          const mx = Math.random() > 0.5 ? t.x : n.x;
+          const my = mx === t.x ? n.y : t.y;
+          n.edges.push({ to: j, mx, my });
+        }
       });
     });
 
-    // Pulse dots travelling along edges
     type Pulse = { from: CNode; to: CNode; t: number; speed: number };
     const pulses: Pulse[] = [];
-    const addPulse = () => {
+    const newPulse = (): Pulse => {
       const n = nodes[Math.floor(Math.random() * nodes.length)];
-      if (!n.connected.length) return;
-      const to = nodes[n.connected[Math.floor(Math.random() * n.connected.length)]];
-      pulses.push({ from: n, to, t: 0, speed: 0.004 + Math.random() * 0.006 });
+      const e = n.edges.length ? n.edges[Math.floor(Math.random() * n.edges.length)] : null;
+      return { from: n, to: e ? nodes[e.to] : n, t: 0, speed: 0.004 + Math.random() * 0.006 };
     };
-    for (let i = 0; i < 18; i++) addPulse();
+    for (let i = 0; i < 18; i++) pulses.push(newPulse());
 
     let raf: number;
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Traces
+      // Traces — no Math.random() here
       ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(0,180,255,0.09)";
       nodes.forEach(n => {
-        n.connected.forEach(j => {
-          const t = nodes[j];
-          ctx.strokeStyle = "rgba(0,180,255,0.09)";
+        n.edges.forEach(e => {
+          const t = nodes[e.to];
           ctx.beginPath();
           ctx.moveTo(n.x, n.y);
-          // 90-degree routing
-          const mx = Math.random() > 0.5 ? t.x : n.x;
-          const my = mx === t.x ? n.y : t.y;
-          ctx.lineTo(mx, my);
+          ctx.lineTo(e.mx, e.my);
           ctx.lineTo(t.x, t.y);
           ctx.stroke();
         });
       });
 
       // Nodes (solder pads)
+      ctx.fillStyle = "rgba(0,200,255,0.18)";
       nodes.forEach(n => {
         ctx.beginPath();
         ctx.arc(n.x, n.y, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0,200,255,0.18)";
         ctx.fill();
       });
 
@@ -89,13 +85,8 @@ function CircuitBackground() {
       pulses.forEach((p, i) => {
         p.t += p.speed;
         if (p.t >= 1) {
-          // restart on a new edge
-          const n = nodes[Math.floor(Math.random() * nodes.length)];
-          if (n.connected.length) {
-            p.from = n;
-            p.to = nodes[n.connected[Math.floor(Math.random() * n.connected.length)]];
-          }
-          p.t = 0;
+          pulses[i] = newPulse();
+          return;
         }
         const x = p.from.x + (p.to.x - p.from.x) * p.t;
         const y = p.from.y + (p.to.y - p.from.y) * p.t;

@@ -19,53 +19,52 @@ function CircuitBackground() {
     window.addEventListener("resize", resize);
 
     const COLS = 18, ROWS = 12;
-    type CNode = { x: number; y: number; connected: number[] };
+    type Edge = { to: number; mx: number; my: number };
+    type CNode = { x: number; y: number; edges: Edge[] };
     const nodes: CNode[] = [];
     const jitter = () => (Math.random() - 0.5) * 60;
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS; c++)
-        nodes.push({ x: (canvas.width / (COLS - 1)) * c + jitter(), y: (canvas.height / (ROWS - 1)) * r + jitter(), connected: [] });
+        nodes.push({ x: (canvas.width / (COLS - 1)) * c + jitter(), y: (canvas.height / (ROWS - 1)) * r + jitter(), edges: [] });
     nodes.forEach((n, i) => {
       [i + 1, i + COLS, i + COLS + 1, i + COLS - 1].forEach(j => {
-        if (j < nodes.length && Math.random() > 0.35) n.connected.push(j);
+        if (j < nodes.length && Math.random() > 0.35) {
+          const t = nodes[j];
+          const mx = Math.random() > 0.5 ? t.x : n.x;
+          const my = mx === t.x ? n.y : t.y;
+          n.edges.push({ to: j, mx, my });
+        }
       });
     });
 
     type Pulse = { from: CNode; to: CNode; t: number; speed: number };
     const pulses: Pulse[] = [];
-    const addPulse = () => {
+    const newPulse = (): Pulse => {
       const n = nodes[Math.floor(Math.random() * nodes.length)];
-      if (!n.connected.length) return;
-      const to = nodes[n.connected[Math.floor(Math.random() * n.connected.length)]];
-      pulses.push({ from: n, to, t: 0, speed: 0.004 + Math.random() * 0.006 });
+      const e = n.edges.length ? n.edges[Math.floor(Math.random() * n.edges.length)] : null;
+      return { from: n, to: e ? nodes[e.to] : n, t: 0, speed: 0.004 + Math.random() * 0.006 };
     };
-    for (let i = 0; i < 18; i++) addPulse();
+    for (let i = 0; i < 18; i++) pulses.push(newPulse());
 
     let raf: number;
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(0,180,255,0.09)";
       nodes.forEach(n => {
-        n.connected.forEach(j => {
-          const t = nodes[j];
-          ctx.strokeStyle = "rgba(0,180,255,0.09)";
+        n.edges.forEach(e => {
+          const t = nodes[e.to];
           ctx.beginPath(); ctx.moveTo(n.x, n.y);
-          const mx = Math.random() > 0.5 ? t.x : n.x;
-          const my = mx === t.x ? n.y : t.y;
-          ctx.lineTo(mx, my); ctx.lineTo(t.x, t.y); ctx.stroke();
+          ctx.lineTo(e.mx, e.my); ctx.lineTo(t.x, t.y); ctx.stroke();
         });
       });
+      ctx.fillStyle = "rgba(0,200,255,0.18)";
       nodes.forEach(n => {
-        ctx.beginPath(); ctx.arc(n.x, n.y, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0,200,255,0.18)"; ctx.fill();
+        ctx.beginPath(); ctx.arc(n.x, n.y, 2.5, 0, Math.PI * 2); ctx.fill();
       });
-      pulses.forEach(p => {
+      pulses.forEach((p, i) => {
         p.t += p.speed;
-        if (p.t >= 1) {
-          const n = nodes[Math.floor(Math.random() * nodes.length)];
-          if (n.connected.length) { p.from = n; p.to = nodes[n.connected[Math.floor(Math.random() * n.connected.length)]]; }
-          p.t = 0;
-        }
+        if (p.t >= 1) { pulses[i] = newPulse(); return; }
         const x = p.from.x + (p.to.x - p.from.x) * p.t;
         const y = p.from.y + (p.to.y - p.from.y) * p.t;
         const g = ctx.createRadialGradient(x, y, 0, x, y, 8);
