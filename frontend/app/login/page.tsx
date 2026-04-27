@@ -338,6 +338,7 @@ export default function LoginPage() {
               fontWeight: 900,
               letterSpacing: 6,
               textTransform: "uppercase",
+              textAlign: "center",
               background: "linear-gradient(135deg, #00cfff 0%, #4488ff 50%, #00cfff 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
