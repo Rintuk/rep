@@ -64,7 +64,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     net_inv = snap.net_invested if snap.net_invested > 0 else (
         snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
     )
-    pool_pnl_pct = round((pool_total_usdt - net_inv) / net_inv * 100, 2) if net_inv > 0 else round(snap.drawdown_pct, 2)
+    pool_pnl_pct = round((pool_total_usdt - net_inv) / net_inv * 100, 4) if net_inv > 0 else 0.0
 
     # Чистый PnL инвестора: 77% от роста пула С МОМЕНТА ЕГО ВХОДА
     entry_pnl_pct = fin.entry_pool_pnl_pct if fin else 0.0
@@ -88,7 +88,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
         ref_entry_pct = ref_fin.entry_pool_pnl_pct if ref_fin else 0.0
         ref_incremental_pct = pool_pnl_pct - ref_entry_pct
-        bonus = round(ref_inv * (ref_incremental_pct / 100) * L1_REF_FEE, 2) if (ref_incremental_pct > 0 and referrer_qualifies) else 0.0
+        bonus = ref_inv * (ref_incremental_pct / 100) * L1_REF_FEE if (ref_incremental_pct > 0 and referrer_qualifies) else 0.0
         ref_bonus += bonus
         # Маскируем email: a***@gmail.com
         parts = ref.email.split("@")

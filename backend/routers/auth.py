@@ -340,7 +340,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         if net_invested_pool > 0:
             pool_pnl_usdt = round(pool_total - net_invested_pool, 2)
-            pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 2)
+            pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 4)
 
     # ── Таблица инвесторов + реальный доход админа ───────────────
     total_gross_pnl = 0.0
@@ -351,7 +351,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         inv = fin.investment_usdt if fin else 0.0
         refs_count = sum(1 for x in all_users if x.referred_by == u.id)
         pnl = 0.0
-        if inv > 0 and snap and pool_pnl_pct != 0:
+        if inv > 0 and snap and net_invested_pool > 0:
             entry_pct = fin.entry_pool_pnl_pct if fin else 0.0
             incremental = pool_pnl_pct - entry_pct
             gross_pnl = inv * (incremental / 100)
@@ -366,7 +366,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             total_admin_pnl += gross_pnl * admin_fee
         # Реф. доход: 3% от прибыли приглашённых (если сам квалифицирован)
         ref_income = 0.0
-        if inv >= MIN_REF_INVESTMENT and snap and pool_pnl_pct != 0:
+        if inv >= MIN_REF_INVESTMENT and snap and net_invested_pool > 0:
             for ref_user in all_users:
                 if ref_user.referred_by != u.id or not ref_user.is_active:
                     continue
