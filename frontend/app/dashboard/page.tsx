@@ -325,10 +325,30 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Рефералы ─────────────────────────────────────────────────────── */}
-        {data.referrals.length > 0 && (
-          <div style={{ ...card, padding: 20 }}>
-            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Мои рефералы</h2>
-            <p style={{ color: "#4a6a9a", fontSize: 12, marginBottom: 16 }}>Вы получаете 3% от прибыли каждого приглашённого</p>
+        <div style={{ ...card, padding: 20 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: data.referrals.length > 0 ? 16 : 0 }}>
+            <div>
+              <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Мои рефералы</h2>
+              <p style={{ color: "#4a6a9a", fontSize: 12 }}>Вы получаете 3% от прибыли каждого приглашённого</p>
+            </div>
+            <button
+              onClick={copyRefLink}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+                background: copied ? "rgba(34,201,122,0.15)" : "rgba(68,136,221,0.12)",
+                border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(68,136,221,0.3)"}`,
+                color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap",
+                transition: "all 0.2s",
+              }}
+            >
+              <Copy size={14} />
+              {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
+            </button>
+          </div>
+          {data.referrals.length === 0 ? (
+            <p style={{ color: "#4a6a9a", fontSize: 13 }}>Пока никто не зарегистрировался по вашей ссылке</p>
+          ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
                 <thead>
@@ -357,8 +377,8 @@ export default function DashboardPage() {
                 )}
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }} className="two-col">
           <style>{`.two-col { @media (max-width:640px) { grid-template-columns: 1fr !important; } }`}</style>
