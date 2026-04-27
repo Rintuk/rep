@@ -29,8 +29,8 @@ function RobotFace() {
       <svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
-            <stop offset="0%" stopColor="#1a4bc4"/>
-            <stop offset="100%" stopColor="#0f2560"/>
+            <stop offset="0%" stopColor="#0a1a5c"/>
+            <stop offset="100%" stopColor="#050e30"/>
           </radialGradient>
           <radialGradient id="headGrad" cx="50%" cy="30%" r="70%">
             <stop offset="0%" stopColor="#3b6fd4"/>
