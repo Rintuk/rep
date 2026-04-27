@@ -99,7 +99,7 @@ function RobotFace() {
   }, []);
   return (
     <div ref={ref} className="inline-block drop-shadow-[0_0_18px_rgba(0,200,255,0.6)]">
-      <svg width="88" height="88" viewBox="0 0 96 96" fill="none">
+      <svg width="70" height="70" viewBox="0 0 96 96" fill="none">
         <defs>
           <radialGradient id="rBg" cx="50%" cy="40%" r="60%"><stop offset="0%" stopColor="#0a1a5c"/><stop offset="100%" stopColor="#050e30"/></radialGradient>
           <radialGradient id="rHead" cx="50%" cy="30%" r="70%"><stop offset="0%" stopColor="#3b6fd4"/><stop offset="100%" stopColor="#1e3a7a"/></radialGradient>
@@ -222,15 +222,15 @@ function RegisterForm() {
     <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden" style={{ background: "#050a1a" }}>
 
       <style>{`
-        .reg-form-panel { padding: 40px 32px; }
-        @media (max-width: 480px) { .reg-form-panel { padding: 28px 20px; } }
+        .reg-form-panel { padding: 24px 32px; }
+        @media (max-width: 480px) { .reg-form-panel { padding: 20px 16px; } }
       `}</style>
 
       <CircuitBackground />
       <div style={{ position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none", background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,100,255,0.08) 0%, transparent 70%)" }} />
 
       {/* Робот + бейдж */}
-      <div className="relative z-10 flex flex-col items-center mb-4">
+      <div className="relative z-10 flex flex-col items-center mb-2">
         <RobotFace />
         <div style={{
           marginTop: 10, background: "rgba(0,200,100,0.12)", border: "1px solid rgba(0,200,100,0.4)",
@@ -248,7 +248,7 @@ function RegisterForm() {
         <div style={{ width: "100%", display: "flex", borderRadius: 18, overflow: "hidden", background: "rgba(8,12,35,0.92)", backdropFilter: "blur(20px)", border: "1px solid rgba(0,180,255,0.2)", boxShadow: "0 0 60px rgba(0,100,255,0.12)" }}>
 
           {/* Левая панель */}
-          <div className="hidden md:flex flex-col justify-center px-10 py-12" style={{ flex: 1, borderRight: "1px solid rgba(0,180,255,0.1)" }}>
+          <div className="hidden md:flex flex-col justify-center px-10 py-6" style={{ flex: 1, borderRight: "1px solid rgba(0,180,255,0.1)" }}>
             <h1 style={{ fontSize: 38, fontWeight: 800, color: "#fff", lineHeight: 1.15, letterSpacing: -1, marginBottom: 12 }}>
               Присоединиться
             </h1>
@@ -270,9 +270,9 @@ function RegisterForm() {
 
           {/* Правая панель — форма */}
           <div className="reg-form-panel flex flex-col justify-center" style={{ flex: 1 }}>
-            <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 20 }}>Регистрация</h2>
+            <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 12 }}>Регистрация</h2>
 
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
               {/* Email */}
               <div>
@@ -354,7 +354,7 @@ function RegisterForm() {
               {/* Кнопка */}
               <button type="submit" disabled={loading || !passwordsMatch}
                 style={{
-                  marginTop: 4,
+                  marginTop: 2,
                   background: loading || !passwordsMatch ? "#1a3060" : "linear-gradient(180deg, #2b6bff 0%, #1040cc 100%)",
                   border: "none", borderRadius: 10, padding: "13px",
                   color: "#fff", fontWeight: 700, fontSize: 15,
@@ -371,7 +371,7 @@ function RegisterForm() {
               </button>
             </form>
 
-            <p style={{ color: "#4a5a7a", fontSize: 13, textAlign: "center", marginTop: 18 }}>
+            <p style={{ color: "#4a5a7a", fontSize: 13, textAlign: "center", marginTop: 10 }}>
               Уже есть аккаунт?{" "}
               <a href="/login" style={{ color: "#4488dd" }}
                 onMouseEnter={e => ((e.target as HTMLAnchorElement).style.textDecoration = "underline")}
