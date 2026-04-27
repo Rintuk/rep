@@ -197,7 +197,35 @@ export default function DashboardPage() {
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 26 }}>🤖</span>
+          <svg width="26" height="26" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: "drop-shadow(0 0 6px rgba(0,200,255,0.6))" }}>
+            <defs>
+              <radialGradient id="hbg" cx="50%" cy="40%" r="60%"><stop offset="0%" stopColor="#0a1a5c"/><stop offset="100%" stopColor="#050e30"/></radialGradient>
+              <radialGradient id="hhd" cx="50%" cy="30%" r="70%"><stop offset="0%" stopColor="#3b6fd4"/><stop offset="100%" stopColor="#1e3a7a"/></radialGradient>
+              <radialGradient id="hey" cx="35%" cy="30%" r="65%"><stop offset="0%" stopColor="#e0f0ff"/><stop offset="100%" stopColor="#93c5fd"/></radialGradient>
+              <radialGradient id="hpu" cx="35%" cy="30%" r="60%"><stop offset="0%" stopColor="#60a5fa"/><stop offset="100%" stopColor="#1d4ed8"/></radialGradient>
+            </defs>
+            <rect width="96" height="96" rx="22" fill="url(#hbg)"/>
+            <rect width="96" height="96" rx="22" fill="white" opacity="0.06"/>
+            <line x1="32" y1="10" x2="28" y2="20" stroke="#7eb8f7" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="28" cy="8" r="4" fill="#93c5fd" stroke="#bfdbfe" strokeWidth="1"/>
+            <line x1="64" y1="10" x2="68" y2="20" stroke="#7eb8f7" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="68" cy="8" r="4" fill="#93c5fd" stroke="#bfdbfe" strokeWidth="1"/>
+            <ellipse cx="48" cy="52" rx="34" ry="32" fill="url(#hhd)"/>
+            <ellipse cx="48" cy="52" rx="34" ry="32" fill="white" opacity="0.05"/>
+            <circle cx="33" cy="50" r="14" fill="#0d2260" stroke="#4a90d9" strokeWidth="1.5"/>
+            <circle cx="33" cy="50" r="11" fill="url(#hey)"/>
+            <circle cx="33" cy="50" r="6" fill="url(#hpu)"/>
+            <circle cx="33" cy="50" r="3" fill="#1e40af"/>
+            <circle cx="30" cy="47" r="2.5" fill="white" opacity="0.9"/>
+            <circle cx="63" cy="50" r="14" fill="#0d2260" stroke="#4a90d9" strokeWidth="1.5"/>
+            <circle cx="63" cy="50" r="11" fill="url(#hey)"/>
+            <circle cx="63" cy="50" r="6" fill="url(#hpu)"/>
+            <circle cx="63" cy="50" r="3" fill="#1e40af"/>
+            <circle cx="60" cy="47" r="2.5" fill="white" opacity="0.9"/>
+            <rect x="36" y="69" width="24" height="8" rx="4" fill="#0d2260" stroke="#3b6fd4" strokeWidth="1"/>
+            <rect x="10" y="44" width="5" height="12" rx="2.5" fill="#2563eb" stroke="#4a90d9" strokeWidth="1"/>
+            <rect x="81" y="44" width="5" height="12" rx="2.5" fill="#2563eb" stroke="#4a90d9" strokeWidth="1"/>
+          </svg>
           <div>
             <h1 style={{ color: "#fff", fontWeight: 800, fontSize: 16, lineHeight: 1, letterSpacing: 0.5 }}>AI Маклер</h1>
             <span style={{
