@@ -18,7 +18,8 @@ interface Dashboard {
   positions: Position[]; recent_trades: Trade[]; ai_feed: AIFeed[];
 }
 
-const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888" };
+const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888", DEPOSIT: "#f59e0b" };
+const ACTION_LABEL: Record<string, string> = { BUY: "BUY", SELL: "SELL", HOLD: "HOLD", DEPOSIT: "Пополнение" };
 
 // ─── Circuit board background ─────────────────────────────────────────────────
 function CircuitBackground() {
@@ -417,12 +418,17 @@ export default function DashboardPage() {
               : data.recent_trades.slice(0, 8).map((t, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: ACTION_COLOR[t.action] + "22", color: ACTION_COLOR[t.action] }}>{t.action}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: (ACTION_COLOR[t.action] ?? "#888") + "22", color: ACTION_COLOR[t.action] ?? "#888" }}>{ACTION_LABEL[t.action] ?? t.action}</span>
                     <span style={{ color: "#fff", fontSize: 13 }}>{t.symbol}</span>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <p style={{ color: "#fff", fontSize: 13 }}>${t.price.toFixed(4)}</p>
-                    {t.pnl != null && <p style={{ color: t.pnl >= 0 ? "#22c97a" : "#ff4d4d", fontSize: 11 }}>{t.pnl >= 0 ? "+" : ""}{t.pnl.toFixed(2)}$</p>}
+                    {t.action === "DEPOSIT"
+                      ? <p style={{ color: "#f59e0b", fontSize: 13, fontWeight: 600 }}>+{t.amount.toFixed(2)} USDT</p>
+                      : <>
+                          <p style={{ color: "#fff", fontSize: 13 }}>${t.price.toFixed(4)}</p>
+                          {t.pnl != null && <p style={{ color: t.pnl >= 0 ? "#22c97a" : "#ff4d4d", fontSize: 11 }}>{t.pnl >= 0 ? "+" : ""}{t.pnl.toFixed(2)}$</p>}
+                        </>
+                    }
                   </div>
                 </div>
               ))
