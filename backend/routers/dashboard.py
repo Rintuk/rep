@@ -6,7 +6,7 @@ from database import get_db
 from models import BotSnapshot, Position, Trade, AIFeedEntry, UserFinancials, User
 from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo
 from security import get_current_user
-from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE
+from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -74,11 +74,13 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     user_pnl_pct = round(incremental_pnl_pct * INVESTOR_SHARE, 2)
 
     # Реферальный доход: 3% от прибыли каждого приглашённого
+    # Условие: реферер сам должен иметь депозит >= MIN_REF_INVESTMENT
     ref_bonus = 0.0
     referrals_info: list[ReferralInfo] = []
     all_referrals = (await db.execute(
         select(User).where(User.referred_by == user.id, User.is_active == True)
     )).scalars().all()
+    referrer_qualifies = user_investment >= MIN_REF_INVESTMENT
     for ref in all_referrals:
         ref_fin = (await db.execute(
             select(UserFinancials).where(UserFinancials.user_id == ref.id)
@@ -86,7 +88,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
         ref_entry_pct = ref_fin.entry_pool_pnl_pct if ref_fin else 0.0
         ref_incremental_pct = pool_pnl_pct - ref_entry_pct
-        bonus = round(ref_inv * (ref_incremental_pct / 100) * L1_REF_FEE, 2) if ref_incremental_pct > 0 else 0.0
+        bonus = round(ref_inv * (ref_incremental_pct / 100) * L1_REF_FEE, 2) if (ref_incremental_pct > 0 and referrer_qualifies) else 0.0
         ref_bonus += bonus
         # Маскируем email: a***@gmail.com
         parts = ref.email.split("@")

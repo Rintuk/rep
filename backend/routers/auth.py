@@ -6,7 +6,7 @@ from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEnt
 from schemas import RegisterIn, LoginIn, TokenOut
 from security import hash_password, verify_password, create_access_token, get_admin_user
 from datetime import datetime, timedelta
-from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE
+from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -357,9 +357,10 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             gross_pnl = inv * (incremental / 100)
             pnl = round(gross_pnl * INVESTOR_SHARE, 2)
             total_gross_pnl += gross_pnl
-            # Если нет активного реферера — его 3% тоже идут администратору
+            # Если нет активного реферера или он не выполнил MIN_REF_INVESTMENT — 3% идут администратору
             has_referrer = u.referred_by is not None and any(
                 x.id == u.referred_by and x.is_active and not x.is_admin
+                and (fins_map[x.id].investment_usdt if x.id in fins_map else 0.0) >= MIN_REF_INVESTMENT
                 for x in all_users
             )
             admin_fee = POOL_FEE if has_referrer else POOL_FEE + L1_REF_FEE
