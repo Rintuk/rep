@@ -2,8 +2,133 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 
+// ─── Circuit board canvas background ────────────────────────────────────────
+function CircuitBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    // Generate circuit nodes
+    const COLS = 18;
+    const ROWS = 12;
+    type CNode = { x: number; y: number; connected: number[] };
+    const nodes: CNode[] = [];
+
+    const jitter = () => (Math.random() - 0.5) * 60;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        nodes.push({
+          x: (canvas.width / (COLS - 1)) * c + jitter(),
+          y: (canvas.height / (ROWS - 1)) * r + jitter(),
+          connected: [],
+        });
+      }
+    }
+    // Connect neighbours with some randomness
+    nodes.forEach((n, i) => {
+      const candidates = [i + 1, i + COLS, i + COLS + 1, i + COLS - 1];
+      candidates.forEach(j => {
+        if (j < nodes.length && Math.random() > 0.35) n.connected.push(j);
+      });
+    });
+
+    // Pulse dots travelling along edges
+    type Pulse = { from: CNode; to: CNode; t: number; speed: number };
+    const pulses: Pulse[] = [];
+    const addPulse = () => {
+      const n = nodes[Math.floor(Math.random() * nodes.length)];
+      if (!n.connected.length) return;
+      const to = nodes[n.connected[Math.floor(Math.random() * n.connected.length)]];
+      pulses.push({ from: n, to, t: 0, speed: 0.004 + Math.random() * 0.006 });
+    };
+    for (let i = 0; i < 18; i++) addPulse();
+
+    let raf: number;
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Traces
+      ctx.lineWidth = 1;
+      nodes.forEach(n => {
+        n.connected.forEach(j => {
+          const t = nodes[j];
+          ctx.strokeStyle = "rgba(0,180,255,0.09)";
+          ctx.beginPath();
+          ctx.moveTo(n.x, n.y);
+          // 90-degree routing
+          const mx = Math.random() > 0.5 ? t.x : n.x;
+          const my = mx === t.x ? n.y : t.y;
+          ctx.lineTo(mx, my);
+          ctx.lineTo(t.x, t.y);
+          ctx.stroke();
+        });
+      });
+
+      // Nodes (solder pads)
+      nodes.forEach(n => {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,200,255,0.18)";
+        ctx.fill();
+      });
+
+      // Pulses
+      pulses.forEach((p, i) => {
+        p.t += p.speed;
+        if (p.t >= 1) {
+          // restart on a new edge
+          const n = nodes[Math.floor(Math.random() * nodes.length)];
+          if (n.connected.length) {
+            p.from = n;
+            p.to = nodes[n.connected[Math.floor(Math.random() * n.connected.length)]];
+          }
+          p.t = 0;
+        }
+        const x = p.from.x + (p.to.x - p.from.x) * p.t;
+        const y = p.from.y + (p.to.y - p.from.y) * p.t;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 8);
+        g.addColorStop(0, "rgba(0,220,255,0.9)");
+        g.addColorStop(1, "rgba(0,220,255,0)");
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+
+        // bright dot
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(180,240,255,0.95)";
+        ctx.fill();
+        void i;
+      });
+
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="fixed inset-0 w-full h-full" style={{ zIndex: 0 }} />;
+}
+
+// ─── Robot face (eyes follow cursor) ────────────────────────────────────────
 function RobotFace() {
   const ref = useRef<HTMLDivElement>(null);
   const [pupil, setPupil] = useState({ x: 0, y: 0 });
@@ -25,8 +150,8 @@ function RobotFace() {
   }, []);
 
   return (
-    <div ref={ref} className="inline-block">
-      <svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <div ref={ref} className="inline-block drop-shadow-[0_0_18px_rgba(0,200,255,0.6)]">
+      <svg width="88" height="88" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
             <stop offset="0%" stopColor="#0a1a5c"/>
@@ -49,55 +174,30 @@ function RobotFace() {
             <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
-
-        {/* Фон — скруглённый квадрат */}
         <rect width="96" height="96" rx="22" fill="url(#bgGrad)"/>
         <rect width="96" height="96" rx="22" fill="white" opacity="0.06"/>
-
-        {/* Антенны */}
         <line x1="32" y1="10" x2="28" y2="20" stroke="#7eb8f7" strokeWidth="2" strokeLinecap="round"/>
         <circle cx="28" cy="8" r="4" fill="#93c5fd" stroke="#bfdbfe" strokeWidth="1"/>
         <line x1="64" y1="10" x2="68" y2="20" stroke="#7eb8f7" strokeWidth="2" strokeLinecap="round"/>
         <circle cx="68" cy="8" r="4" fill="#93c5fd" stroke="#bfdbfe" strokeWidth="1"/>
-
-        {/* Голова */}
         <ellipse cx="48" cy="52" rx="34" ry="32" fill="url(#headGrad)"/>
         <ellipse cx="48" cy="52" rx="34" ry="32" fill="white" opacity="0.05"/>
-        {/* Блик на голове */}
         <ellipse cx="36" cy="30" rx="12" ry="6" fill="white" opacity="0.12" transform="rotate(-15 36 30)"/>
-
-        {/* Левый глаз — внешнее кольцо */}
         <circle cx="33" cy="50" r="14" fill="#0d2260" stroke="#4a90d9" strokeWidth="1.5"/>
-        {/* Левый глаз — белок */}
         <circle cx="33" cy="50" r="11" fill="url(#eyeGrad)"/>
-        {/* Левый зрачок */}
         <circle cx={33 + pupil.x} cy={50 + pupil.y} r="6" fill="url(#pupilGrad)" filter="url(#glow)"/>
         <circle cx={33 + pupil.x} cy={50 + pupil.y} r="3" fill="#1e40af"/>
-        {/* Блик левого глаза */}
         <circle cx={30 + pupil.x * 0.3} cy={47 + pupil.y * 0.3} r="2.5" fill="white" opacity="0.9"/>
-        <circle cx={33 + pupil.x * 0.3} cy={52 + pupil.y * 0.3} r="1" fill="white" opacity="0.5"/>
-
-        {/* Правый глаз — внешнее кольцо */}
         <circle cx="63" cy="50" r="14" fill="#0d2260" stroke="#4a90d9" strokeWidth="1.5"/>
-        {/* Правый глаз — белок */}
         <circle cx="63" cy="50" r="11" fill="url(#eyeGrad)"/>
-        {/* Правый зрачок */}
         <circle cx={63 + pupil.x} cy={50 + pupil.y} r="6" fill="url(#pupilGrad)" filter="url(#glow)"/>
         <circle cx={63 + pupil.x} cy={50 + pupil.y} r="3" fill="#1e40af"/>
-        {/* Блик правого глаза */}
         <circle cx={60 + pupil.x * 0.3} cy={47 + pupil.y * 0.3} r="2.5" fill="white" opacity="0.9"/>
-        <circle cx={63 + pupil.x * 0.3} cy={52 + pupil.y * 0.3} r="1" fill="white" opacity="0.5"/>
-
-        {/* Нос */}
         <rect x="45" y="62" width="6" height="4" rx="2" fill="#2563eb" opacity="0.6"/>
-
-        {/* Рот — решётка */}
         <rect x="36" y="69" width="24" height="8" rx="4" fill="#0d2260" stroke="#3b6fd4" strokeWidth="1"/>
         <line x1="42" y1="69" x2="42" y2="77" stroke="#3b6fd4" strokeWidth="1"/>
         <line x1="48" y1="69" x2="48" y2="77" stroke="#3b6fd4" strokeWidth="1"/>
         <line x1="54" y1="69" x2="54" y2="77" stroke="#3b6fd4" strokeWidth="1"/>
-
-        {/* Уши */}
         <rect x="10" y="44" width="5" height="12" rx="2.5" fill="#2563eb" stroke="#4a90d9" strokeWidth="1"/>
         <rect x="81" y="44" width="5" height="12" rx="2.5" fill="#2563eb" stroke="#4a90d9" strokeWidth="1"/>
       </svg>
@@ -105,6 +205,8 @@ function RobotFace() {
   );
 }
 
+
+// ─── Main page ───────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -130,77 +232,212 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--background)" }}>
-      <div className="w-full max-w-md rounded-2xl p-8 border" style={{ background: "var(--card)", borderColor: "var(--border)" }}>
-        <div className="text-center mb-8">
-          <div className="mb-3"><RobotFace /></div>
-          <h1 className="text-2xl font-bold text-white">AI Маклер</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>Инвестиционная платформа</p>
-        </div>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden"
+      style={{ background: "#050a1a" }}>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="rounded-xl p-4 space-y-4" style={{ background: "#07071299", boxShadow: "0 0 0 1px #ffffff0d, 0 4px 24px #00000066" }}>
-            <div>
-              <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Email</label>
-              <input
-                type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition"
-                style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
-                placeholder="investor@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>Пароль</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required
-                  className="w-full rounded-lg px-4 py-3 text-white border outline-none focus:border-blue-500 transition pr-11"
-                  style={{ background: "#0d0d1a", borderColor: "var(--border)" }}
-                  placeholder="••••••••"
-                />
-                <button type="button" onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition hover:opacity-80"
-                  style={{ color: "var(--muted)" }}>
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
+      <style>{`
+        .login-form-panel { padding: 48px 32px; }
+        @media (max-width: 480px) {
+          .login-form-panel { padding: 32px 20px; }
+        }
+      `}</style>
+
+      <CircuitBackground />
+
+      {/* Radial glow center */}
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 1, pointerEvents: "none",
+        background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,100,255,0.08) 0%, transparent 70%)",
+      }} />
+
+      {/* ── Robot mascot + status badge ─────────────────────────── */}
+      <div className="relative z-10 flex flex-col items-center mb-4">
+        <RobotFace />
+        <div style={{
+          marginTop: 10,
+          background: "rgba(0,200,100,0.12)",
+          border: "1px solid rgba(0,200,100,0.4)",
+          borderRadius: 20,
+          padding: "3px 14px",
+          fontSize: 12,
+          color: "#22c97a",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          backdropFilter: "blur(4px)",
+        }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: "50%",
+            background: "#22c97a",
+            boxShadow: "0 0 6px #22c97a",
+            display: "inline-block",
+          }} />
+          AI Аналитик: Онлайн
+        </div>
+      </div>
+
+      {/* ── Main card ───────────────────────────────────────────── */}
+      <div className="relative z-10 w-full flex" style={{ maxWidth: 860 }}>
+        {/* Glow border effect */}
+        <div style={{
+          position: "absolute", inset: -1, borderRadius: 20,
+          background: "linear-gradient(135deg, rgba(0,180,255,0.35) 0%, rgba(0,80,200,0.1) 50%, rgba(0,180,255,0.25) 100%)",
+          zIndex: -1,
+          filter: "blur(1px)",
+        }} />
+
+        <div style={{
+          width: "100%",
+          display: "flex",
+          borderRadius: 18,
+          overflow: "hidden",
+          background: "rgba(8,12,35,0.92)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(0,180,255,0.2)",
+          boxShadow: "0 0 60px rgba(0,100,255,0.12), 0 0 120px rgba(0,60,180,0.08)",
+        }}>
+
+          {/* Left panel */}
+          <div className="hidden md:flex flex-col justify-center px-10 py-12"
+            style={{ flex: 1, borderRight: "1px solid rgba(0,180,255,0.1)" }}>
+            <h1 style={{
+              fontSize: 42,
+              fontWeight: 800,
+              color: "#fff",
+              lineHeight: 1.15,
+              letterSpacing: -1,
+              marginBottom: 12,
+            }}>
+              AI Маклер
+            </h1>
+            <p style={{ color: "#6b8ab0", fontSize: 16, marginBottom: 32 }}>
+              Инвестиционная платформа
+            </p>
+            {/* decorative chart lines */}
+            <svg width="180" height="80" viewBox="0 0 180 80" fill="none">
+              <polyline points="0,70 30,55 60,60 90,35 120,40 150,20 180,25"
+                stroke="rgba(0,180,255,0.25)" strokeWidth="2" fill="none"/>
+              <polyline points="0,80 30,72 60,75 90,58 120,62 150,45 180,50"
+                stroke="rgba(0,100,200,0.15)" strokeWidth="1.5" fill="none"/>
+              {/* dots */}
+              {[0,30,60,90,120,150,180].map((x,i) => {
+                const ys = [70,55,60,35,40,20,25];
+                return <circle key={i} cx={x} cy={ys[i]} r="3"
+                  fill="rgba(0,200,255,0.5)" stroke="rgba(0,200,255,0.8)" strokeWidth="1"/>;
+              })}
+            </svg>
           </div>
 
-          {error && <p className="text-sm text-red-400 text-center">{error}</p>}
+          {/* Right panel — form */}
+          <div className="login-form-panel flex flex-col justify-center" style={{ flex: 1 }}>
+            <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
+              Вход в аккаунт
+            </h2>
 
-          <button
-            type="submit" disabled={loading}
-            className="w-full py-3 rounded-lg font-semibold text-white disabled:opacity-50"
-            style={{
-              background: "linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)",
-              boxShadow: loading ? "none" : "0 6px 0 #1e3a8a, 0 8px 16px #1d4ed855",
-              transform: loading ? "translateY(4px)" : "translateY(0)",
-              transition: "transform 0.1s ease, box-shadow 0.1s ease",
-              textShadow: "0 1px 2px #00000066",
-            }}
-            onMouseDown={e => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(4px)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 2px 0 #1e3a8a, 0 4px 8px #1d4ed855";
-            }}
-            onMouseUp={e => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 0 #1e3a8a, 0 8px 16px #1d4ed855";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 0 #1e3a8a, 0 8px 16px #1d4ed855";
-            }}
-          >
-            {loading ? "Вход..." : "Войти"}
-          </button>
-        </form>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Email */}
+              <div>
+                <label style={{ color: "#6b8ab0", fontSize: 13, display: "block", marginBottom: 6 }}>
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#3b5a8a", pointerEvents: "none" }} />
+                  <input
+                    type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                    placeholder="Email"
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      background: "rgba(5,10,30,0.8)",
+                      border: "1px solid rgba(0,140,255,0.2)",
+                      borderRadius: 10, padding: "12px 14px 12px 40px",
+                      color: "#e0e8ff", fontSize: 14, outline: "none",
+                      transition: "border-color 0.2s",
+                    }}
+                    onFocus={e => (e.target.style.borderColor = "rgba(0,180,255,0.6)")}
+                    onBlur={e => (e.target.style.borderColor = "rgba(0,140,255,0.2)")}
+                  />
+                </div>
+              </div>
 
-        <p className="text-center text-sm mt-6" style={{ color: "var(--muted)" }}>
-          Нет аккаунта?{" "}
-          <a href="/register" className="text-blue-400 hover:underline">Зарегистрироваться</a>
-        </p>
+              {/* Password */}
+              <div>
+                <label style={{ color: "#6b8ab0", fontSize: 13, display: "block", marginBottom: 6 }}>
+                  Пароль
+                </label>
+                <div className="relative">
+                  <Lock size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#3b5a8a", pointerEvents: "none" }} />
+                  <input
+                    type={showPassword ? "text" : "password"} value={password}
+                    onChange={e => setPassword(e.target.value)} required
+                    placeholder="Пароль"
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      background: "rgba(5,10,30,0.8)",
+                      border: "1px solid rgba(0,140,255,0.2)",
+                      borderRadius: 10, padding: "12px 40px 12px 40px",
+                      color: "#e0e8ff", fontSize: 14, outline: "none",
+                      transition: "border-color 0.2s",
+                    }}
+                    onFocus={e => (e.target.style.borderColor = "rgba(0,180,255,0.6)")}
+                    onBlur={e => (e.target.style.borderColor = "rgba(0,140,255,0.2)")}
+                  />
+                  <button type="button" onClick={() => setShowPassword(v => !v)}
+                    style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#3b5a8a", background: "none", border: "none", cursor: "pointer" }}>
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+              </div>
+
+              {error && <p style={{ color: "#ff5555", fontSize: 13, textAlign: "center" }}>{error}</p>}
+
+              {/* Submit */}
+              <button
+                type="submit" disabled={loading}
+                style={{
+                  marginTop: 4,
+                  background: loading ? "#1a3060" : "linear-gradient(180deg, #2b6bff 0%, #1040cc 100%)",
+                  border: "none", borderRadius: 10, padding: "13px",
+                  color: "#fff", fontWeight: 700, fontSize: 15, cursor: loading ? "not-allowed" : "pointer",
+                  boxShadow: loading ? "none" : "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)",
+                  transform: loading ? "translateY(3px)" : "translateY(0)",
+                  transition: "transform 0.1s, box-shadow 0.1s, background 0.2s",
+                  letterSpacing: 0.5,
+                }}
+                onMouseDown={e => {
+                  if (!loading) {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(4px)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 1px 0 #0d2a80, 0 2px 8px rgba(30,80,255,0.2)";
+                  }
+                }}
+                onMouseUp={e => {
+                  if (!loading) {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)";
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!loading) {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)";
+                  }
+                }}
+              >
+                {loading ? "Вход..." : "Войти"}
+              </button>
+            </form>
+
+            <p style={{ color: "#4a5a7a", fontSize: 13, textAlign: "center", marginTop: 20 }}>
+              Нет аккаунта?{" "}
+              <a href="/register" style={{ color: "#4488dd" }}
+                onMouseEnter={e => ((e.target as HTMLAnchorElement).style.textDecoration = "underline")}
+                onMouseLeave={e => ((e.target as HTMLAnchorElement).style.textDecoration = "none")}>
+                Зарегистрироваться
+              </a>
+            </p>
+          </div>
+        </div>
       </div>
+
     </div>
   );
 }
