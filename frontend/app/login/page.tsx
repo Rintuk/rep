@@ -231,6 +231,13 @@ export default function LoginPage() {
         @media (max-width: 480px) {
           .login-form-panel { padding: 32px 20px; }
         }
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus {
+          -webkit-box-shadow: 0 0 0 1000px rgba(5,10,30,0.95) inset !important;
+          -webkit-text-fill-color: #e0e8ff !important;
+          caret-color: #e0e8ff;
+        }
         .form-title-desktop { display: block; }
         .form-title-mobile  { display: none; }
         @media (max-width: 767px) {

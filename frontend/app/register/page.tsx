@@ -224,6 +224,13 @@ function RegisterForm() {
       <style>{`
         .reg-form-panel { padding: 24px 32px; }
         @media (max-width: 480px) { .reg-form-panel { padding: 20px 16px; } }
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus {
+          -webkit-box-shadow: 0 0 0 1000px rgba(5,10,30,0.95) inset !important;
+          -webkit-text-fill-color: #e0e8ff !important;
+          caret-color: #e0e8ff;
+        }
       `}</style>
 
       <CircuitBackground />
