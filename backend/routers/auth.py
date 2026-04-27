@@ -357,7 +357,6 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             gross_pnl = inv * (incremental / 100)
             pnl = round(gross_pnl * INVESTOR_SHARE, 2)
             total_gross_pnl += gross_pnl
-            # Если нет активного реферера или он не выполнил MIN_REF_INVESTMENT — 3% идут администратору
             has_referrer = u.referred_by is not None and any(
                 x.id == u.referred_by and x.is_active and not x.is_admin
                 and (fins_map[x.id].investment_usdt if x.id in fins_map else 0.0) >= MIN_REF_INVESTMENT
@@ -365,10 +364,23 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             )
             admin_fee = POOL_FEE if has_referrer else POOL_FEE + L1_REF_FEE
             total_admin_pnl += gross_pnl * admin_fee
+        # Реф. доход: 3% от прибыли приглашённых (если сам квалифицирован)
+        ref_income = 0.0
+        if inv >= MIN_REF_INVESTMENT and snap and pool_pnl_pct != 0:
+            for ref_user in all_users:
+                if ref_user.referred_by != u.id or not ref_user.is_active:
+                    continue
+                ref_fin = fins_map.get(ref_user.id)
+                ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
+                ref_entry = ref_fin.entry_pool_pnl_pct if ref_fin else 0.0
+                ref_incr = pool_pnl_pct - ref_entry
+                if ref_inv > 0 and ref_incr > 0:
+                    ref_income += ref_inv * (ref_incr / 100) * L1_REF_FEE
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
             "pnl": pnl, "referrals_count": refs_count,
+            "ref_income": round(ref_income, 2),
         })
 
     pool_profit = round(total_gross_pnl, 2)

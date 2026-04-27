@@ -26,7 +26,7 @@ interface Overview {
   positions: { symbol: string; amount: number; avg_price: number; current_price: number; value: number }[];
   trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
   ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
-  investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number }[];
+  investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number }[];
   referrals: { id: string; email: string; is_active: boolean; referred_by_email: string; investment: number }[];
   pending_users: { id: string; email: string; created_at: string }[];
 }
@@ -635,14 +635,14 @@ export default function AdminPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640, fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${border}` }}>
-                    {["Email", "Инвестировано", "Выведено", "PnL", "Рефералов", "Дата", ""].map((h, i) => (
+                    {["Email", "Инвестировано", "Выведено", "PnL", "Реф. доход", "Рефералов", "Дата", ""].map((h, i) => (
                       <th key={i} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 500, color: muted }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {data.investors.length === 0
-                    ? <tr><td colSpan={7} style={{ padding: "24px 16px", textAlign: "center", color: muted }}>Инвесторов нет</td></tr>
+                    ? <tr><td colSpan={8} style={{ padding: "24px 16px", textAlign: "center", color: muted }}>Инвесторов нет</td></tr>
                     : data.investors.map((u) => {
                       const isOpen = expandedId === u.id;
                       const f = forms[u.id];
@@ -654,6 +654,9 @@ export default function AdminPage() {
                             <td style={{ padding: "12px 16px", color: muted }}>{u.withdrawal.toFixed(2)} $</td>
                             <td style={{ padding: "12px 16px", fontWeight: 600, color: u.pnl >= 0 ? "#22c97a" : "#ff4d4d" }}>
                               {u.pnl >= 0 ? "+" : ""}{u.pnl.toFixed(2)} $
+                            </td>
+                            <td style={{ padding: "12px 16px", fontWeight: 600, color: u.ref_income > 0 ? "#f59e0b" : muted }}>
+                              {u.ref_income > 0 ? `+${u.ref_income.toFixed(2)} $` : "—"}
                             </td>
                             <td style={{ padding: "12px 16px", color: "#fff" }}>{u.referrals_count}</td>
                             <td style={{ padding: "12px 16px", fontSize: 11, color: muted }}>{new Date(u.created_at).toLocaleDateString("ru")}</td>
@@ -673,7 +676,7 @@ export default function AdminPage() {
                           </tr>
                           {isOpen && (
                             <tr style={{ background: "rgba(3,6,22,0.95)" }}>
-                              <td colSpan={7} style={{ padding: "20px 24px" }}>
+                              <td colSpan={8} style={{ padding: "20px 24px" }}>
                                 {!f ? (
                                   <p style={{ color: muted, fontSize: 13 }}>Загрузка...</p>
                                 ) : (
