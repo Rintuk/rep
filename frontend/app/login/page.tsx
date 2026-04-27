@@ -17,8 +17,8 @@ function RobotFace() {
       const dx = e.clientX - cx;
       const dy = e.clientY - cy;
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      const max = 4;
-      setPupil({ x: (dx / dist) * Math.min(dist * 0.1, max), y: (dy / dist) * Math.min(dist * 0.1, max) });
+      const max = 5;
+      setPupil({ x: (dx / dist) * Math.min(dist * 0.08, max), y: (dy / dist) * Math.min(dist * 0.08, max) });
     };
     window.addEventListener("mousemove", move);
     return () => window.removeEventListener("mousemove", move);
@@ -26,27 +26,80 @@ function RobotFace() {
 
   return (
     <div ref={ref} className="inline-block">
-      <svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Антенна */}
-        <line x1="36" y1="4" x2="36" y2="14" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round"/>
-        <circle cx="36" cy="3" r="3" fill="#60a5fa"/>
+      <svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
+            <stop offset="0%" stopColor="#2563eb"/>
+            <stop offset="100%" stopColor="#1a3a8f"/>
+          </radialGradient>
+          <radialGradient id="headGrad" cx="50%" cy="30%" r="70%">
+            <stop offset="0%" stopColor="#3b6fd4"/>
+            <stop offset="100%" stopColor="#1e3a7a"/>
+          </radialGradient>
+          <radialGradient id="eyeGrad" cx="35%" cy="30%" r="65%">
+            <stop offset="0%" stopColor="#e0f0ff"/>
+            <stop offset="100%" stopColor="#93c5fd"/>
+          </radialGradient>
+          <radialGradient id="pupilGrad" cx="35%" cy="30%" r="60%">
+            <stop offset="0%" stopColor="#60a5fa"/>
+            <stop offset="100%" stopColor="#1d4ed8"/>
+          </radialGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="1.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        {/* Фон — скруглённый квадрат */}
+        <rect width="96" height="96" rx="22" fill="url(#bgGrad)"/>
+        <rect width="96" height="96" rx="22" fill="white" opacity="0.06"/>
+
+        {/* Антенны */}
+        <line x1="32" y1="10" x2="28" y2="20" stroke="#7eb8f7" strokeWidth="2" strokeLinecap="round"/>
+        <circle cx="28" cy="8" r="4" fill="#93c5fd" stroke="#bfdbfe" strokeWidth="1"/>
+        <line x1="64" y1="10" x2="68" y2="20" stroke="#7eb8f7" strokeWidth="2" strokeLinecap="round"/>
+        <circle cx="68" cy="8" r="4" fill="#93c5fd" stroke="#bfdbfe" strokeWidth="1"/>
+
         {/* Голова */}
-        <rect x="10" y="14" width="52" height="44" rx="10" fill="#1e293b" stroke="#3b82f6" strokeWidth="1.5"/>
+        <ellipse cx="48" cy="52" rx="34" ry="32" fill="url(#headGrad)"/>
+        <ellipse cx="48" cy="52" rx="34" ry="32" fill="white" opacity="0.05"/>
+        {/* Блик на голове */}
+        <ellipse cx="36" cy="30" rx="12" ry="6" fill="white" opacity="0.12" transform="rotate(-15 36 30)"/>
+
+        {/* Левый глаз — внешнее кольцо */}
+        <circle cx="33" cy="50" r="14" fill="#0d2260" stroke="#4a90d9" strokeWidth="1.5"/>
         {/* Левый глаз — белок */}
-        <circle cx="24" cy="34" r="9" fill="#0f172a" stroke="#3b82f6" strokeWidth="1"/>
-        {/* Правый глаз — белок */}
-        <circle cx="48" cy="34" r="9" fill="#0f172a" stroke="#3b82f6" strokeWidth="1"/>
+        <circle cx="33" cy="50" r="11" fill="url(#eyeGrad)"/>
         {/* Левый зрачок */}
-        <circle cx={24 + pupil.x} cy={34 + pupil.y} r="4.5" fill="#3b82f6"/>
-        <circle cx={24 + pupil.x + 1.5} cy={34 + pupil.y - 1.5} r="1.5" fill="#93c5fd" opacity="0.7"/>
+        <circle cx={33 + pupil.x} cy={50 + pupil.y} r="6" fill="url(#pupilGrad)" filter="url(#glow)"/>
+        <circle cx={33 + pupil.x} cy={50 + pupil.y} r="3" fill="#1e40af"/>
+        {/* Блик левого глаза */}
+        <circle cx={30 + pupil.x * 0.3} cy={47 + pupil.y * 0.3} r="2.5" fill="white" opacity="0.9"/>
+        <circle cx={33 + pupil.x * 0.3} cy={52 + pupil.y * 0.3} r="1" fill="white" opacity="0.5"/>
+
+        {/* Правый глаз — внешнее кольцо */}
+        <circle cx="63" cy="50" r="14" fill="#0d2260" stroke="#4a90d9" strokeWidth="1.5"/>
+        {/* Правый глаз — белок */}
+        <circle cx="63" cy="50" r="11" fill="url(#eyeGrad)"/>
         {/* Правый зрачок */}
-        <circle cx={48 + pupil.x} cy={34 + pupil.y} r="4.5" fill="#3b82f6"/>
-        <circle cx={48 + pupil.x + 1.5} cy={34 + pupil.y - 1.5} r="1.5" fill="#93c5fd" opacity="0.7"/>
-        {/* Рот */}
-        <rect x="22" y="48" width="28" height="5" rx="2.5" fill="#1d4ed8" opacity="0.8"/>
-        <rect x="26" y="49" width="4" height="3" rx="1" fill="#60a5fa"/>
-        <rect x="34" y="49" width="4" height="3" rx="1" fill="#60a5fa"/>
-        <rect x="42" y="49" width="4" height="3" rx="1" fill="#60a5fa"/>
+        <circle cx={63 + pupil.x} cy={50 + pupil.y} r="6" fill="url(#pupilGrad)" filter="url(#glow)"/>
+        <circle cx={63 + pupil.x} cy={50 + pupil.y} r="3" fill="#1e40af"/>
+        {/* Блик правого глаза */}
+        <circle cx={60 + pupil.x * 0.3} cy={47 + pupil.y * 0.3} r="2.5" fill="white" opacity="0.9"/>
+        <circle cx={63 + pupil.x * 0.3} cy={52 + pupil.y * 0.3} r="1" fill="white" opacity="0.5"/>
+
+        {/* Нос */}
+        <rect x="45" y="62" width="6" height="4" rx="2" fill="#2563eb" opacity="0.6"/>
+
+        {/* Рот — решётка */}
+        <rect x="36" y="69" width="24" height="8" rx="4" fill="#0d2260" stroke="#3b6fd4" strokeWidth="1"/>
+        <line x1="42" y1="69" x2="42" y2="77" stroke="#3b6fd4" strokeWidth="1"/>
+        <line x1="48" y1="69" x2="48" y2="77" stroke="#3b6fd4" strokeWidth="1"/>
+        <line x1="54" y1="69" x2="54" y2="77" stroke="#3b6fd4" strokeWidth="1"/>
+
+        {/* Уши */}
+        <rect x="10" y="44" width="5" height="12" rx="2.5" fill="#2563eb" stroke="#4a90d9" strokeWidth="1"/>
+        <rect x="81" y="44" width="5" height="12" rx="2.5" fill="#2563eb" stroke="#4a90d9" strokeWidth="1"/>
       </svg>
     </div>
   );
