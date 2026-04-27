@@ -409,6 +409,26 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/admin/adjust-net-invested", dependencies=[Depends(get_admin_user)])
+async def adjust_net_invested(add_amount: float, db: AsyncSession = Depends(get_db)):
+    """Прибавляет add_amount к net_invested во всех снимках.
+    Используется когда в пул добавлен капитал (например, BNB→USDT), который бот не учёл в net_invested.
+    """
+    if add_amount == 0:
+        raise HTTPException(status_code=400, detail="add_amount не может быть 0")
+    snaps = (await db.execute(select(BotSnapshot))).scalars().all()
+    updated = 0
+    for s in snaps:
+        s.net_invested = round(s.net_invested + add_amount, 4)
+        updated += 1
+    await db.commit()
+    return {
+        "updated_snapshots": updated,
+        "add_amount": add_amount,
+        "message": f"net_invested скорректирован на +{add_amount} $ в {updated} снимках",
+    }
+
+
 @router.post("/admin/cleanup-demo-snapshots", dependencies=[Depends(get_admin_user)])
 async def cleanup_demo_snapshots(db: AsyncSession = Depends(get_db)):
     """Удаляет демо-снимки из БД и сбрасывает точки входа инвесторов.

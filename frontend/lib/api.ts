@@ -136,6 +136,11 @@ export async function cleanupDemoSnapshots() {
   return res.data as { deleted_snapshots: number; reset_investors: number; message: string };
 }
 
+export async function adjustNetInvested(add_amount: number) {
+  const res = await api.post("/auth/admin/adjust-net-invested", null, { params: { add_amount } });
+  return res.data as { updated_snapshots: number; add_amount: number; message: string };
+}
+
 export async function getDemoAccount() {
   const res = await api.get("/api/demo/account");
   return res.data;

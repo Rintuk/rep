@@ -7,7 +7,7 @@ import {
   updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword,
   getAdminDeposits, approveDeposit, rejectDeposit, getAdminPoolHistory,
   getAdminWithdrawals, approveWithdrawal, rejectWithdrawal, getUserHistory,
-  cleanupDemoSnapshots
+  cleanupDemoSnapshots, adjustNetInvested
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -121,6 +121,9 @@ export default function AdminPage() {
   const [historyData, setHistoryData] = useState<{deposits:{id:string;amount:number;comment:string;status:string;created_at:string}[];withdrawals:{id:string;amount:number;comment:string;status:string;created_at:string}[]} | null>(null);
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustLoading, setAdjustLoading] = useState(false);
+  const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -575,6 +578,53 @@ export default function AdminPage() {
                 {cleanupLoading ? "..." : "Очистить"}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Корректировка net_invested (депозит не через бота) */}
+        {activeTab === "overview" && (
+          <div style={{ ...card, padding: 16, border: "1px solid rgba(68,136,221,0.25)" }}>
+            <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>💰 Корректировка депозита в пул</p>
+            <p style={{ color: muted, fontSize: 12, marginBottom: 10 }}>
+              Если в пул добавлен капитал напрямую (BNB, перевод и т.д.) и бот не учёл его в net_invested — введи сумму в USDT.
+              Значение прибавится ко всем снимкам, и инвесторы перестанут видеть депозит как прибыль.
+            </p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="number"
+                value={adjustAmount}
+                onChange={e => setAdjustAmount(e.target.value)}
+                placeholder="Сумма депозита в USDT"
+                style={{
+                  flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#fff", outline: "none",
+                }}
+              />
+              <button
+                disabled={adjustLoading || !adjustAmount}
+                onClick={async () => {
+                  const amt = parseFloat(adjustAmount);
+                  if (!amt || isNaN(amt)) return;
+                  if (!confirm(`Прибавить ${amt} $ к net_invested во всех снимках?`)) return;
+                  setAdjustLoading(true); setAdjustMsg(null);
+                  try {
+                    const r = await adjustNetInvested(amt);
+                    setAdjustMsg(r.message);
+                    setAdjustAmount("");
+                    fetchData();
+                  } catch { setAdjustMsg("Ошибка"); }
+                  finally { setAdjustLoading(false); }
+                }}
+                style={{
+                  padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
+                  background: "rgba(68,136,221,0.6)", color: "#fff", cursor: "pointer",
+                  opacity: (adjustLoading || !adjustAmount) ? 0.5 : 1,
+                }}>
+                {adjustLoading ? "..." : "Применить"}
+              </button>
+            </div>
+            {adjustMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 8 }}>{adjustMsg}</p>}
           </div>
         )}
 
