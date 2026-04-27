@@ -231,6 +231,12 @@ export default function LoginPage() {
         @media (max-width: 480px) {
           .login-form-panel { padding: 32px 20px; }
         }
+        .form-title-desktop { display: block; }
+        .form-title-mobile  { display: none; }
+        @media (max-width: 767px) {
+          .form-title-desktop { display: none; }
+          .form-title-mobile  { display: block; }
+        }
       `}</style>
 
       <CircuitBackground />
@@ -321,9 +327,26 @@ export default function LoginPage() {
 
           {/* Right panel — form */}
           <div className="login-form-panel flex flex-col justify-center" style={{ flex: 1 }}>
-            <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
+            {/* Desktop: обычный заголовок */}
+            <h2 className="form-title-desktop" style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
               Вход в аккаунт
             </h2>
+            {/* Mobile: стильный заголовок */}
+            <h1 className="form-title-mobile" style={{
+              marginBottom: 24,
+              fontSize: 28,
+              fontWeight: 900,
+              letterSpacing: 6,
+              textTransform: "uppercase",
+              background: "linear-gradient(135deg, #00cfff 0%, #4488ff 50%, #00cfff 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              filter: "drop-shadow(0 0 12px rgba(0,180,255,0.5))",
+              lineHeight: 1.2,
+            }}>
+              AI MAKLER
+            </h1>
 
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Email */}
