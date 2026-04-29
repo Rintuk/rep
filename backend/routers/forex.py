@@ -17,16 +17,10 @@ async def _get_forex_pool_pnl_pct(db: AsyncSession) -> float:
     )).scalar_one_or_none()
     if not snap:
         return 0.0
-    positions = (await db.execute(
-        select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
-    )).scalars().all()
-    pool_total = snap.balance_usdt + sum(
-        p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
-    )
     ref = snap.net_invested if snap.net_invested > 0 else (
         snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
     )
-    return round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+    return round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
 
 
 # ── Форекс обзор для администратора ──────────────────────────────────────────
@@ -105,8 +99,8 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         )
         real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         if net_invested_pool > 0:
-            pool_pnl_usdt = round(pool_total - net_invested_pool, 2)
-            pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 4)
+            pool_pnl_usdt = round(pool_free - net_invested_pool, 2)
+            pool_pnl_pct = round((pool_free - net_invested_pool) / net_invested_pool * 100, 4)
 
     total_gross_pnl = total_admin_pnl = 0.0
     investors_table = []
@@ -197,14 +191,9 @@ async def admin_forex_pool_history(db: AsyncSession = Depends(get_db)):
 
     result = []
     for s in clean_snaps:
-        positions = (await db.execute(
-            select(ForexPosition).where(ForexPosition.snapshot_id == s.id)
-        )).scalars().all()
-        pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
-        pool_total = round(s.balance_usdt + pool_positions, 2)
-        pnl = round(pool_total - s.net_invested, 2)
+        pnl = round(s.balance_usdt - s.net_invested, 2)
         pnl_pct = round((pnl / s.net_invested) * 100, 2)
-        result.append({"ts": s.timestamp.strftime("%d.%m %H:%M"), "pool_total": pool_total,
+        result.append({"ts": s.timestamp.strftime("%d.%m %H:%M"), "pool_total": round(s.balance_usdt, 2),
                         "pnl": pnl, "pnl_pct": pnl_pct})
     return result
 

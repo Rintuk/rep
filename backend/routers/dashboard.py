@@ -116,7 +116,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
             forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
         )
-        forex_pool_pnl_pct = round((forex_pool_total - fx_net_inv) / fx_net_inv * 100, 4) if fx_net_inv > 0 else 0.0
+        forex_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4) if fx_net_inv > 0 else 0.0
 
         forex_entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
         forex_incremental = forex_pool_pnl_pct - forex_entry_pct
@@ -150,7 +150,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
         )
         if fx_net_inv > 0:
-            fx_pool_pnl_pct = round((forex_pool_total - fx_net_inv) / fx_net_inv * 100, 4)
+            fx_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4)
             all_forex_refs = (await db.execute(
                 select(User).where(User.referred_by == user.id, User.is_active == True)
             )).scalars().all()
