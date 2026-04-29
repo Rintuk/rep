@@ -118,8 +118,8 @@ export async function getUserDetail(id: string) {
 export async function getUserHistory(id: string) {
   const res = await api.get(`/auth/admin/users/${id}/history`);
   return res.data as {
-    deposits: {id:string;amount:number;comment:string;status:string;created_at:string}[];
-    withdrawals: {id:string;amount:number;comment:string;status:string;created_at:string}[];
+    deposits: {id:string;amount:number;comment:string;status:string;pool_type:string;created_at:string}[];
+    withdrawals: {id:string;amount:number;comment:string;status:string;pool_type:string;created_at:string}[];
   };
 }
 
