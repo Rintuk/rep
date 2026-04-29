@@ -23,6 +23,7 @@ interface Dashboard {
   forex_pool_total: number; forex_pool_positions: number; forex_balance: number;
   forex_server_online: boolean; forex_last_updated: string | null;
   forex_investment: number; forex_pnl: number; forex_pnl_pct: number;
+  forex_ref_bonus: number;
   forex_positions: Position[]; forex_recent_trades: Trade[];
 }
 type DepositItem = { id: string; amount: number; status: string; created_at: string };
@@ -298,17 +299,21 @@ export default function DashboardPage() {
 
         {/* Переключатель пула */}
         <div style={{ display: "flex", gap: 6 }}>
-          {(["crypto", "forex"] as const).map(p => (
-            <button key={p} onClick={() => setActivePool(p)} style={{
-              padding: "6px 18px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-              background: activePool === p ? "rgba(0,180,255,0.15)" : "transparent",
-              border: `1px solid ${activePool === p ? "rgba(0,180,255,0.5)" : "rgba(0,180,255,0.15)"}`,
-              color: activePool === p ? "#00cfff" : "#4a6a9a",
-              cursor: "pointer", transition: "all 0.2s",
-            }}>
-              {p === "crypto" ? "Крипто" : "Форекс"}
-            </button>
-          ))}
+          {(["crypto", "forex"] as const).map(p => {
+            const isActive = activePool === p;
+            const isForexBtn = p === "forex";
+            return (
+              <button key={p} onClick={() => setActivePool(p)} style={{
+                padding: "6px 18px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                background: isActive ? (isForexBtn ? "rgba(245,158,11,0.18)" : "rgba(0,180,255,0.15)") : "transparent",
+                border: `1px solid ${isActive ? (isForexBtn ? "rgba(245,158,11,0.5)" : "rgba(0,180,255,0.5)") : "rgba(0,180,255,0.15)"}`,
+                color: isActive ? (isForexBtn ? "#f59e0b" : "#00cfff") : "#4a6a9a",
+                cursor: "pointer", transition: "all 0.2s",
+              }}>
+                {p === "crypto" ? "Крипто" : "Форекс"}
+              </button>
+            );
+          })}
         </div>
 
         {/* Меню */}
@@ -381,6 +386,7 @@ export default function DashboardPage() {
             { icon: <TrendingUp size={18}/>, label: "Ваш баланс", value: poolInvestment > 0 ? `${poolInvestment.toFixed(2)} $` : "—", sub: poolInvestment > 0 ? "инвестировано" : "нет данных", color: "#22c97a" },
             { icon: poolPnl >= 0 ? <TrendingUp size={18}/> : <TrendingDown size={18}/>, label: "Чистый доход", value: poolInvestment > 0 ? `${poolPnl >= 0 ? "+" : ""}${poolPnl.toFixed(2)} $` : "—", sub: poolInvestment > 0 ? `${poolPnlPct >= 0 ? "+" : ""}${poolPnlPct.toFixed(2)}%` : "нет вложений", color: pnlColor },
             ...(isCrypto && data.ref_bonus > 0 ? [{ icon: <TrendingUp size={18}/>, label: "Реф. доход", value: `+${data.ref_bonus.toFixed(2)} $`, sub: "3% от прибыли", color: "#f59e0b" }] : []),
+            ...(!isCrypto && (data.forex_ref_bonus ?? 0) > 0 ? [{ icon: <TrendingUp size={18}/>, label: "Реф. доход", value: `+${data.forex_ref_bonus.toFixed(2)} $`, sub: "3% от прибыли", color: "#f59e0b" }] : []),
           ].map((c, i) => (
             <div key={i} style={{ ...card, padding: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: c.color }}>
@@ -393,7 +399,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* ── Рефералы (только крипто) ──────────────────────────────────────── */}
+        {/* ── Рефералы ──────────────────────────────────────────────────────── */}
         {isCrypto && (
           <div style={{ ...card, padding: 20 }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: data.referrals.length > 0 ? 16 : 0 }}>
@@ -444,6 +450,31 @@ export default function DashboardPage() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {!isCrypto && (data.forex_ref_bonus ?? 0) > 0 && (
+          <div style={{ ...card, padding: 20 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
+              <div>
+                <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Реф. доход (Форекс)</h2>
+                <p style={{ color: "#4a6a9a", fontSize: 12 }}>Вы получаете 3% от прибыли приглашённых в форекс-пул</p>
+              </div>
+              <button onClick={copyRefLink} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+                background: copied ? "rgba(34,201,122,0.15)" : "rgba(245,158,11,0.12)",
+                border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(245,158,11,0.3)"}`,
+                color: copied ? "#22c97a" : "#f59e0b", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
+              }}>
+                <Copy size={14} />
+                {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
+              </button>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 12, borderTop: "1px solid rgba(0,180,255,0.08)" }}>
+              <span style={{ color: "#4a6a9a", fontSize: 13 }}>Итого бонус</span>
+              <span style={{ fontWeight: 700, color: "#f59e0b", fontSize: 16 }}>+{data.forex_ref_bonus.toFixed(2)} $</span>
+            </div>
           </div>
         )}
 

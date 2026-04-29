@@ -144,6 +144,27 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             if len(forex_trades_out) >= 15:
                 break
 
+    forex_ref_bonus = 0.0
+    if forex_snap and forex_investment >= MIN_REF_INVESTMENT:
+        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+            forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
+        )
+        if fx_net_inv > 0:
+            fx_pool_pnl_pct = round((forex_pool_total - fx_net_inv) / fx_net_inv * 100, 4)
+            all_forex_refs = (await db.execute(
+                select(User).where(User.referred_by == user.id, User.is_active == True)
+            )).scalars().all()
+            for ref in all_forex_refs:
+                ref_fin = (await db.execute(
+                    select(UserFinancials).where(UserFinancials.user_id == ref.id)
+                )).scalar_one_or_none()
+                ref_inv = ref_fin.forex_investment_usdt if ref_fin else 0.0
+                ref_entry = ref_fin.forex_entry_pool_pnl_pct if ref_fin else 0.0
+                ref_incr = fx_pool_pnl_pct - ref_entry
+                if ref_inv > 0 and ref_incr > 0:
+                    forex_ref_bonus += ref_inv * (ref_incr / 100) * L1_REF_FEE
+    forex_ref_bonus = round(forex_ref_bonus, 2)
+
     return DashboardOut(
         balance_usdt=snap.balance_usdt,
         pool_total_usdt=round(pool_total_usdt, 2),
@@ -168,6 +189,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         forex_investment=forex_investment,
         forex_pnl=forex_pnl,
         forex_pnl_pct=forex_pnl_pct,
+        forex_ref_bonus=forex_ref_bonus,
         forex_positions=forex_positions_out,
         forex_recent_trades=forex_trades_out,
     )

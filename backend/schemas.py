@@ -109,5 +109,6 @@ class DashboardOut(BaseModel):
     forex_investment: float = 0.0
     forex_pnl: float = 0.0
     forex_pnl_pct: float = 0.0
+    forex_ref_bonus: float = 0.0
     forex_positions: list[PositionOut] = []
     forex_recent_trades: list[TradeOut] = []
