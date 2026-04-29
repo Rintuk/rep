@@ -482,8 +482,9 @@ export default function DashboardPage() {
           <style>{`.two-col { @media (max-width:640px) { grid-template-columns: 1fr !important; } }`}</style>
 
           {/* ── Позиции ────────────────────────────────────────────────────── */}
-          <div style={{ ...card, padding: 20 }}>
-            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>💼 Открытые позиции</h2>
+          <div style={{ ...card, padding: 20, maxHeight: 320, display: "flex", flexDirection: "column" }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16, flexShrink: 0 }}>💼 Открытые позиции</h2>
+            <div style={{ overflowY: "auto", flex: 1 }}>
             {poolPositions.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Позиций нет</p>
               : poolPositions.map((p, i) => {
@@ -504,6 +505,7 @@ export default function DashboardPage() {
                 );
               })
             }
+            </div>
           </div>
 
           {/* ── Последние сделки ───────────────────────────────────────────── */}
