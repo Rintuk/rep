@@ -111,7 +111,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in fx_positions
         )
         forex_balance = forex_snap.balance_usdt
-        forex_pool_total = forex_balance + forex_pool_positions
+        forex_pool_total = forex_balance
 
         fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
             forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
