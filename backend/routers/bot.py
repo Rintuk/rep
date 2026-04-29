@@ -183,18 +183,18 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         db.add(ForexAIFeedEntry(snapshot_id=snapshot.id, timestamp=entry.timestamp,
                                 action=entry.action, symbol=entry.symbol, reason=entry.reason))
 
-    if real_total_now > 0:
+    if balance_usd > 0:
         virtual_accounts = (await db.execute(
             select(ForexVirtualAccount).where(ForexVirtualAccount.is_started == True)
         )).scalars().all()
         for va in virtual_accounts:
             if va.start_real_total <= 0:
-                va.start_real_total = real_total_now
+                va.start_real_total = balance_usd
                 va.start_balance = va.balance_usdt if va.balance_usdt > 0 else va.start_balance
                 va.updated_at = datetime.utcnow()
                 continue
             if va.start_real_total > 0:
-                pool_pnl_pct = (real_total_now - va.start_real_total) / va.start_real_total
+                pool_pnl_pct = (balance_usd - va.start_real_total) / va.start_real_total
                 va.balance_usdt = round(va.start_balance * (1 + pool_pnl_pct), 4)
             va.updated_at = datetime.utcnow()
             scale = va.start_balance / va.start_real_total
