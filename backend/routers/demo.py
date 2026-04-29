@@ -193,14 +193,7 @@ async def start_forex_demo_account(
         select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
 
-    real_total = 0.0
-    if snap:
-        snap_positions = (await db.execute(
-            select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
-        )).scalars().all()
-        real_total = snap.balance_usdt + sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in snap_positions
-        )
+    real_total = snap.balance_usdt if snap else 0.0
 
     va = (await db.execute(
         select(ForexVirtualAccount).where(ForexVirtualAccount.user_id == user.id)

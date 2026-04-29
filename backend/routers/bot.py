@@ -190,7 +190,6 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         for va in virtual_accounts:
             if va.start_real_total <= 0:
                 va.start_real_total = balance_usd
-                va.start_balance = va.balance_usdt if va.balance_usdt > 0 else va.start_balance
                 va.updated_at = datetime.utcnow()
                 continue
             if va.start_real_total > 0:
