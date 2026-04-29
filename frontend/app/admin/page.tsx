@@ -328,7 +328,7 @@ export default function AdminPage() {
     { key: "withdrawals", label: "💸 Выводы", badge: pendingWithdrawals },
     { key: "referrals",   label: `🔗 Реф. (${data.referrals.length})` },
     { key: "trades",      label: "📋 Сделки" },
-    { key: "ai",          label: "🧠 ИИ" },
+    ...(!isForex ? [{ key: "ai", label: "🧠 ИИ" }] : []),
   ];
 
   return (
