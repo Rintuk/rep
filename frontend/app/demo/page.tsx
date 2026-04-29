@@ -205,21 +205,6 @@ export default function DemoPage() {
           </div>
         </div>
 
-        {/* Переключатель пула */}
-        <div style={{ display: "flex", gap: 6 }}>
-          {(["crypto", "forex"] as const).map(p => (
-            <button key={p} onClick={() => setActivePool(p)} style={{
-              padding: "6px 18px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-              background: activePool === p ? "rgba(245,158,11,0.18)" : "transparent",
-              border: `1px solid ${activePool === p ? "rgba(245,158,11,0.5)" : "rgba(0,180,255,0.15)"}`,
-              color: activePool === p ? "#f59e0b" : "#4a6a9a",
-              cursor: "pointer", transition: "all 0.2s",
-            }}>
-              {p === "crypto" ? "Крипто" : "Форекс"}
-            </button>
-          ))}
-        </div>
-
         {/* Реал/Демо переключатель + Сброс */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -254,6 +239,21 @@ export default function DemoPage() {
       </header>
 
       <main style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
+
+        {/* Переключатель пула */}
+        <div style={{ display: "flex", gap: 8 }}>
+          {(["crypto", "forex"] as const).map(p => (
+            <button key={p} onClick={() => setActivePool(p)} style={{
+              padding: "9px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+              background: activePool === p ? "rgba(245,158,11,0.18)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${activePool === p ? "rgba(245,158,11,0.7)" : "rgba(255,255,255,0.1)"}`,
+              color: activePool === p ? "#f59e0b" : muted,
+              cursor: "pointer", transition: "all 0.2s",
+            }}>
+              {p === "crypto" ? "₿ Крипто" : "💱 Форекс"}
+            </button>
+          ))}
+        </div>
 
         {!data?.is_started ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 24 }}>

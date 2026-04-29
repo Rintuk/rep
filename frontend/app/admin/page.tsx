@@ -367,28 +367,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Центр: переключатель пулов */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {(["crypto", "forex"] as const).map(pool => (
-            <button key={pool} onClick={() => { setActivePool(pool); setActiveTab("overview"); }}
-              style={{
-                padding: "8px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
-                border: `1px solid ${activePool === pool
-                  ? (pool === "forex" ? "rgba(245,158,11,0.7)" : "rgba(68,136,221,0.7)")
-                  : "rgba(255,255,255,0.1)"}`,
-                background: activePool === pool
-                  ? (pool === "forex" ? "rgba(245,158,11,0.18)" : "rgba(68,136,221,0.18)")
-                  : "transparent",
-                color: activePool === pool
-                  ? (pool === "forex" ? "#f59e0b" : "#4488dd")
-                  : muted,
-                transition: "all 0.2s",
-              }}>
-              {pool === "crypto" ? "₿ Крипто Пул" : "💱 Форекс Пул"}
-            </button>
-          ))}
-        </div>
-
         {/* Правый блок */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {pendingDeposits > 0 && (
@@ -417,13 +395,26 @@ export default function AdminPage() {
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
 
-        {/* Метка активного пула */}
+        {/* Переключатель пулов */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 20, fontWeight: 600,
-            background: isForex ? "rgba(245,158,11,0.15)" : "rgba(68,136,221,0.15)",
-            color: poolColor, border: `1px solid ${isForex ? "rgba(245,158,11,0.3)" : "rgba(68,136,221,0.3)"}` }}>
-            {isForex ? "💱" : "₿"} {poolLabel}
-          </span>
+          {(["crypto", "forex"] as const).map(pool => (
+            <button key={pool} onClick={() => { setActivePool(pool); setActiveTab("overview"); }}
+              style={{
+                padding: "9px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                border: `1px solid ${activePool === pool
+                  ? (pool === "forex" ? "rgba(245,158,11,0.7)" : "rgba(68,136,221,0.7)")
+                  : "rgba(255,255,255,0.1)"}`,
+                background: activePool === pool
+                  ? (pool === "forex" ? "rgba(245,158,11,0.18)" : "rgba(68,136,221,0.18)")
+                  : "rgba(255,255,255,0.03)",
+                color: activePool === pool
+                  ? (pool === "forex" ? "#f59e0b" : "#4488dd")
+                  : muted,
+                transition: "all 0.2s",
+              }}>
+              {pool === "crypto" ? "₿ Крипто Пул" : "💱 Форекс Пул"}
+            </button>
+          ))}
         </div>
 
         {/* Ожидают одобрения */}
