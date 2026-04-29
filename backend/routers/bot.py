@@ -139,23 +139,32 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     except Exception:
         ts = datetime.utcnow()
 
-    real_total_now = payload.balance_usdt + sum(
-        p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
+    # Центовый счёт: все денежные значения делим на 100 для перевода в доллары
+    CENT = 100.0
+    balance_usd        = payload.balance_usdt        / CENT
+    hwm_usd            = payload.hwm                 / CENT
+    real_start_usd     = payload.real_start_balance  / CENT
+    net_invested_usd   = payload.net_invested        / CENT
+
+    real_total_now = balance_usd + sum(
+        (p.amount / CENT) * (p.current_price if p.current_price > 0 else p.avg_price)
         for p in payload.positions
     )
 
     snapshot = ForexBotSnapshot(
         bot_id=payload.bot_id, timestamp=ts,
-        balance_usdt=payload.balance_usdt, mode=payload.mode,
-        hwm=payload.hwm, drawdown_pct=payload.drawdown_pct,
-        real_start_balance=payload.real_start_balance, net_invested=payload.net_invested,
+        balance_usdt=balance_usd, mode=payload.mode,
+        hwm=hwm_usd, drawdown_pct=payload.drawdown_pct,
+        real_start_balance=real_start_usd, net_invested=net_invested_usd,
     )
     db.add(snapshot)
     await db.flush()
 
     for p in payload.positions:
-        db.add(ForexPosition(snapshot_id=snapshot.id, symbol=p.symbol, amount=p.amount,
-                             avg_price=p.avg_price, current_price=p.current_price if p.current_price > 0 else p.avg_price))
+        db.add(ForexPosition(snapshot_id=snapshot.id, symbol=p.symbol,
+                             amount=round(p.amount / CENT, 4),
+                             avg_price=p.avg_price,
+                             current_price=p.current_price if p.current_price > 0 else p.avg_price))
 
     new_real_trades = []
     for t in payload.recent_trades:
@@ -166,7 +175,9 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         if already:
             continue
         db.add(ForexTrade(snapshot_id=snapshot.id, symbol=t.symbol, action=t.action,
-                          amount=t.amount, price=t.price, pnl=t.pnl, timestamp=t.timestamp))
+                          amount=t.amount, price=t.price,
+                          pnl=round(t.pnl / CENT, 4) if t.pnl is not None else None,
+                          timestamp=t.timestamp))
         new_real_trades.append(t)
 
     for entry in payload.ai_feed:
@@ -199,9 +210,10 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                 )).scalars().first()
                 if exists:
                     continue
+                pnl_usd = (t.pnl / CENT) if t.pnl is not None else None
                 db.add(ForexVirtualTrade(user_id=va.user_id, symbol=t.symbol, action=t.action,
                                          amount=round((t.amount or 0) * scale, 6), price=t.price,
-                                         pnl=round(t.pnl * scale, 4) if t.pnl is not None else None,
+                                         pnl=round(pnl_usd * scale, 4) if pnl_usd is not None else None,
                                          timestamp=t.timestamp))
 
     await db.commit()
