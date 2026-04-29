@@ -168,9 +168,9 @@ async def get_user_history(user_id: str, db: AsyncSession = Depends(get_db)):
 
     return {
         "deposits": [{"id": r.id, "amount": r.amount, "comment": r.comment,
-                      "status": r.status, "created_at": str(r.created_at)} for r in deposits],
+                      "status": r.status, "pool_type": r.pool_type, "created_at": str(r.created_at)} for r in deposits],
         "withdrawals": [{"id": r.id, "amount": r.amount, "comment": r.comment,
-                         "status": r.status, "created_at": str(r.created_at)} for r in withdrawals],
+                         "status": r.status, "pool_type": r.pool_type, "created_at": str(r.created_at)} for r in withdrawals],
     }
 
 

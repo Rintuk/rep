@@ -128,7 +128,7 @@ export default function AdminPage() {
   const [confirmingWithdrawal, setConfirmingWithdrawal] = useState<string | null>(null);
   const [actualWithdrawAmounts, setActualWithdrawAmounts] = useState<Record<string, string>>({});
   const [historyUser, setHistoryUser] = useState<{email:string;id:string} | null>(null);
-  const [historyData, setHistoryData] = useState<{deposits:{id:string;amount:number;comment:string;status:string;created_at:string}[];withdrawals:{id:string;amount:number;comment:string;status:string;created_at:string}[]} | null>(null);
+  const [historyData, setHistoryData] = useState<{deposits:{id:string;amount:number;comment:string;status:string;pool_type:string;created_at:string}[];withdrawals:{id:string;amount:number;comment:string;status:string;pool_type:string;created_at:string}[]} | null>(null);
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState("");
@@ -141,10 +141,6 @@ export default function AdminPage() {
     fetchData();
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    fetchData();
   }, [activePool]);
 
   async function fetchData() {
@@ -1041,7 +1037,14 @@ export default function AdminPage() {
                     : historyData.deposits.map(d => (
                       <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${border}` }}>
                         <div>
-                          <p style={{ color: "#fff", fontWeight: 600 }}>+{d.amount.toFixed(2)} USDT</p>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                            <p style={{ color: "#fff", fontWeight: 600 }}>+{d.amount.toFixed(2)} USDT</p>
+                            <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, fontWeight: 600,
+                              background: d.pool_type === "forex" ? "rgba(245,158,11,0.15)" : "rgba(68,136,221,0.15)",
+                              color: d.pool_type === "forex" ? "#f59e0b" : "#4488dd" }}>
+                              {d.pool_type === "forex" ? "Форекс" : "Крипто"}
+                            </span>
+                          </div>
                           {d.comment && <p style={{ color: muted, fontSize: 11, marginTop: 2 }}>{d.comment}</p>}
                           <p style={{ color: muted, fontSize: 11 }}>{new Date(d.created_at).toLocaleString("ru")}</p>
                         </div>
@@ -1060,7 +1063,14 @@ export default function AdminPage() {
                     : historyData.withdrawals.map(w => (
                       <div key={w.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${border}` }}>
                         <div>
-                          <p style={{ color: "#fff", fontWeight: 600 }}>-{w.amount.toFixed(2)} USDT</p>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                            <p style={{ color: "#fff", fontWeight: 600 }}>-{w.amount.toFixed(2)} USDT</p>
+                            <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 10, fontWeight: 600,
+                              background: w.pool_type === "forex" ? "rgba(245,158,11,0.15)" : "rgba(68,136,221,0.15)",
+                              color: w.pool_type === "forex" ? "#f59e0b" : "#4488dd" }}>
+                              {w.pool_type === "forex" ? "Форекс" : "Крипто"}
+                            </span>
+                          </div>
                           {w.comment && <p style={{ color: muted, fontSize: 11, marginTop: 2 }}>{w.comment}</p>}
                           <p style={{ color: muted, fontSize: 11 }}>{new Date(w.created_at).toLocaleString("ru")}</p>
                         </div>

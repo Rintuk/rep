@@ -238,8 +238,7 @@ async def update_user_forex_financials(
                 )
         fin.forex_investment_usdt = forex_investment_usdt
         fin.forex_withdrawal_usdt = forex_withdrawal_usdt
-        if note:
-            fin.note = note
+        fin.note = note
         fin.updated_at = datetime.utcnow()
     else:
         db.add(UserFinancials(
