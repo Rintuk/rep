@@ -89,9 +89,8 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                 va.start_balance = va.balance_usdt if va.balance_usdt > 0 else va.start_balance
                 va.updated_at = datetime.utcnow()
                 continue
-            net_inv = snapshot.net_invested if snapshot.net_invested > 0 else va.start_real_total
-            if net_inv > 0:
-                pool_pnl_pct = (real_total_now - net_inv) / net_inv
+            if va.start_real_total > 0:
+                pool_pnl_pct = (real_total_now - va.start_real_total) / va.start_real_total
                 va.balance_usdt = round(va.start_balance * (1 + pool_pnl_pct), 4)
             va.updated_at = datetime.utcnow()
             scale = va.start_balance / va.start_real_total
@@ -194,9 +193,8 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                 va.start_balance = va.balance_usdt if va.balance_usdt > 0 else va.start_balance
                 va.updated_at = datetime.utcnow()
                 continue
-            net_inv = snapshot.net_invested if snapshot.net_invested > 0 else va.start_real_total
-            if net_inv > 0:
-                pool_pnl_pct = (real_total_now - net_inv) / net_inv
+            if va.start_real_total > 0:
+                pool_pnl_pct = (real_total_now - va.start_real_total) / va.start_real_total
                 va.balance_usdt = round(va.start_balance * (1 + pool_pnl_pct), 4)
             va.updated_at = datetime.utcnow()
             scale = va.start_balance / va.start_real_total
