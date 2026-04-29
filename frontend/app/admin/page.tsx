@@ -255,6 +255,7 @@ export default function AdminPage() {
     setForexSavingId(id);
     try {
       await updateUserForexFinancials(id, parseFloat(f.forex_investment_usdt) || 0, parseFloat(f.forex_withdrawal_usdt) || 0, f.note);
+      await setReferralLimit(id, parseInt(f.referral_limit) || 5);
       setForexSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
       setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
       fetchData();
@@ -728,12 +729,14 @@ export default function AdminPage() {
                                         <p style={{ color: "#f59e0b", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>💱 Форекс Пул</p>
                                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
                                           {[
-                                            { label: "Инвестировано (USDT)", field: "forex_investment_usdt" as keyof InvestorForm },
-                                            { label: "Выведено (USDT)", field: "forex_withdrawal_usdt" as keyof InvestorForm },
-                                          ].map(({ label, field }) => (
+                                            { label: "Инвестировано (USDT)", field: "forex_investment_usdt" as keyof InvestorForm, type: "number" },
+                                            { label: "Выведено (USDT)", field: "forex_withdrawal_usdt" as keyof InvestorForm, type: "number" },
+                                            { label: "Лимит рефералов", field: "referral_limit" as keyof InvestorForm, type: "number" },
+                                            { label: "Заметка", field: "note" as keyof InvestorForm, type: "text" },
+                                          ].map(({ label, field, type }) => (
                                             <div key={field}>
                                               <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
-                                              <input type="number" value={f[field]}
+                                              <input type={type} value={f[field]}
                                                 onChange={e => updateForm(u.id, field, e.target.value)}
                                                 style={{ ...inputStyle, border: "1px solid rgba(245,158,11,0.3)" }} />
                                             </div>
@@ -748,31 +751,6 @@ export default function AdminPage() {
                                         </div>
                                       </div>
                                     )}
-
-                                    {/* Общие поля */}
-                                    <div style={{ borderTop: `1px solid ${border}`, paddingTop: 16 }}>
-                                      <p style={{ color: muted, fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Общие</p>
-                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-                                        {[
-                                          { label: "Лимит рефералов", field: "referral_limit" as keyof InvestorForm },
-                                          { label: "Заметка", field: "note" as keyof InvestorForm },
-                                        ].map(({ label, field }) => (
-                                          <div key={field}>
-                                            <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
-                                            <input type={field === "note" ? "text" : "number"} value={f[field]}
-                                              onChange={e => updateForm(u.id, field, e.target.value)}
-                                              style={inputStyle} />
-                                          </div>
-                                        ))}
-                                      </div>
-                                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
-                                        <button onClick={() => handleSave(u.id)} disabled={savingId === u.id}
-                                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(13,13,40,0.8)", color: muted, cursor: "pointer", border: `1px solid ${border}`, opacity: savingId === u.id ? 0.5 : 1 }}>
-                                          <Save size={13} />{savingId === u.id ? "Сохранение..." : "Сохранить общие"}
-                                        </button>
-                                        {saveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: saveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{saveMsg[u.id]}</span>}
-                                      </div>
-                                    </div>
 
                                     {/* Удалить + смена пароля */}
                                     <div style={{ display: "flex", gap: 12, borderTop: `1px solid ${border}`, paddingTop: 16 }}>
