@@ -141,32 +141,21 @@ async def get_forex_demo_account(user: User = Depends(get_current_user), db: Asy
     )).scalar_one_or_none()
 
     positions = []
-    gross_balance = va.balance_usdt
-    real_total = 0.0
+    pool_positions_pnl = 0.0
 
-    if snap:
+    if snap and va.start_real_total > 0:
         real_positions = (await db.execute(
             select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
         )).scalars().all()
-        real_total = snap.balance_usdt + sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in real_positions
-        )
-        if snap.net_invested > 0 and real_total > 0:
-            pool_pnl_pct = (real_total - snap.net_invested) / snap.net_invested
-            gross_balance = va.start_balance * (1 + pool_pnl_pct)
-        elif real_total > 0 and va.start_real_total > 0:
-            gross_balance = va.start_balance * (real_total / va.start_real_total)
-
-    gross_pnl = gross_balance - va.start_balance
-    net_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
-    net_balance = round(va.start_balance + net_pnl, 2)
-
-    if snap and real_total > 0:
-        scale = net_balance / real_total
+        scale = va.start_balance / va.start_real_total
         for p in real_positions:
             cur_price = p.current_price if p.current_price > 0 else p.avg_price
+            pool_positions_pnl += p.amount * scale
             positions.append({"symbol": p.symbol, "amount": round(p.amount * scale, 6),
-                               "avg_price": p.avg_price, "value": round(p.amount * cur_price * scale, 2)})
+                               "avg_price": p.avg_price, "value": round(p.amount * scale, 2)})
+
+    net_balance = round(va.balance_usdt, 2)
+    net_pnl = round(net_balance - va.start_balance, 2)
 
     trades = (await db.execute(
         select(ForexVirtualTrade).where(ForexVirtualTrade.user_id == user.id)
@@ -176,7 +165,9 @@ async def get_forex_demo_account(user: User = Depends(get_current_user), db: Asy
     pnl_pct = round((net_pnl / va.start_balance * 100) if va.start_balance > 0 else 0, 2)
     return {
         "is_started": True, "balance_usdt": net_balance, "start_balance": va.start_balance,
-        "pnl": net_pnl, "pnl_pct": pnl_pct, "positions": positions,
+        "pnl": net_pnl, "pnl_pct": pnl_pct,
+        "pool_positions_pnl": round(pool_positions_pnl, 2),
+        "positions": positions,
         "trades": [{"symbol": t.symbol, "action": t.action, "amount": t.amount, "price": t.price,
                     "pnl": t.pnl, "timestamp": t.timestamp} for t in trades],
         "created_at": va.created_at.isoformat(), "updated_at": va.updated_at.isoformat(),
