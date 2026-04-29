@@ -698,13 +698,62 @@ export default function AdminPage() {
                                   <p style={{ color: muted, fontSize: 13 }}>Загрузка...</p>
                                 ) : (
                                   <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                                    {/* Крипто пул */}
-                                    <div>
-                                      <p style={{ color: "#4488dd", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>₿ Крипто Пул</p>
+                                    {/* Пул-зависимые поля */}
+                                    {!isForex ? (
+                                      <div>
+                                        <p style={{ color: "#4488dd", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>₿ Крипто Пул</p>
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                                          {[
+                                            { label: "Инвестировано (USDT)", field: "investment_usdt" as keyof InvestorForm },
+                                            { label: "Выведено (USDT)", field: "withdrawal_usdt" as keyof InvestorForm },
+                                          ].map(({ label, field }) => (
+                                            <div key={field}>
+                                              <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
+                                              <input type="number" value={f[field]}
+                                                onChange={e => updateForm(u.id, field, e.target.value)}
+                                                style={inputStyle} />
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+                                          <button onClick={() => handleSave(u.id)} disabled={savingId === u.id}
+                                            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(13,58,32,0.8)", color: "#22c97a", cursor: "pointer", border: "none", opacity: savingId === u.id ? 0.5 : 1 }}>
+                                            <Save size={13} />{savingId === u.id ? "Сохранение..." : "Сохранить крипто"}
+                                          </button>
+                                          {saveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: saveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{saveMsg[u.id]}</span>}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <p style={{ color: "#f59e0b", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>💱 Форекс Пул</p>
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                                          {[
+                                            { label: "Инвестировано (USDT)", field: "forex_investment_usdt" as keyof InvestorForm },
+                                            { label: "Выведено (USDT)", field: "forex_withdrawal_usdt" as keyof InvestorForm },
+                                          ].map(({ label, field }) => (
+                                            <div key={field}>
+                                              <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
+                                              <input type="number" value={f[field]}
+                                                onChange={e => updateForm(u.id, field, e.target.value)}
+                                                style={{ ...inputStyle, border: "1px solid rgba(245,158,11,0.3)" }} />
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+                                          <button onClick={() => handleForexSave(u.id)} disabled={forexSavingId === u.id}
+                                            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(40,30,0,0.8)", color: "#f59e0b", cursor: "pointer", border: "none", opacity: forexSavingId === u.id ? 0.5 : 1 }}>
+                                            <Save size={13} />{forexSavingId === u.id ? "Сохранение..." : "Сохранить форекс"}
+                                          </button>
+                                          {forexSaveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: forexSaveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{forexSaveMsg[u.id]}</span>}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Общие поля */}
+                                    <div style={{ borderTop: `1px solid ${border}`, paddingTop: 16 }}>
+                                      <p style={{ color: muted, fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Общие</p>
                                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
                                         {[
-                                          { label: "Инвестировано (USDT)", field: "investment_usdt" as keyof InvestorForm },
-                                          { label: "Выведено (USDT)", field: "withdrawal_usdt" as keyof InvestorForm },
                                           { label: "Лимит рефералов", field: "referral_limit" as keyof InvestorForm },
                                           { label: "Заметка", field: "note" as keyof InvestorForm },
                                         ].map(({ label, field }) => (
@@ -718,35 +767,10 @@ export default function AdminPage() {
                                       </div>
                                       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
                                         <button onClick={() => handleSave(u.id)} disabled={savingId === u.id}
-                                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(13,58,32,0.8)", color: "#22c97a", cursor: "pointer", border: "none", opacity: savingId === u.id ? 0.5 : 1 }}>
-                                          <Save size={13} />{savingId === u.id ? "Сохранение..." : "Сохранить крипто"}
+                                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(13,13,40,0.8)", color: muted, cursor: "pointer", border: `1px solid ${border}`, opacity: savingId === u.id ? 0.5 : 1 }}>
+                                          <Save size={13} />{savingId === u.id ? "Сохранение..." : "Сохранить общие"}
                                         </button>
                                         {saveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: saveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{saveMsg[u.id]}</span>}
-                                      </div>
-                                    </div>
-
-                                    {/* Форекс пул */}
-                                    <div style={{ borderTop: `1px solid ${border}`, paddingTop: 16 }}>
-                                      <p style={{ color: "#f59e0b", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>💱 Форекс Пул</p>
-                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-                                        {[
-                                          { label: "Инвестировано (USDT)", field: "forex_investment_usdt" as keyof InvestorForm },
-                                          { label: "Выведено (USDT)", field: "forex_withdrawal_usdt" as keyof InvestorForm },
-                                        ].map(({ label, field }) => (
-                                          <div key={field}>
-                                            <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
-                                            <input type="number" value={f[field]}
-                                              onChange={e => updateForm(u.id, field, e.target.value)}
-                                              style={{ ...inputStyle, border: "1px solid rgba(245,158,11,0.3)" }} />
-                                          </div>
-                                        ))}
-                                      </div>
-                                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
-                                        <button onClick={() => handleForexSave(u.id)} disabled={forexSavingId === u.id}
-                                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(40,30,0,0.8)", color: "#f59e0b", cursor: "pointer", border: "none", opacity: forexSavingId === u.id ? 0.5 : 1 }}>
-                                          <Save size={13} />{forexSavingId === u.id ? "Сохранение..." : "Сохранить форекс"}
-                                        </button>
-                                        {forexSaveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: forexSaveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{forexSaveMsg[u.id]}</span>}
                                       </div>
                                     </div>
 
