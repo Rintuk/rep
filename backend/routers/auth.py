@@ -143,6 +143,8 @@ async def get_user_detail(user_id: str, db: AsyncSession = Depends(get_db)):
         "created_at": str(user.created_at),
         "investment_usdt": fin.investment_usdt if fin else 0.0,
         "withdrawal_usdt": fin.withdrawal_usdt if fin else 0.0,
+        "forex_investment_usdt": fin.forex_investment_usdt if fin else 0.0,
+        "forex_withdrawal_usdt": fin.forex_withdrawal_usdt if fin else 0.0,
         "note": fin.note if fin else "",
         "referrals": [
             {"id": r.id, "email": r.email, "is_active": r.is_active, "created_at": str(r.created_at)}

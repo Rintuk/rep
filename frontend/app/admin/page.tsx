@@ -3,11 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import React from "react";
 import {
-  getAdminOverview, approveUser, rejectUser,
-  updateUserFinancials, setReferralLimit, deleteUser, getUserDetail, resetUserPassword,
+  getAdminOverview, getAdminForexOverview,
+  approveUser, rejectUser,
+  updateUserFinancials, updateUserForexFinancials, setReferralLimit,
+  deleteUser, getUserDetail, resetUserPassword,
   getAdminDeposits, approveDeposit, rejectDeposit, getAdminPoolHistory,
   getAdminWithdrawals, approveWithdrawal, rejectWithdrawal, getUserHistory,
-  cleanupDemoSnapshots, adjustNetInvested
+  cleanupDemoSnapshots, adjustNetInvested,
+  getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
+  getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
+  cleanupForexDemoSnapshots, adjustForexNetInvested,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -36,6 +41,8 @@ interface InvestorForm {
   withdrawal_usdt: string;
   note: string;
   referral_limit: string;
+  forex_investment_usdt: string;
+  forex_withdrawal_usdt: string;
 }
 
 function CircuitBackground() {
@@ -99,6 +106,7 @@ function CircuitBackground() {
 
 export default function AdminPage() {
   const router = useRouter();
+  const [activePool, setActivePool] = useState<"crypto" | "forex">("crypto");
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -111,6 +119,8 @@ export default function AdminPage() {
   const [forms, setForms] = useState<Record<string, InvestorForm>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<Record<string, string>>({});
+  const [forexSavingId, setForexSavingId] = useState<string | null>(null);
+  const [forexSaveMsg, setForexSaveMsg] = useState<Record<string, string>>({});
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
   const [resetMsg, setResetMsg] = useState<Record<string, string>>({});
   const [confirmingDeposit, setConfirmingDeposit] = useState<string | null>(null);
@@ -133,9 +143,18 @@ export default function AdminPage() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    fetchData();
+  }, [activePool]);
+
   async function fetchData() {
     try {
-      const [d, dep, wdr] = await Promise.all([getAdminOverview(), getAdminDeposits(), getAdminWithdrawals()]);
+      const isForex = activePool === "forex";
+      const [d, dep, wdr] = await Promise.all([
+        isForex ? getAdminForexOverview() : getAdminOverview(),
+        isForex ? getAdminForexDeposits() : getAdminDeposits(),
+        isForex ? getAdminForexWithdrawals() : getAdminWithdrawals(),
+      ]);
       setData(d);
       setDeposits(dep);
       setWithdrawals(wdr);
@@ -145,7 +164,7 @@ export default function AdminPage() {
       setLoading(false);
     }
     try {
-      const hist = await getAdminPoolHistory();
+      const hist = activePool === "forex" ? await getAdminForexPoolHistory() : await getAdminPoolHistory();
       setPoolHistory(hist);
     } catch { /* график недоступен */ }
   }
@@ -153,8 +172,32 @@ export default function AdminPage() {
   async function handleApproveDeposit(id: string) {
     const amount = parseFloat(actualAmounts[id] || "0");
     if (!amount || amount <= 0) return;
-    await approveDeposit(id, amount);
+    if (activePool === "forex") await approveForexDeposit(id, amount);
+    else await approveDeposit(id, amount);
     setConfirmingDeposit(null);
+    fetchData();
+  }
+
+  async function handleRejectDeposit(id: string) {
+    if (!confirm("Отклонить заявку?")) return;
+    if (activePool === "forex") await rejectForexDeposit(id);
+    else await rejectDeposit(id);
+    fetchData();
+  }
+
+  async function handleApproveWithdrawal(id: string) {
+    const amount = parseFloat(actualWithdrawAmounts[id] || "0");
+    if (!amount || amount <= 0) return;
+    if (activePool === "forex") await approveForexWithdrawal(id, amount);
+    else await approveWithdrawal(id, amount);
+    setConfirmingWithdrawal(null);
+    fetchData();
+  }
+
+  async function handleRejectWithdrawal(id: string) {
+    if (!confirm("Отклонить заявку на вывод?")) return;
+    if (activePool === "forex") await rejectForexWithdrawal(id);
+    else await rejectWithdrawal(id);
     fetchData();
   }
 
@@ -165,35 +208,10 @@ export default function AdminPage() {
     setHistoryData(data);
   }
 
-  async function handleApproveWithdrawal(id: string) {
-    const amount = parseFloat(actualWithdrawAmounts[id] || "0");
-    if (!amount || amount <= 0) return;
-    await approveWithdrawal(id, amount);
-    setConfirmingWithdrawal(null);
-    fetchData();
-  }
-
-  async function handleRejectWithdrawal(id: string) {
-    if (!confirm("Отклонить заявку на вывод?")) return;
-    await rejectWithdrawal(id);
-    fetchData();
-  }
-
-  async function handleRejectDeposit(id: string) {
-    if (!confirm("Отклонить заявку?")) return;
-    await rejectDeposit(id);
-    fetchData();
-  }
-
-  async function handleApprove(id: string) {
-    await approveUser(id);
-    fetchData();
-  }
-
+  async function handleApprove(id: string) { await approveUser(id); fetchData(); }
   async function handleReject(id: string) {
     if (!confirm("Отклонить и удалить пользователя?")) return;
-    await rejectUser(id);
-    fetchData();
+    await rejectUser(id); fetchData();
   }
 
   async function toggleExpand(id: string) {
@@ -207,9 +225,11 @@ export default function AdminPage() {
           withdrawal_usdt: String(detail.withdrawal_usdt ?? 0),
           note: detail.note ?? "",
           referral_limit: String(detail.referral_limit ?? 5),
+          forex_investment_usdt: String(detail.forex_investment_usdt ?? 0),
+          forex_withdrawal_usdt: String(detail.forex_withdrawal_usdt ?? 0),
         }}));
       } catch {
-        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5" } }));
+        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", forex_investment_usdt: "0", forex_withdrawal_usdt: "0" } }));
       }
     }
   }
@@ -230,9 +250,21 @@ export default function AdminPage() {
       fetchData();
     } catch {
       setSaveMsg(prev => ({ ...prev, [id]: "✗ Ошибка" }));
-    } finally {
-      setSavingId(null);
-    }
+    } finally { setSavingId(null); }
+  }
+
+  async function handleForexSave(id: string) {
+    const f = forms[id];
+    if (!f) return;
+    setForexSavingId(id);
+    try {
+      await updateUserForexFinancials(id, parseFloat(f.forex_investment_usdt) || 0, parseFloat(f.forex_withdrawal_usdt) || 0);
+      setForexSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
+      setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
+      fetchData();
+    } catch {
+      setForexSaveMsg(prev => ({ ...prev, [id]: "✗ Ошибка" }));
+    } finally { setForexSavingId(null); }
   }
 
   async function handleResetPassword(id: string) {
@@ -243,18 +275,13 @@ export default function AdminPage() {
       setNewPasswords(prev => ({ ...prev, [id]: "" }));
       setResetMsg(prev => ({ ...prev, [id]: "✓ Пароль изменён" }));
       setTimeout(() => setResetMsg(prev => ({ ...prev, [id]: "" })), 2000);
-    } catch {
-      setResetMsg(prev => ({ ...prev, [id]: "✗ Ошибка" }));
-    }
+    } catch { setResetMsg(prev => ({ ...prev, [id]: "✗ Ошибка" })); }
   }
 
   async function handleDelete(id: string, email: string) {
     if (!confirm(`Удалить пользователя ${email}? Это действие необратимо.`)) return;
-    try {
-      await deleteUser(id);
-      setExpandedId(null);
-      fetchData();
-    } catch { alert("Ошибка удаления"); }
+    try { await deleteUser(id); setExpandedId(null); fetchData(); }
+    catch { alert("Ошибка удаления"); }
   }
 
   const card: React.CSSProperties = {
@@ -268,14 +295,13 @@ export default function AdminPage() {
   const inputStyle: React.CSSProperties = {
     background: "rgba(5,10,30,0.9)",
     border: "1px solid rgba(0,180,255,0.2)",
-    borderRadius: 8,
-    color: "#e0e8ff",
-    padding: "8px 12px",
-    fontSize: 13,
-    outline: "none",
-    width: "100%",
-    boxSizing: "border-box",
+    borderRadius: 8, color: "#e0e8ff", padding: "8px 12px",
+    fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box",
   };
+
+  const isForex = activePool === "forex";
+  const poolColor = isForex ? "#f59e0b" : "#4488dd";
+  const poolLabel = isForex ? "Форекс Пул" : "Крипто Пул";
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "rgba(3,5,20,1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -297,8 +323,6 @@ export default function AdminPage() {
   if (!data) return null;
 
   const pnlColor = data.drawdown_pct >= 0 ? "#22c97a" : "#ff4d4d";
-  const incomeColor = data.admin_income > 0 ? "#22c97a" : "#888";
-
   const pendingDeposits = deposits.filter(d => d.status === "pending").length;
   const pendingWithdrawals = withdrawals.filter(w => w.status === "pending").length;
   const TABS = [
@@ -332,6 +356,7 @@ export default function AdminPage() {
         padding: "12px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
+        {/* Левый блок */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 22 }}>⚙️</span>
           <div>
@@ -345,38 +370,65 @@ export default function AdminPage() {
             </span>
           </div>
         </div>
+
+        {/* Центр: переключатель пулов */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {(["crypto", "forex"] as const).map(pool => (
+            <button key={pool} onClick={() => { setActivePool(pool); setActiveTab("overview"); }}
+              style={{
+                padding: "8px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                border: `1px solid ${activePool === pool
+                  ? (pool === "forex" ? "rgba(245,158,11,0.7)" : "rgba(68,136,221,0.7)")
+                  : "rgba(255,255,255,0.1)"}`,
+                background: activePool === pool
+                  ? (pool === "forex" ? "rgba(245,158,11,0.18)" : "rgba(68,136,221,0.18)")
+                  : "transparent",
+                color: activePool === pool
+                  ? (pool === "forex" ? "#f59e0b" : "#4488dd")
+                  : muted,
+                transition: "all 0.2s",
+              }}>
+              {pool === "crypto" ? "₿ Крипто Пул" : "💱 Форекс Пул"}
+            </button>
+          ))}
+        </div>
+
+        {/* Правый блок */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {pendingDeposits > 0 && (
             <button onClick={() => setActiveTab("deposits")}
-              style={{
-                display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px",
+              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px",
                 borderRadius: 8, border: "1px solid rgba(245,158,11,0.33)", color: "#f59e0b",
-                background: "rgba(26,18,0,0.6)", cursor: "pointer",
-              }}>
+                background: "rgba(26,18,0,0.6)", cursor: "pointer" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b", display: "inline-block" }} />
               <span>{pendingDeposits} заявк{pendingDeposits === 1 ? "а" : pendingDeposits < 5 ? "и" : ""}</span>
             </button>
           )}
           <button onClick={fetchData}
-            style={{
-              display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "6px 12px",
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "6px 12px",
               borderRadius: 8, border: "1px solid rgba(0,180,255,0.2)", color: muted,
-              background: "transparent", cursor: "pointer",
-            }}>
+              background: "transparent", cursor: "pointer" }}>
             <RefreshCw size={13} /><span>Обновить</span>
           </button>
           <button onClick={() => { localStorage.removeItem("token"); router.push("/login"); }}
-            style={{
-              fontSize: 13, padding: "6px 12px", borderRadius: 8,
+            style={{ fontSize: 13, padding: "6px 12px", borderRadius: 8,
               border: "1px solid rgba(255,77,77,0.33)", color: "#ff4d4d",
-              background: "transparent", cursor: "pointer",
-            }}>
+              background: "transparent", cursor: "pointer" }}>
             Выйти
           </button>
         </div>
       </header>
 
       <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
+
+        {/* Метка активного пула */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 20, fontWeight: 600,
+            background: isForex ? "rgba(245,158,11,0.15)" : "rgba(68,136,221,0.15)",
+            color: poolColor, border: `1px solid ${isForex ? "rgba(245,158,11,0.3)" : "rgba(68,136,221,0.3)"}` }}>
+            {isForex ? "💱" : "₿"} {poolLabel}
+          </span>
+        </div>
 
         {/* Ожидают одобрения */}
         {data.pending_users.length > 0 && (
@@ -411,8 +463,8 @@ export default function AdminPage() {
         {/* Карточки метрик */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
           {[
-            { icon: <Wallet size={18} />, label: "Общий пул", value: `${data.pool_total.toFixed(2)} $`, sub: `свободно: ${data.pool_free.toFixed(2)} $`, color: "#4488dd" },
-            { icon: <Activity size={18} />, label: "Пул в позициях", value: `${data.pool_positions_usdt.toFixed(2)} $`, sub: `вложено всего: ${data.total_invested.toFixed(2)} $`, color: "#9966ee" },
+            { icon: <Wallet size={18} />, label: "Общий пул", value: `${data.pool_total.toFixed(2)} $`, sub: `свободно: ${data.pool_free.toFixed(2)} $`, color: poolColor },
+            { icon: <Activity size={18} />, label: "Пул в позициях", value: `${data.pool_positions_usdt.toFixed(2)} $`, sub: `вложено: ${data.total_invested.toFixed(2)} $`, color: "#9966ee" },
             { icon: <Users size={18} />, label: "Участников", value: `${data.investors_count}`, sub: `инвестиции: ${data.total_invested.toFixed(2)} $`, color: "#22c97a" },
             { icon: data.pool_pnl_usdt >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />, label: "Доход от торговли", value: `${data.pool_pnl_usdt >= 0 ? "+" : ""}${data.pool_pnl_usdt.toFixed(2)} $`, sub: `${data.pool_pnl_pct >= 0 ? "+" : ""}${data.pool_pnl_pct.toFixed(2)}% · итого: ${data.admin_total_income >= 0 ? "+" : ""}${data.admin_total_income.toFixed(2)} $`, color: data.pool_pnl_usdt >= 0 ? "#22c97a" : "#ff4d4d" },
           ].map((c, i) => (
@@ -436,7 +488,7 @@ export default function AdminPage() {
                 borderRadius: "8px 8px 0 0", cursor: "pointer", border: "none",
                 color: activeTab === t.key ? "#fff" : muted,
                 background: activeTab === t.key ? "rgba(8,12,35,0.9)" : "transparent",
-                borderBottom: activeTab === t.key ? "2px solid #4488dd" : "2px solid transparent",
+                borderBottom: activeTab === t.key ? `2px solid ${poolColor}` : "2px solid transparent",
               }}>
               {t.label}
               {"badge" in t && (t.badge ?? 0) > 0 && (
@@ -455,7 +507,7 @@ export default function AdminPage() {
           return (
             <div style={{ ...card, padding: 20 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <h2 style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>📈 Доход от торговли (история)</h2>
+                <h2 style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>📈 Доход от торговли (история) — {poolLabel}</h2>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 13 }}>
                   <span style={{ color: muted }}>Точек: {poolHistory.length}</span>
                   <span style={{ fontWeight: 600, color: chartColor }}>
@@ -472,16 +524,13 @@ export default function AdminPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
-                  <XAxis dataKey="ts" tick={{ fill: "#6b7bb0", fontSize: 11 }} tickLine={false} axisLine={false}
-                    interval={Math.floor(poolHistory.length / 6)} />
+                  <XAxis dataKey="ts" tick={{ fill: "#6b7bb0", fontSize: 11 }} tickLine={false} axisLine={false} interval={Math.floor(poolHistory.length / 6)} />
                   <YAxis tick={{ fill: "#6b7bb0", fontSize: 11 }} tickLine={false} axisLine={false}
                     tickFormatter={v => `${v >= 0 ? "+" : ""}${v.toFixed(1)}$`}
                     domain={[minPnl - Math.abs(minPnl) * 0.1, maxPnl + Math.abs(maxPnl) * 0.1]} />
-                  <Tooltip
-                    contentStyle={{ background: "#0c0e28", border: `1px solid ${border}`, borderRadius: 8, fontSize: 12 }}
+                  <Tooltip contentStyle={{ background: "#0c0e28", border: `1px solid ${border}`, borderRadius: 8, fontSize: 12 }}
                     labelStyle={{ color: muted }}
-                    formatter={(v) => { const n = Number(v); return [`${n >= 0 ? "+" : ""}${n.toFixed(2)} $`, "PnL"]; }}
-                  />
+                    formatter={(v) => { const n = Number(v); return [`${n >= 0 ? "+" : ""}${n.toFixed(2)} $`, "PnL"]; }} />
                   <ReferenceLine y={0} stroke="#ffffff20" strokeDasharray="4 4" />
                   <Area type="monotone" dataKey="pnl" stroke={chartColor} strokeWidth={2}
                     fill="url(#pnlGradAdmin)" dot={false} activeDot={{ r: 4, fill: chartColor }} />
@@ -491,7 +540,7 @@ export default function AdminPage() {
           );
         })()}
 
-        {/* Обзор — позиции + статистика */}
+        {/* Обзор */}
         {activeTab === "overview" && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
             <div style={{ ...card, padding: 20 }}>
@@ -510,9 +559,7 @@ export default function AdminPage() {
                       <div style={{ textAlign: "right" }}>
                         <p style={{ color: "#fff", fontSize: 13 }}>{p.value.toFixed(2)} $</p>
                         <p style={{ color: muted, fontSize: 11 }}>avg ${p.avg_price.toFixed(4)} · тек. ${cur.toFixed(4)}</p>
-                        <p style={{ color: pc, fontSize: 11, fontWeight: 600 }}>
-                          {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} $ ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
-                        </p>
+                        <p style={{ color: pc, fontSize: 11, fontWeight: 600 }}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} $ ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)</p>
                       </div>
                     </div>
                   );
@@ -531,8 +578,8 @@ export default function AdminPage() {
                   { label: "Стартовый депозит", value: `${data.real_start_balance.toFixed(2)} $` },
                   { label: "Чистый вклад", value: `${data.net_invested_pool.toFixed(2)} $` },
                   { label: "Доход от торговли", value: `${data.pool_pnl_usdt >= 0 ? "+" : ""}${data.pool_pnl_usdt.toFixed(2)} $ (${data.pool_pnl_pct >= 0 ? "+" : ""}${data.pool_pnl_pct.toFixed(2)}%)`, color: data.pool_pnl_usdt >= 0 ? "#22c97a" : "#ff4d4d" },
-                  { label: "Расч. прибыль инвесторов", value: `${data.pool_profit >= 0 ? "+" : ""}${data.pool_profit.toFixed(2)} $`, color: data.pool_profit >= 0 ? "#4488dd" : "#ff4d4d" },
-                  { label: "Мой доход (20%)", value: `${data.admin_income >= 0 ? "+" : ""}${data.admin_income.toFixed(2)} $`, color: incomeColor },
+                  { label: "Расч. прибыль инвесторов", value: `${data.pool_profit >= 0 ? "+" : ""}${data.pool_profit.toFixed(2)} $`, color: data.pool_profit >= 0 ? poolColor : "#ff4d4d" },
+                  { label: "Мой доход (20%)", value: `${data.admin_income >= 0 ? "+" : ""}${data.admin_income.toFixed(2)} $`, color: data.admin_income > 0 ? "#22c97a" : "#888" },
                   { label: "Мой капитал в пуле", value: `${data.admin_own_capital.toFixed(2)} $` },
                   { label: "Доход с моего капитала", value: `${data.admin_own_pnl >= 0 ? "+" : ""}${data.admin_own_pnl.toFixed(2)} $`, color: data.admin_own_pnl >= 0 ? "#22c97a" : "#ff4d4d" },
                   { label: "Итого мой доход", value: `${data.admin_total_income >= 0 ? "+" : ""}${data.admin_total_income.toFixed(2)} $`, color: data.admin_total_income >= 0 ? "#22c97a" : "#ff4d4d" },
@@ -552,10 +599,8 @@ export default function AdminPage() {
           <div style={{ ...card, padding: 16, border: "1px solid rgba(255,77,77,0.2)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <p style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>🧹 Очистка демо-снимков</p>
-                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>
-                  Удаляет аномальные снимки из БД и сбрасывает точки входа инвесторов.
-                </p>
+                <p style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>🧹 Очистка демо-снимков ({poolLabel})</p>
+                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Удаляет аномальные снимки и сбрасывает точки входа инвесторов.</p>
                 {cleanupMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{cleanupMsg}</p>}
               </div>
               <button
@@ -563,64 +608,49 @@ export default function AdminPage() {
                   if (!confirm("Удалить демо-снимки и сбросить точки входа инвесторов?")) return;
                   setCleanupLoading(true); setCleanupMsg(null);
                   try {
-                    const r = await cleanupDemoSnapshots();
-                    setCleanupMsg(r.message);
-                    fetchData();
+                    const r = isForex ? await cleanupForexDemoSnapshots() : await cleanupDemoSnapshots();
+                    setCleanupMsg(r.message); fetchData();
                   } catch { setCleanupMsg("Ошибка"); }
                   finally { setCleanupLoading(false); }
                 }}
                 disabled={cleanupLoading}
-                style={{
-                  marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                   background: "rgba(127,29,29,0.7)", color: "#fca5a5", cursor: "pointer", border: "none",
-                  opacity: cleanupLoading ? 0.5 : 1,
-                }}>
+                  opacity: cleanupLoading ? 0.5 : 1 }}>
                 {cleanupLoading ? "..." : "Очистить"}
               </button>
             </div>
           </div>
         )}
 
-        {/* Корректировка net_invested (депозит не через бота) */}
+        {/* Корректировка net_invested */}
         {activeTab === "overview" && (
-          <div style={{ ...card, padding: 16, border: "1px solid rgba(68,136,221,0.25)" }}>
-            <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>💰 Корректировка депозита в пул</p>
+          <div style={{ ...card, padding: 16, border: `1px solid ${isForex ? "rgba(245,158,11,0.25)" : "rgba(68,136,221,0.25)"}` }}>
+            <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>💰 Корректировка депозита в пул ({poolLabel})</p>
             <p style={{ color: muted, fontSize: 12, marginBottom: 10 }}>
-              Если в пул добавлен капитал напрямую (BNB, перевод и т.д.) и бот не учёл его в net_invested — введи сумму в USDT.
-              Значение прибавится ко всем снимкам, и инвесторы перестанут видеть депозит как прибыль.
+              Если в пул добавлен капитал напрямую — введи сумму в USDT. Значение прибавится ко всем снимкам.
             </p>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="number"
-                value={adjustAmount}
-                onChange={e => setAdjustAmount(e.target.value)}
+              <input type="number" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)}
                 placeholder="Сумма депозита в USDT"
-                style={{
-                  flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13,
                   background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-                  color: "#fff", outline: "none",
-                }}
-              />
-              <button
-                disabled={adjustLoading || !adjustAmount}
+                  color: "#fff", outline: "none" }} />
+              <button disabled={adjustLoading || !adjustAmount}
                 onClick={async () => {
                   const amt = parseFloat(adjustAmount);
                   if (!amt || isNaN(amt)) return;
                   if (!confirm(`Прибавить ${amt} $ к net_invested во всех снимках?`)) return;
                   setAdjustLoading(true); setAdjustMsg(null);
                   try {
-                    const r = await adjustNetInvested(amt);
-                    setAdjustMsg(r.message);
-                    setAdjustAmount("");
-                    fetchData();
+                    const r = isForex ? await adjustForexNetInvested(amt) : await adjustNetInvested(amt);
+                    setAdjustMsg(r.message); setAdjustAmount(""); fetchData();
                   } catch { setAdjustMsg("Ошибка"); }
                   finally { setAdjustLoading(false); }
                 }}
-                style={{
-                  padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
-                  background: "rgba(68,136,221,0.6)", color: "#fff", cursor: "pointer",
-                  opacity: (adjustLoading || !adjustAmount) ? 0.5 : 1,
-                }}>
+                style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
+                  background: isForex ? "rgba(245,158,11,0.6)" : "rgba(68,136,221,0.6)", color: "#fff",
+                  cursor: "pointer", opacity: (adjustLoading || !adjustAmount) ? 0.5 : 1 }}>
                 {adjustLoading ? "..." : "Применить"}
               </button>
             </div>
@@ -663,7 +693,7 @@ export default function AdminPage() {
                             <td style={{ padding: "12px 16px" }}>
                               <div style={{ display: "flex", gap: 8 }}>
                                 <button onClick={() => toggleExpand(u.id)}
-                                  style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, padding: "4px 10px", borderRadius: 6, border: `1px solid ${isOpen ? "#4488dd" : "rgba(68,136,221,0.33)"}`, color: "#4488dd", background: "transparent", cursor: "pointer" }}>
+                                  style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, padding: "4px 10px", borderRadius: 6, border: `1px solid ${isOpen ? poolColor : "rgba(68,136,221,0.33)"}`, color: poolColor, background: "transparent", cursor: "pointer" }}>
                                   {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                                   {isOpen ? "Свернуть" : "Управление"}
                                 </button>
@@ -680,34 +710,67 @@ export default function AdminPage() {
                                 {!f ? (
                                   <p style={{ color: muted, fontSize: 13 }}>Загрузка...</p>
                                 ) : (
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-                                      {[
-                                        { label: "Инвестировано (USDT)", field: "investment_usdt" as keyof InvestorForm, type: "number" },
-                                        { label: "Выведено (USDT)", field: "withdrawal_usdt" as keyof InvestorForm, type: "number" },
-                                        { label: "Лимит рефералов", field: "referral_limit" as keyof InvestorForm, type: "number" },
-                                        { label: "Заметка", field: "note" as keyof InvestorForm, type: "text" },
-                                      ].map(({ label, field, type }) => (
-                                        <div key={field}>
-                                          <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
-                                          <input type={type} value={f[field]}
-                                            onChange={e => updateForm(u.id, field, e.target.value)}
-                                            style={inputStyle} />
-                                        </div>
-                                      ))}
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                                    {/* Крипто пул */}
+                                    <div>
+                                      <p style={{ color: "#4488dd", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>₿ Крипто Пул</p>
+                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                                        {[
+                                          { label: "Инвестировано (USDT)", field: "investment_usdt" as keyof InvestorForm },
+                                          { label: "Выведено (USDT)", field: "withdrawal_usdt" as keyof InvestorForm },
+                                          { label: "Лимит рефералов", field: "referral_limit" as keyof InvestorForm },
+                                          { label: "Заметка", field: "note" as keyof InvestorForm },
+                                        ].map(({ label, field }) => (
+                                          <div key={field}>
+                                            <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
+                                            <input type={field === "note" ? "text" : "number"} value={f[field]}
+                                              onChange={e => updateForm(u.id, field, e.target.value)}
+                                              style={inputStyle} />
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+                                        <button onClick={() => handleSave(u.id)} disabled={savingId === u.id}
+                                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(13,58,32,0.8)", color: "#22c97a", cursor: "pointer", border: "none", opacity: savingId === u.id ? 0.5 : 1 }}>
+                                          <Save size={13} />{savingId === u.id ? "Сохранение..." : "Сохранить крипто"}
+                                        </button>
+                                        {saveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: saveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{saveMsg[u.id]}</span>}
+                                      </div>
                                     </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                      <button onClick={() => handleSave(u.id)} disabled={savingId === u.id}
-                                        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(13,58,32,0.8)", color: "#22c97a", cursor: "pointer", border: "none", opacity: savingId === u.id ? 0.5 : 1 }}>
-                                        <Save size={13} />{savingId === u.id ? "Сохранение..." : "Сохранить"}
-                                      </button>
+
+                                    {/* Форекс пул */}
+                                    <div style={{ borderTop: `1px solid ${border}`, paddingTop: 16 }}>
+                                      <p style={{ color: "#f59e0b", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>💱 Форекс Пул</p>
+                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                                        {[
+                                          { label: "Инвестировано (USDT)", field: "forex_investment_usdt" as keyof InvestorForm },
+                                          { label: "Выведено (USDT)", field: "forex_withdrawal_usdt" as keyof InvestorForm },
+                                        ].map(({ label, field }) => (
+                                          <div key={field}>
+                                            <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
+                                            <input type="number" value={f[field]}
+                                              onChange={e => updateForm(u.id, field, e.target.value)}
+                                              style={{ ...inputStyle, border: "1px solid rgba(245,158,11,0.3)" }} />
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+                                        <button onClick={() => handleForexSave(u.id)} disabled={forexSavingId === u.id}
+                                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(40,30,0,0.8)", color: "#f59e0b", cursor: "pointer", border: "none", opacity: forexSavingId === u.id ? 0.5 : 1 }}>
+                                          <Save size={13} />{forexSavingId === u.id ? "Сохранение..." : "Сохранить форекс"}
+                                        </button>
+                                        {forexSaveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: forexSaveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{forexSaveMsg[u.id]}</span>}
+                                      </div>
+                                    </div>
+
+                                    {/* Удалить + смена пароля */}
+                                    <div style={{ display: "flex", gap: 12, borderTop: `1px solid ${border}`, paddingTop: 16 }}>
                                       <button onClick={() => handleDelete(u.id, u.email)}
                                         style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(58,13,13,0.8)", color: "#ff4d4d", cursor: "pointer", border: "none" }}>
                                         <Trash2 size={13} /> Удалить
                                       </button>
-                                      {saveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: saveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{saveMsg[u.id]}</span>}
                                     </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 12, borderTop: `1px solid ${border}` }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 12, borderTop: `1px solid ${border}`, paddingTop: 12 }}>
                                       <input type="text" value={newPasswords[u.id] || ""}
                                         onChange={e => setNewPasswords(prev => ({ ...prev, [u.id]: e.target.value }))}
                                         placeholder="Новый пароль..."
@@ -737,9 +800,7 @@ export default function AdminPage() {
         {activeTab === "deposits" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {deposits.length === 0 ? (
-              <div style={{ ...card, padding: 32, textAlign: "center" }}>
-                <p style={{ color: muted }}>Заявок пока нет</p>
-              </div>
+              <div style={{ ...card, padding: 32, textAlign: "center" }}><p style={{ color: muted }}>Заявок пока нет</p></div>
             ) : deposits.map(d => (
               <div key={d.id} style={{ ...card, padding: 16, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, border: d.status === "pending" ? "1px solid rgba(245,158,11,0.27)" : `1px solid ${border}` }}>
                 <div style={{ flex: 1 }}>
@@ -747,8 +808,7 @@ export default function AdminPage() {
                     <span style={{ color: "#fff", fontWeight: 600 }}>{d.email}</span>
                     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20,
                       background: d.status === "approved" ? "rgba(13,58,32,0.8)" : d.status === "rejected" ? "rgba(58,13,13,0.8)" : "rgba(26,18,0,0.8)",
-                      color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b",
-                    }}>
+                      color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b" }}>
                       {d.status === "approved" ? "✓ Подтверждено" : d.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
                     </span>
                   </div>
@@ -801,9 +861,7 @@ export default function AdminPage() {
         {activeTab === "withdrawals" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {withdrawals.length === 0 ? (
-              <div style={{ ...card, padding: 32, textAlign: "center" }}>
-                <p style={{ color: muted }}>Заявок пока нет</p>
-              </div>
+              <div style={{ ...card, padding: 32, textAlign: "center" }}><p style={{ color: muted }}>Заявок пока нет</p></div>
             ) : withdrawals.map(w => (
               <div key={w.id} style={{ ...card, padding: 16, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12, border: w.status === "pending" ? "1px solid rgba(255,153,68,0.27)" : `1px solid ${border}` }}>
                 <div style={{ flex: 1 }}>
@@ -811,8 +869,7 @@ export default function AdminPage() {
                     <span style={{ color: "#fff", fontWeight: 600 }}>{w.email}</span>
                     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20,
                       background: w.status === "approved" ? "rgba(13,58,32,0.8)" : w.status === "rejected" ? "rgba(58,13,13,0.8)" : "rgba(26,13,0,0.8)",
-                      color: w.status === "approved" ? "#22c97a" : w.status === "rejected" ? "#ff4d4d" : "#ff9944",
-                    }}>
+                      color: w.status === "approved" ? "#22c97a" : w.status === "rejected" ? "#ff4d4d" : "#ff9944" }}>
                       {w.status === "approved" ? "✓ Выплачено" : w.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
                     </span>
                   </div>
@@ -879,7 +936,7 @@ export default function AdminPage() {
                     {data.referrals.map((r) => (
                       <tr key={r.id} className="adm-row" style={{ borderBottom: `1px solid ${border}` }}>
                         <td style={{ padding: "12px 16px", color: "#fff" }}>{r.email}</td>
-                        <td style={{ padding: "12px 16px", color: "#4488dd", fontSize: 13 }}>{r.referred_by_email}</td>
+                        <td style={{ padding: "12px 16px", color: poolColor, fontSize: 13 }}>{r.referred_by_email}</td>
                         <td style={{ padding: "12px 16px", color: "#fff" }}>{r.investment.toFixed(2)} $</td>
                         <td style={{ padding: "12px 16px" }}>
                           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: r.is_active ? "rgba(13,58,32,0.8)" : "rgba(58,32,0,0.8)", color: r.is_active ? "#22c97a" : "#f59e0b" }}>
@@ -913,9 +970,7 @@ export default function AdminPage() {
                     {data.trades.map((t, i) => (
                       <tr key={i} className="adm-row" style={{ borderBottom: `1px solid ${border}` }}>
                         <td style={{ padding: "12px 16px" }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: ACTION_COLOR[t.action] + "22", color: ACTION_COLOR[t.action] }}>
-                            {t.action}
-                          </span>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: ACTION_COLOR[t.action] + "22", color: ACTION_COLOR[t.action] }}>{t.action}</span>
                         </td>
                         <td style={{ padding: "12px 16px", color: "#fff", fontWeight: 500 }}>{t.symbol}</td>
                         <td style={{ padding: "12px 16px", color: "#fff" }}>${t.price.toFixed(4)}</td>
@@ -941,9 +996,7 @@ export default function AdminPage() {
               : <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                 {data.ai_feed.map((a, i) => (
                   <div key={i} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: `1px solid ${border}` }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 8px", borderRadius: 4, background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action], alignSelf: "flex-start", marginTop: 2 }}>
-                      {a.action}
-                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 8px", borderRadius: 4, background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action], alignSelf: "flex-start", marginTop: 2 }}>{a.action}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                         <span style={{ color: "#fff", fontWeight: 500, fontSize: 13 }}>{a.symbol}</span>
@@ -994,13 +1047,11 @@ export default function AdminPage() {
                         </div>
                         <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20,
                           background: d.status === "approved" ? "rgba(13,58,32,0.8)" : d.status === "rejected" ? "rgba(58,13,13,0.8)" : "rgba(26,18,0,0.8)",
-                          color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b",
-                        }}>
+                          color: d.status === "approved" ? "#22c97a" : d.status === "rejected" ? "#ff4d4d" : "#f59e0b" }}>
                           {d.status === "approved" ? "✓ Зачислено" : d.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
                         </span>
                       </div>
-                    ))
-                  }
+                    ))}
                 </div>
                 <div>
                   <h3 style={{ color: "#ff9944", fontSize: 13, fontWeight: 600, marginBottom: 8 }}>💸 Выводы</h3>
@@ -1015,13 +1066,11 @@ export default function AdminPage() {
                         </div>
                         <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20,
                           background: w.status === "approved" ? "rgba(13,58,32,0.8)" : w.status === "rejected" ? "rgba(58,13,13,0.8)" : "rgba(26,13,0,0.8)",
-                          color: w.status === "approved" ? "#22c97a" : w.status === "rejected" ? "#ff4d4d" : "#ff9944",
-                        }}>
+                          color: w.status === "approved" ? "#22c97a" : w.status === "rejected" ? "#ff4d4d" : "#ff9944" }}>
                           {w.status === "approved" ? "✓ Выплачено" : w.status === "rejected" ? "✗ Отклонено" : "⏳ Ожидает"}
                         </span>
                       </div>
-                    ))
-                  }
+                    ))}
                 </div>
               </div>
             )}

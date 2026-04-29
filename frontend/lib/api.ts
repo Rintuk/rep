@@ -42,6 +42,66 @@ export async function getAdminPoolHistory() {
   return res.data as { ts: string; pool_total: number; pnl: number; pnl_pct: number }[];
 }
 
+// ── Форекс admin ────────────────────────────────────────────────────────────
+
+export async function getAdminForexOverview() {
+  const res = await api.get("/auth/admin/forex-overview");
+  return res.data;
+}
+
+export async function getAdminForexPoolHistory() {
+  const res = await api.get("/auth/admin/forex-pool-history");
+  return res.data as { ts: string; pool_total: number; pnl: number; pnl_pct: number }[];
+}
+
+export async function getAdminForexDeposits() {
+  const res = await api.get("/auth/admin/forex-deposits");
+  return res.data;
+}
+
+export async function approveForexDeposit(id: string, actual_amount: number) {
+  const res = await api.post(`/auth/admin/forex-deposits/${id}/approve`, null, { params: { actual_amount } });
+  return res.data;
+}
+
+export async function rejectForexDeposit(id: string) {
+  const res = await api.post(`/auth/admin/forex-deposits/${id}/reject`);
+  return res.data;
+}
+
+export async function getAdminForexWithdrawals() {
+  const res = await api.get("/auth/admin/forex-withdrawals");
+  return res.data;
+}
+
+export async function approveForexWithdrawal(id: string, actual_amount: number) {
+  const res = await api.post(`/auth/admin/forex-withdrawals/${id}/approve`, null, { params: { actual_amount } });
+  return res.data;
+}
+
+export async function rejectForexWithdrawal(id: string) {
+  const res = await api.post(`/auth/admin/forex-withdrawals/${id}/reject`);
+  return res.data;
+}
+
+export async function updateUserForexFinancials(id: string, forex_investment_usdt: number, forex_withdrawal_usdt: number) {
+  await api.patch(`/auth/admin/users/${id}/forex-financials`, null, {
+    params: { forex_investment_usdt, forex_withdrawal_usdt }
+  });
+}
+
+export async function cleanupForexDemoSnapshots() {
+  const res = await api.post("/auth/admin/forex-cleanup-demo");
+  return res.data as { deleted_snapshots: number; reset_investors: number; message: string };
+}
+
+export async function adjustForexNetInvested(add_amount: number) {
+  const res = await api.post("/auth/admin/forex-adjust-net-invested", null, { params: { add_amount } });
+  return res.data as { updated_snapshots: number; add_amount: number; message: string };
+}
+
+// ── Обычный admin ────────────────────────────────────────────────────────────
+
 export async function approveUser(id: string) {
   await api.post(`/auth/admin/approve/${id}`);
 }
@@ -80,6 +140,8 @@ export async function setReferralLimit(id: string, limit: number) {
 export async function resetUserPassword(id: string, new_password: string) {
   await api.post(`/auth/admin/users/${id}/reset-password`, null, { params: { new_password } });
 }
+
+// ── Крипто депозиты/выводы (пользователь) ────────────────────────────────────
 
 export async function createDepositRequest(amount: number, comment: string) {
   const res = await api.post("/auth/deposits/request", null, { params: { amount, comment } });
@@ -131,6 +193,30 @@ export async function rejectWithdrawal(id: string) {
   return res.data;
 }
 
+// ── Форекс депозиты/выводы (пользователь) ────────────────────────────────────
+
+export async function createForexDepositRequest(amount: number, comment: string) {
+  const res = await api.post("/auth/forex-deposits/request", null, { params: { amount, comment } });
+  return res.data;
+}
+
+export async function getMyForexDeposits() {
+  const res = await api.get("/auth/forex-deposits/my");
+  return res.data;
+}
+
+export async function createForexWithdrawalRequest(amount: number, comment: string) {
+  const res = await api.post("/auth/forex-withdrawals/request", null, { params: { amount, comment } });
+  return res.data;
+}
+
+export async function getMyForexWithdrawals() {
+  const res = await api.get("/auth/forex-withdrawals/my");
+  return res.data;
+}
+
+// ── Крипто демо ──────────────────────────────────────────────────────────────
+
 export async function cleanupDemoSnapshots() {
   const res = await api.post("/auth/admin/cleanup-demo-snapshots");
   return res.data as { deleted_snapshots: number; reset_investors: number; message: string };
@@ -153,5 +239,22 @@ export async function startDemoAccount(amount: number) {
 
 export async function resetDemoAccount() {
   const res = await api.post("/api/demo/reset");
+  return res.data;
+}
+
+// ── Форекс демо ──────────────────────────────────────────────────────────────
+
+export async function getForexDemoAccount() {
+  const res = await api.get("/api/demo/forex/account");
+  return res.data;
+}
+
+export async function startForexDemoAccount(amount: number) {
+  const res = await api.post("/api/demo/forex/start", null, { params: { amount } });
+  return res.data;
+}
+
+export async function resetForexDemoAccount() {
+  const res = await api.post("/api/demo/forex/reset");
   return res.data;
 }

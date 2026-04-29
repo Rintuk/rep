@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getDemoAccount, startDemoAccount, resetDemoAccount } from "@/lib/api";
+import {
+  getDemoAccount, startDemoAccount, resetDemoAccount,
+  getForexDemoAccount, startForexDemoAccount, resetForexDemoAccount,
+} from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, RotateCcw } from "lucide-react";
 
 interface Position { symbol: string; amount: number; avg_price: number; value: number; }
@@ -112,40 +115,7 @@ export default function DemoPage() {
   const [resetting, setResetting] = useState(false);
   const [starting, setStarting] = useState(false);
   const [amountInput, setAmountInput] = useState("1000");
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) { router.push("/login"); return; }
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function fetchData() {
-    try {
-      const d = await getDemoAccount();
-      setData(d);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleStart() {
-    const amount = parseFloat(amountInput);
-    if (!amount || amount <= 0) return;
-    setStarting(true);
-    await startDemoAccount(amount);
-    await fetchData();
-    setStarting(false);
-  }
-
-  async function handleReset() {
-    if (!confirm("Остановить демо-счёт и удалить историю? Можно будет начать заново с новой суммой.")) return;
-    setResetting(true);
-    await resetDemoAccount();
-    await fetchData();
-    setResetting(false);
-  }
+  const [activePool, setActivePool] = useState<"crypto" | "forex">("crypto");
 
   const card: React.CSSProperties = {
     background: "rgba(8,12,35,0.85)",
@@ -154,6 +124,46 @@ export default function DemoPage() {
     backdropFilter: "blur(12px)",
   };
   const muted = "#6b7bb0";
+
+  async function fetchData(pool: "crypto" | "forex") {
+    try {
+      const d = pool === "forex" ? await getForexDemoAccount() : await getDemoAccount();
+      setData(d);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) { router.push("/login"); return; }
+    setLoading(true);
+    setData(null);
+    fetchData(activePool);
+    const interval = setInterval(() => fetchData(activePool), 60000);
+    return () => clearInterval(interval);
+  }, [activePool]);
+
+  async function handleStart() {
+    const amount = parseFloat(amountInput);
+    if (!amount || amount <= 0) return;
+    setStarting(true);
+    try {
+      if (activePool === "forex") await startForexDemoAccount(amount);
+      else await startDemoAccount(amount);
+      await fetchData(activePool);
+    } finally { setStarting(false); }
+  }
+
+  async function handleReset() {
+    if (!confirm("Остановить демо-счёт и удалить историю? Можно будет начать заново с новой суммой.")) return;
+    setResetting(true);
+    try {
+      if (activePool === "forex") await resetForexDemoAccount();
+      else await resetDemoAccount();
+      await fetchData(activePool);
+    } finally { setResetting(false); }
+  }
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "rgba(3,5,20,1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -186,6 +196,7 @@ export default function DemoPage() {
         padding: "12px 20px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
+        {/* Лого */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <RobotSVG />
           <div>
@@ -193,6 +204,23 @@ export default function DemoPage() {
             <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 600 }}>Демо счёт</span>
           </div>
         </div>
+
+        {/* Переключатель пула */}
+        <div style={{ display: "flex", gap: 6 }}>
+          {(["crypto", "forex"] as const).map(p => (
+            <button key={p} onClick={() => setActivePool(p)} style={{
+              padding: "6px 18px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+              background: activePool === p ? "rgba(245,158,11,0.18)" : "transparent",
+              border: `1px solid ${activePool === p ? "rgba(245,158,11,0.5)" : "rgba(0,180,255,0.15)"}`,
+              color: activePool === p ? "#f59e0b" : "#4a6a9a",
+              cursor: "pointer", transition: "all 0.2s",
+            }}>
+              {p === "crypto" ? "Крипто" : "Форекс"}
+            </button>
+          ))}
+        </div>
+
+        {/* Реал/Демо переключатель + Сброс */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: muted }}>Реал</span>
@@ -229,9 +257,11 @@ export default function DemoPage() {
 
         {!data?.is_started ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 24 }}>
-            <div style={{ fontSize: 48 }}>🧪</div>
+            <div style={{ fontSize: 48 }}>{activePool === "forex" ? "💱" : "🧪"}</div>
             <div style={{ textAlign: "center" }}>
-              <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 22, marginBottom: 8 }}>Запустить демо-счёт</h2>
+              <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 22, marginBottom: 8 }}>
+                Запустить {activePool === "forex" ? "Форекс" : "Крипто"} демо-счёт
+              </h2>
               <p style={{ color: muted, fontSize: 13 }}>Введите виртуальную сумму — бот начнёт торговать как будто это ваши деньги.</p>
               <p style={{ color: "#f59e0b", fontSize: 13, marginTop: 4 }}>Деньги виртуальные — стратегия настоящая.</p>
             </div>
@@ -264,9 +294,11 @@ export default function DemoPage() {
         ) : (
           <>
             <div style={{ ...card, padding: 16, border: "1px solid rgba(245,158,11,0.27)", display: "flex", alignItems: "center", gap: 16, background: "rgba(26,16,0,0.7)" }}>
-              <span style={{ fontSize: 28 }}>🧪</span>
+              <span style={{ fontSize: 28 }}>{activePool === "forex" ? "💱" : "🧪"}</span>
               <div>
-                <p style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>Виртуальный портфель — реальная стратегия бота</p>
+                <p style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>
+                  {activePool === "forex" ? "Форекс" : "Виртуальный"} портфель — реальная стратегия бота
+                </p>
                 <p style={{ color: "#a87a30", fontSize: 12, marginTop: 2 }}>
                   Ваш демо-счёт зеркалит реальную торговлю AI Маклера. Деньги виртуальные — стратегия настоящая.
                 </p>
@@ -300,17 +332,15 @@ export default function DemoPage() {
                 <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16, fontSize: 14 }}>💼 Виртуальные позиции</h2>
                 {data.positions.length === 0
                   ? <p style={{ color: muted, fontSize: 13 }}>Позиций нет — бот ещё не торговал</p>
-                  : <div>
-                    {data.positions.map((p, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
-                        <span style={{ color: "#fff", fontWeight: 500 }}>{p.symbol}</span>
-                        <div style={{ textAlign: "right" }}>
-                          <p style={{ color: "#fff", fontSize: 13 }}>{p.amount.toFixed(6)}</p>
-                          <p style={{ color: muted, fontSize: 11 }}>avg ${p.avg_price.toFixed(4)} · {p.value.toFixed(2)} $</p>
-                        </div>
+                  : data.positions.map((p, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
+                      <span style={{ color: "#fff", fontWeight: 500 }}>{p.symbol}</span>
+                      <div style={{ textAlign: "right" }}>
+                        <p style={{ color: "#fff", fontSize: 13 }}>{p.amount.toFixed(6)}</p>
+                        <p style={{ color: muted, fontSize: 11 }}>avg ${p.avg_price.toFixed(4)} · {p.value.toFixed(2)} $</p>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))
                 }
               </div>
 

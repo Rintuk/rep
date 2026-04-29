@@ -80,7 +80,7 @@ class ReferralInfo(BaseModel):
     bonus_usdt: float   # сколько реферер зарабатывает с этого человека
 
 class DashboardOut(BaseModel):
-    # Пул (весь бот)
+    # Крипто пул
     balance_usdt: float
     pool_total_usdt: float
     pool_positions_usdt: float
@@ -89,7 +89,7 @@ class DashboardOut(BaseModel):
     drawdown_pct: float
     server_online: bool
     last_updated: str | None
-    # Данные пользователя
+    # Данные пользователя (крипто)
     user_investment: float
     user_pnl: float
     user_pnl_pct: float
@@ -99,3 +99,15 @@ class DashboardOut(BaseModel):
     positions: list[PositionOut]
     recent_trades: list[TradeOut]
     ai_feed: list[AIFeedOut]
+    # Форекс пул
+    forex_pool_total: float = 0.0
+    forex_pool_positions: float = 0.0
+    forex_balance: float = 0.0
+    forex_server_online: bool = False
+    forex_last_updated: str | None = None
+    # Данные пользователя (форекс)
+    forex_investment: float = 0.0
+    forex_pnl: float = 0.0
+    forex_pnl_pct: float = 0.0
+    forex_positions: list[PositionOut] = []
+    forex_recent_trades: list[TradeOut] = []

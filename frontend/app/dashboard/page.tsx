@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getDashboard, createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals } from "@/lib/api";
+import {
+  getDashboard,
+  createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals,
+  createForexDepositRequest, getMyForexDeposits, createForexWithdrawalRequest, getMyForexWithdrawals,
+} from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -16,7 +20,12 @@ interface Dashboard {
   user_investment: number; user_pnl: number; user_pnl_pct: number;
   ref_bonus: number; referral_code: string; referrals: ReferralInfo[];
   positions: Position[]; recent_trades: Trade[]; ai_feed: AIFeed[];
+  forex_pool_total: number; forex_pool_positions: number; forex_balance: number;
+  forex_server_online: boolean; forex_last_updated: string | null;
+  forex_investment: number; forex_pnl: number; forex_pnl_pct: number;
+  forex_positions: Position[]; forex_recent_trades: Trade[];
 }
+type DepositItem = { id: string; amount: number; status: string; created_at: string };
 
 const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888", DEPOSIT: "#f59e0b" };
 const ACTION_LABEL: Record<string, string> = { BUY: "BUY", SELL: "SELL", HOLD: "HOLD", DEPOSIT: "Пополнение" };
@@ -86,7 +95,6 @@ function CircuitBackground() {
   return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }} />;
 }
 
-// ─── Shared card style ────────────────────────────────────────────────────────
 const card: React.CSSProperties = {
   background: "rgba(8,12,35,0.82)",
   border: "1px solid rgba(0,180,255,0.15)",
@@ -94,24 +102,43 @@ const card: React.CSSProperties = {
   backdropFilter: "blur(12px)",
 };
 
+function statusBadge(online: boolean) {
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20,
+      background: online ? "rgba(34,201,122,0.12)" : "rgba(255,77,77,0.12)",
+      color: online ? "#22c97a" : "#ff4d4d",
+      border: `1px solid ${online ? "rgba(34,201,122,0.3)" : "rgba(255,77,77,0.3)"}`,
+    }}>
+      ● {online ? "ONLINE" : "OFFLINE"}
+    </span>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState("");
+  const [activePool, setActivePool] = useState<"crypto" | "forex">("crypto");
   const [referralCode, setReferralCode] = useState("");
   const [copied, setCopied] = useState(false);
+
   const [showDeposit, setShowDeposit] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositComment, setDepositComment] = useState("");
   const [depositLoading, setDepositLoading] = useState(false);
   const [depositDone, setDepositDone] = useState(false);
-  const [myDeposits, setMyDeposits] = useState<{id:string;amount:number;status:string;created_at:string}[]>([]);
+  const [myDeposits, setMyDeposits] = useState<DepositItem[]>([]);
+  const [myForexDeposits, setMyForexDeposits] = useState<DepositItem[]>([]);
+
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawComment, setWithdrawComment] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [withdrawDone, setWithdrawDone] = useState(false);
-  const [myWithdrawals, setMyWithdrawals] = useState<{id:string;amount:number;status:string;created_at:string}[]>([]);
+  const [myWithdrawals, setMyWithdrawals] = useState<DepositItem[]>([]);
+  const [myForexWithdrawals, setMyForexWithdrawals] = useState<DepositItem[]>([]);
+
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -121,6 +148,8 @@ export default function DashboardPage() {
     fetchData();
     getMyDeposits().then(setMyDeposits).catch(() => {});
     getMyWithdrawals().then(setMyWithdrawals).catch(() => {});
+    getMyForexDeposits().then(setMyForexDeposits).catch(() => {});
+    getMyForexWithdrawals().then(setMyForexWithdrawals).catch(() => {});
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -140,9 +169,14 @@ export default function DashboardPage() {
     if (!amount || amount <= 0) return;
     setDepositLoading(true);
     try {
-      await createDepositRequest(amount, depositComment);
+      if (activePool === "forex") {
+        await createForexDepositRequest(amount, depositComment);
+        setMyForexDeposits(await getMyForexDeposits());
+      } else {
+        await createDepositRequest(amount, depositComment);
+        setMyDeposits(await getMyDeposits());
+      }
       setDepositDone(true); setDepositAmount(""); setDepositComment("");
-      setMyDeposits(await getMyDeposits());
     } finally { setDepositLoading(false); }
   }
 
@@ -151,9 +185,14 @@ export default function DashboardPage() {
     if (!amount || amount <= 0) return;
     setWithdrawLoading(true);
     try {
-      await createWithdrawalRequest(amount, withdrawComment);
+      if (activePool === "forex") {
+        await createForexWithdrawalRequest(amount, withdrawComment);
+        setMyForexWithdrawals(await getMyForexWithdrawals());
+      } else {
+        await createWithdrawalRequest(amount, withdrawComment);
+        setMyWithdrawals(await getMyWithdrawals());
+      }
       setWithdrawDone(true); setWithdrawAmount(""); setWithdrawComment("");
-      setMyWithdrawals(await getMyWithdrawals());
     } finally { setWithdrawLoading(false); }
   }
 
@@ -161,6 +200,9 @@ export default function DashboardPage() {
     navigator.clipboard.writeText(`${window.location.origin}/register?ref=${referralCode}`);
     setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
+
+  function openDeposit() { setMenuOpen(false); setShowDeposit(true); setDepositDone(false); setDepositAmount(""); setDepositComment(""); }
+  function openWithdraw() { setMenuOpen(false); setShowWithdraw(true); setWithdrawDone(false); setWithdrawAmount(""); setWithdrawComment(""); }
 
   if (error) return (
     <div style={{ minHeight: "100vh", background: "#050a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -182,7 +224,27 @@ export default function DashboardPage() {
     </div>
   );
 
-  const pnlColor = data.user_pnl >= 0 ? "#22c97a" : "#ff4d4d";
+  const isCrypto = activePool === "crypto";
+  const poolInvestment = isCrypto ? data.user_investment : data.forex_investment;
+  const poolPnl = isCrypto ? data.user_pnl : data.forex_pnl;
+  const poolPnlPct = isCrypto ? data.user_pnl_pct : data.forex_pnl_pct;
+  const poolTotal = isCrypto ? data.pool_total_usdt : (data.forex_pool_total ?? 0);
+  const poolPositionsUsdt = isCrypto ? data.pool_positions_usdt : (data.forex_pool_positions ?? 0);
+  const poolBalance = isCrypto ? data.balance_usdt : (data.forex_balance ?? 0);
+  const poolOnline = isCrypto ? data.server_online : (data.forex_server_online ?? false);
+  const poolLastUpdated = isCrypto ? data.last_updated : (data.forex_last_updated ?? null);
+  const poolPositions = isCrypto ? data.positions : (data.forex_positions ?? []);
+  const poolTrades = isCrypto ? data.recent_trades : (data.forex_recent_trades ?? []);
+  const activeDeposits = isCrypto ? myDeposits : myForexDeposits;
+  const activeWithdrawals = isCrypto ? myWithdrawals : myForexWithdrawals;
+  const pnlColor = poolPnl >= 0 ? "#22c97a" : "#ff4d4d";
+
+  const walletAddr = isCrypto
+    ? process.env.NEXT_PUBLIC_WALLET_ADDRESS
+    : process.env.NEXT_PUBLIC_FOREX_WALLET_ADDRESS;
+  const walletNetwork = isCrypto
+    ? (process.env.NEXT_PUBLIC_WALLET_NETWORK || "USDT TRC20")
+    : (process.env.NEXT_PUBLIC_FOREX_WALLET_NETWORK || "USDT TRC20");
 
   return (
     <div style={{ minHeight: "100vh", background: "#050a1a" }}>
@@ -197,6 +259,7 @@ export default function DashboardPage() {
         padding: "12px 20px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
+        {/* Лого */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <svg width="26" height="26" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: "drop-shadow(0 0 6px rgba(0,200,255,0.6))" }}>
             <defs>
@@ -229,17 +292,26 @@ export default function DashboardPage() {
           </svg>
           <div>
             <h1 style={{ color: "#fff", fontWeight: 800, fontSize: 16, lineHeight: 1, letterSpacing: 0.5 }}>AI Маклер</h1>
-            <span style={{
-              fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20,
-              background: data.server_online ? "rgba(34,201,122,0.12)" : "rgba(255,77,77,0.12)",
-              color: data.server_online ? "#22c97a" : "#ff4d4d",
-              border: `1px solid ${data.server_online ? "rgba(34,201,122,0.3)" : "rgba(255,77,77,0.3)"}`,
-            }}>
-              ● {data.server_online ? "ONLINE" : "OFFLINE"}
-            </span>
+            {statusBadge(poolOnline)}
           </div>
         </div>
 
+        {/* Переключатель пула */}
+        <div style={{ display: "flex", gap: 6 }}>
+          {(["crypto", "forex"] as const).map(p => (
+            <button key={p} onClick={() => setActivePool(p)} style={{
+              padding: "6px 18px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+              background: activePool === p ? "rgba(0,180,255,0.15)" : "transparent",
+              border: `1px solid ${activePool === p ? "rgba(0,180,255,0.5)" : "rgba(0,180,255,0.15)"}`,
+              color: activePool === p ? "#00cfff" : "#4a6a9a",
+              cursor: "pointer", transition: "all 0.2s",
+            }}>
+              {p === "crypto" ? "Крипто" : "Форекс"}
+            </button>
+          ))}
+        </div>
+
+        {/* Меню */}
         <div style={{ position: "relative" }}>
           <button onClick={() => setMenuOpen(v => !v)} style={{
             padding: "8px", borderRadius: 10, cursor: "pointer",
@@ -253,15 +325,11 @@ export default function DashboardPage() {
           {menuOpen && (
             <>
               <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
-              <div style={{
-                position: "absolute", right: 0, top: 44, zIndex: 50, width: 220,
-                ...card, overflow: "hidden",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-              }}>
+              <div style={{ position: "absolute", right: 0, top: 44, zIndex: 50, width: 220, ...card, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
                 {[
                   { label: "Реал / Демо", special: "toggle" },
-                  { label: "Пополнить счёт", color: "#22c97a", icon: <PlusCircle size={15}/>, action: () => { setMenuOpen(false); setShowDeposit(true); setDepositDone(false); } },
-                  { label: "Вывести средства", color: "#ff9944", icon: <Wallet size={15}/>, action: () => { setMenuOpen(false); setShowWithdraw(true); setWithdrawDone(false); } },
+                  { label: "Пополнить счёт", color: "#22c97a", icon: <PlusCircle size={15}/>, action: openDeposit },
+                  { label: "Вывести средства", color: "#ff9944", icon: <Wallet size={15}/>, action: openWithdraw },
                   { label: copied ? "Скопировано!" : "Реф. ссылка", color: "#6b8ab0", icon: <Copy size={15}/>, action: () => { setMenuOpen(false); copyRefLink(); } },
                   { label: "Выйти", color: "#ff4d4d", icon: <LogOut size={15}/>, action: () => { setMenuOpen(false); logout(); } },
                 ].map((item, i) => item.special === "toggle" ? (
@@ -298,7 +366,7 @@ export default function DashboardPage() {
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
 
         {/* ── Карточки метрик ───────────────────────────────────────────────── */}
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.ref_bonus > 0 ? 5 : 4}, 1fr)`, gap: 12 }} className="metrics-grid">
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${isCrypto && data.ref_bonus > 0 ? 5 : 4}, 1fr)`, gap: 12 }} className="metrics-grid">
           <style>{`
             @media (max-width: 768px) { .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; } }
             input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus {
@@ -308,11 +376,11 @@ export default function DashboardPage() {
           `}</style>
 
           {[
-            { icon: <Wallet size={18}/>, label: "Общий пул", value: `${data.pool_total_usdt.toFixed(2)} $`, sub: `свободно: ${data.balance_usdt.toFixed(2)} $`, color: "#4488dd" },
-            { icon: <Activity size={18}/>, label: "Пул в позициях", value: `${data.pool_positions_usdt.toFixed(2)} $`, sub: null, color: "#9966ee" },
-            { icon: <TrendingUp size={18}/>, label: "Ваш баланс", value: data.user_investment > 0 ? `${data.user_investment.toFixed(2)} $` : "—", sub: data.user_investment > 0 ? "инвестировано" : "нет данных", color: "#22c97a" },
-            { icon: data.user_pnl >= 0 ? <TrendingUp size={18}/> : <TrendingDown size={18}/>, label: "Чистый доход", value: data.user_investment > 0 ? `${data.user_pnl >= 0 ? "+" : ""}${data.user_pnl.toFixed(2)} $` : "—", sub: data.user_investment > 0 ? `${data.user_pnl_pct >= 0 ? "+" : ""}${data.user_pnl_pct.toFixed(2)}%` : "нет вложений", color: pnlColor },
-            ...(data.ref_bonus > 0 ? [{ icon: <TrendingUp size={18}/>, label: "Реф. доход", value: `+${data.ref_bonus.toFixed(2)} $`, sub: "3% от прибыли", color: "#f59e0b" }] : []),
+            { icon: <Wallet size={18}/>, label: "Общий пул", value: `${poolTotal.toFixed(2)} $`, sub: `свободно: ${poolBalance.toFixed(2)} $`, color: "#4488dd" },
+            { icon: <Activity size={18}/>, label: "Пул в позициях", value: `${poolPositionsUsdt.toFixed(2)} $`, sub: null, color: "#9966ee" },
+            { icon: <TrendingUp size={18}/>, label: "Ваш баланс", value: poolInvestment > 0 ? `${poolInvestment.toFixed(2)} $` : "—", sub: poolInvestment > 0 ? "инвестировано" : "нет данных", color: "#22c97a" },
+            { icon: poolPnl >= 0 ? <TrendingUp size={18}/> : <TrendingDown size={18}/>, label: "Чистый доход", value: poolInvestment > 0 ? `${poolPnl >= 0 ? "+" : ""}${poolPnl.toFixed(2)} $` : "—", sub: poolInvestment > 0 ? `${poolPnlPct >= 0 ? "+" : ""}${poolPnlPct.toFixed(2)}%` : "нет вложений", color: pnlColor },
+            ...(isCrypto && data.ref_bonus > 0 ? [{ icon: <TrendingUp size={18}/>, label: "Реф. доход", value: `+${data.ref_bonus.toFixed(2)} $`, sub: "3% от прибыли", color: "#f59e0b" }] : []),
           ].map((c, i) => (
             <div key={i} style={{ ...card, padding: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, color: c.color }}>
@@ -325,61 +393,59 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* ── Рефералы ─────────────────────────────────────────────────────── */}
-        <div style={{ ...card, padding: 20 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: data.referrals.length > 0 ? 16 : 0 }}>
-            <div>
-              <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Мои рефералы</h2>
-              <p style={{ color: "#4a6a9a", fontSize: 12 }}>Вы получаете 3% от прибыли каждого приглашённого</p>
-            </div>
-            <button
-              onClick={copyRefLink}
-              style={{
+        {/* ── Рефералы (только крипто) ──────────────────────────────────────── */}
+        {isCrypto && (
+          <div style={{ ...card, padding: 20 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: data.referrals.length > 0 ? 16 : 0 }}>
+              <div>
+                <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Мои рефералы</h2>
+                <p style={{ color: "#4a6a9a", fontSize: 12 }}>Вы получаете 3% от прибыли каждого приглашённого</p>
+              </div>
+              <button onClick={copyRefLink} style={{
                 display: "flex", alignItems: "center", gap: 8,
                 padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
                 background: copied ? "rgba(34,201,122,0.15)" : "rgba(68,136,221,0.12)",
                 border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(68,136,221,0.3)"}`,
-                color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap",
-                transition: "all 0.2s",
-              }}
-            >
-              <Copy size={14} />
-              {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
-            </button>
-          </div>
-          {data.referrals.length === 0 ? (
-            <p style={{ color: "#4a6a9a", fontSize: 13 }}>Пока никто не зарегистрировался по вашей ссылке</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ color: "#4a6a9a" }}>
-                    <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 400 }}>Email</th>
-                    <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Инвестиция</th>
-                    <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Ваш бонус</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.referrals.map((r, i) => (
-                    <tr key={i} style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
-                      <td style={{ padding: "8px 0", color: "#fff" }}>{r.email}</td>
-                      <td style={{ padding: "8px 0", textAlign: "right", color: "#fff" }}>{r.investment_usdt > 0 ? `${r.investment_usdt.toFixed(2)} $` : "—"}</td>
-                      <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600, color: r.bonus_usdt > 0 ? "#f59e0b" : "#4a6a9a" }}>{r.bonus_usdt > 0 ? `+${r.bonus_usdt.toFixed(2)} $` : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                {data.ref_bonus > 0 && (
-                  <tfoot>
-                    <tr style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
-                      <td colSpan={2} style={{ paddingTop: 8, color: "#4a6a9a", fontSize: 12 }}>Итого бонус</td>
-                      <td style={{ paddingTop: 8, textAlign: "right", fontWeight: 700, color: "#f59e0b" }}>+{data.ref_bonus.toFixed(2)} $</td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
+                color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
+              }}>
+                <Copy size={14} />
+                {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
+              </button>
             </div>
-          )}
-        </div>
+            {data.referrals.length === 0 ? (
+              <p style={{ color: "#4a6a9a", fontSize: 13 }}>Пока никто не зарегистрировался по вашей ссылке</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ color: "#4a6a9a" }}>
+                      <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 400 }}>Email</th>
+                      <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Инвестиция</th>
+                      <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Ваш бонус</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.referrals.map((r, i) => (
+                      <tr key={i} style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
+                        <td style={{ padding: "8px 0", color: "#fff" }}>{r.email}</td>
+                        <td style={{ padding: "8px 0", textAlign: "right", color: "#fff" }}>{r.investment_usdt > 0 ? `${r.investment_usdt.toFixed(2)} $` : "—"}</td>
+                        <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600, color: r.bonus_usdt > 0 ? "#f59e0b" : "#4a6a9a" }}>{r.bonus_usdt > 0 ? `+${r.bonus_usdt.toFixed(2)} $` : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {data.ref_bonus > 0 && (
+                    <tfoot>
+                      <tr style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
+                        <td colSpan={2} style={{ paddingTop: 8, color: "#4a6a9a", fontSize: 12 }}>Итого бонус</td>
+                        <td style={{ paddingTop: 8, textAlign: "right", fontWeight: 700, color: "#f59e0b" }}>+{data.ref_bonus.toFixed(2)} $</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }} className="two-col">
           <style>{`.two-col { @media (max-width:640px) { grid-template-columns: 1fr !important; } }`}</style>
@@ -387,9 +453,9 @@ export default function DashboardPage() {
           {/* ── Позиции ────────────────────────────────────────────────────── */}
           <div style={{ ...card, padding: 20 }}>
             <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>💼 Открытые позиции</h2>
-            {data.positions.length === 0
+            {poolPositions.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Позиций нет</p>
-              : data.positions.map((p, i) => {
+              : poolPositions.map((p, i) => {
                 const cur = p.current_price || p.avg_price;
                 const value = p.amount * cur;
                 const pnl = p.amount * (cur - p.avg_price);
@@ -397,8 +463,7 @@ export default function DashboardPage() {
                 const c = pnl >= 0 ? "#22c97a" : "#ff4d4d";
                 return (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
-                    <a href={`https://www.tradingview.com/chart/?symbol=BYBIT:${p.symbol}`} target="_blank" rel="noopener noreferrer"
-                      style={{ color: "#00cfff", fontWeight: 600, fontSize: 14, textDecoration: "none" }}>{p.symbol}</a>
+                    <span style={{ color: "#00cfff", fontWeight: 600, fontSize: 14 }}>{p.symbol}</span>
                     <div style={{ textAlign: "right" }}>
                       <p style={{ color: "#fff", fontSize: 13 }}>{value.toFixed(2)} $</p>
                       <p style={{ color: "#4a6a9a", fontSize: 11 }}>avg ${p.avg_price.toFixed(4)} · тек. ${cur.toFixed(4)}</p>
@@ -413,9 +478,9 @@ export default function DashboardPage() {
           {/* ── Последние сделки ───────────────────────────────────────────── */}
           <div style={{ ...card, padding: 20 }}>
             <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>📋 Последние сделки</h2>
-            {data.recent_trades.length === 0
+            {poolTrades.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Сделок нет</p>
-              : data.recent_trades.slice(0, 8).map((t, i) => (
+              : poolTrades.slice(0, 8).map((t, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: (ACTION_COLOR[t.action] ?? "#888") + "22", color: ACTION_COLOR[t.action] ?? "#888" }}>{ACTION_LABEL[t.action] ?? t.action}</span>
@@ -436,31 +501,33 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Лента ИИ ─────────────────────────────────────────────────────── */}
-        <div style={{ ...card, padding: 20 }}>
-          <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>🧠 Лента решений ИИ</h2>
-          {data.ai_feed.length === 0
-            ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Решений пока нет</p>
-            : data.ai_feed.map((a, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action], alignSelf: "flex-start", marginTop: 2, whiteSpace: "nowrap" }}>{a.action}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{a.symbol}</span>
-                    <span style={{ color: "#4a6a9a", fontSize: 11 }}>{a.timestamp}</span>
+        {/* ── Лента ИИ (только крипто) ─────────────────────────────────────── */}
+        {isCrypto && (
+          <div style={{ ...card, padding: 20 }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>🧠 Лента решений ИИ</h2>
+            {data.ai_feed.length === 0
+              ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Решений пока нет</p>
+              : data.ai_feed.map((a, i) => (
+                <div key={i} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action], alignSelf: "flex-start", marginTop: 2, whiteSpace: "nowrap" }}>{a.action}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{a.symbol}</span>
+                      <span style={{ color: "#4a6a9a", fontSize: 11 }}>{a.timestamp}</span>
+                    </div>
+                    <p style={{ color: "#4a6a9a", fontSize: 12, lineHeight: 1.5 }}>{a.reason}</p>
                   </div>
-                  <p style={{ color: "#4a6a9a", fontSize: 12, lineHeight: 1.5 }}>{a.reason}</p>
                 </div>
-              </div>
-            ))
-          }
-        </div>
+              ))
+            }
+          </div>
+        )}
 
         {/* ── Заявки на пополнение ─────────────────────────────────────────── */}
-        {myDeposits.length > 0 && (
+        {activeDeposits.length > 0 && (
           <div style={{ ...card, padding: 20 }}>
-            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>💳 Заявки на пополнение</h2>
-            {myDeposits.map(d => (
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>💳 Заявки на пополнение{!isCrypto ? " (Форекс)" : ""}</h2>
+            {activeDeposits.map(d => (
               <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
                 <div>
                   <p style={{ color: "#fff", fontWeight: 600 }}>{d.amount.toFixed(2)} USDT</p>
@@ -479,9 +546,9 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {data.last_updated && (
+        {poolLastUpdated && (
           <p style={{ textAlign: "center", color: "#2a3a5a", fontSize: 11, paddingBottom: 16 }}>
-            Последнее обновление: {new Date(data.last_updated).toLocaleString("ru")}
+            Последнее обновление: {new Date(poolLastUpdated).toLocaleString("ru")}
           </p>
         )}
       </main>
@@ -492,7 +559,9 @@ export default function DashboardPage() {
           onClick={e => { if (e.target === e.currentTarget) setShowDeposit(false); }}>
           <div style={{ ...card, padding: 24, width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", border: "1px solid rgba(34,201,122,0.3)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>Пополнение депозита</h2>
+              <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>
+                Пополнение {isCrypto ? "Крипто" : "Форекс"} пула
+              </h2>
               <button onClick={() => setShowDeposit(false)} style={{ color: "#4a6a9a", background: "none", border: "none", cursor: "pointer" }}><X size={20}/></button>
             </div>
             {depositDone ? (
@@ -504,23 +573,20 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {process.env.NEXT_PUBLIC_WALLET_ADDRESS && (() => {
-                  const addr = process.env.NEXT_PUBLIC_WALLET_ADDRESS!;
-                  return (
-                    <div style={{ background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.2)", borderRadius: 12, padding: 16 }}>
-                      <p style={{ color: "#4488dd", fontSize: 12, fontWeight: 600, textAlign: "center", marginBottom: 12 }}>{process.env.NEXT_PUBLIC_WALLET_NETWORK || "USDT TRC20"}</p>
-                      <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-                        <div style={{ background: "#fff", padding: 8, borderRadius: 8 }}><QRCodeSVG value={addr} size={130}/></div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(0,0,20,0.5)", borderRadius: 8, padding: "8px 12px" }}>
-                        <p style={{ flex: 1, color: "#4a6a9a", fontSize: 11, wordBreak: "break-all", fontFamily: "monospace" }}>{addr}</p>
-                        <button onClick={() => { navigator.clipboard.writeText(addr); setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2000); }} style={{ color: copiedAddress ? "#22c97a" : "#4488dd", background: "none", border: "none", cursor: "pointer" }}>
-                          {copiedAddress ? <CheckCheck size={15}/> : <Copy size={15}/>}
-                        </button>
-                      </div>
+                {walletAddr && (
+                  <div style={{ background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.2)", borderRadius: 12, padding: 16 }}>
+                    <p style={{ color: "#4488dd", fontSize: 12, fontWeight: 600, textAlign: "center", marginBottom: 12 }}>{walletNetwork}</p>
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+                      <div style={{ background: "#fff", padding: 8, borderRadius: 8 }}><QRCodeSVG value={walletAddr} size={130}/></div>
                     </div>
-                  );
-                })()}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(0,0,20,0.5)", borderRadius: 8, padding: "8px 12px" }}>
+                      <p style={{ flex: 1, color: "#4a6a9a", fontSize: 11, wordBreak: "break-all", fontFamily: "monospace" }}>{walletAddr}</p>
+                      <button onClick={() => { navigator.clipboard.writeText(walletAddr!); setCopiedAddress(true); setTimeout(() => setCopiedAddress(false), 2000); }} style={{ color: copiedAddress ? "#22c97a" : "#4488dd", background: "none", border: "none", cursor: "pointer" }}>
+                        {copiedAddress ? <CheckCheck size={15}/> : <Copy size={15}/>}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label style={{ color: "#4a6a9a", fontSize: 12, display: "block", marginBottom: 6 }}>Сумма (USDT)</label>
                   <input type="number" min="1" step="0.01" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="100" autoFocus
@@ -551,7 +617,9 @@ export default function DashboardPage() {
           onClick={e => { if (e.target === e.currentTarget) setShowWithdraw(false); }}>
           <div style={{ ...card, padding: 24, width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", border: "1px solid rgba(255,153,68,0.3)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>Вывод средств</h2>
+              <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18 }}>
+                Вывод из {isCrypto ? "Крипто" : "Форекс"} пула
+              </h2>
               <button onClick={() => setShowWithdraw(false)} style={{ color: "#4a6a9a", background: "none", border: "none", cursor: "pointer" }}><X size={20}/></button>
             </div>
             {withdrawDone ? (
@@ -580,10 +648,10 @@ export default function DashboardPage() {
                   style={{ padding: "13px", borderRadius: 10, background: "linear-gradient(180deg,#ff9944,#cc6600)", color: "#fff", fontWeight: 700, fontSize: 15, border: "none", cursor: "pointer", opacity: withdrawLoading || !withdrawAmount ? 0.5 : 1 }}>
                   {withdrawLoading ? "Отправка..." : "Отправить заявку"}
                 </button>
-                {myWithdrawals.length > 0 && (
+                {activeWithdrawals.length > 0 && (
                   <div style={{ borderTop: "1px solid rgba(0,180,255,0.08)", paddingTop: 12 }}>
                     <p style={{ color: "#4a6a9a", fontSize: 11, fontWeight: 600, marginBottom: 8 }}>МОИ ЗАЯВКИ НА ВЫВОД</p>
-                    {myWithdrawals.map(w => (
+                    {activeWithdrawals.map(w => (
                       <div key={w.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0" }}>
                         <span style={{ color: "#4a6a9a" }}>{new Date(w.created_at).toLocaleDateString("ru")}</span>
                         <span style={{ color: "#fff" }}>{w.amount} USDT</span>
