@@ -297,6 +297,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Переключатель пула */}
+        <div style={{ display: "flex", gap: 6 }}>
+          {(["crypto", "forex"] as const).map(p => {
+            const isActive = activePool === p;
+            const isForexBtn = p === "forex";
+            return (
+              <button key={p} onClick={() => setActivePool(p)} style={{
+                padding: "6px 18px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                background: isActive ? (isForexBtn ? "rgba(245,158,11,0.18)" : "rgba(0,180,255,0.15)") : "transparent",
+                border: `1px solid ${isActive ? (isForexBtn ? "rgba(245,158,11,0.5)" : "rgba(0,180,255,0.5)") : "rgba(0,180,255,0.15)"}`,
+                color: isActive ? (isForexBtn ? "#f59e0b" : "#00cfff") : "#4a6a9a",
+                cursor: "pointer", transition: "all 0.2s",
+              }}>
+                {p === "crypto" ? "Крипто" : "Форекс"}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Меню */}
         <div style={{ position: "relative" }}>
           <button onClick={() => setMenuOpen(v => !v)} style={{
@@ -350,25 +369,6 @@ export default function DashboardPage() {
       </header>
 
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
-
-        {/* ── Переключатель пула ───────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 8 }}>
-          {(["crypto", "forex"] as const).map(p => {
-            const isActive = activePool === p;
-            const isForexBtn = p === "forex";
-            return (
-              <button key={p} onClick={() => setActivePool(p)} style={{
-                padding: "9px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                background: isActive ? (isForexBtn ? "rgba(245,158,11,0.18)" : "rgba(0,180,255,0.15)") : "rgba(255,255,255,0.03)",
-                border: `1px solid ${isActive ? (isForexBtn ? "rgba(245,158,11,0.7)" : "rgba(0,180,255,0.7)") : "rgba(255,255,255,0.1)"}`,
-                color: isActive ? (isForexBtn ? "#f59e0b" : "#00cfff") : "#4a6a9a",
-                cursor: "pointer", transition: "all 0.2s",
-              }}>
-                {p === "crypto" ? "₿ Крипто" : "💱 Форекс"}
-              </button>
-            );
-          })}
-        </div>
 
         {/* ── Карточки метрик ───────────────────────────────────────────────── */}
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${isCrypto && data.ref_bonus > 0 ? 5 : 4}, 1fr)`, gap: 12 }} className="metrics-grid">
