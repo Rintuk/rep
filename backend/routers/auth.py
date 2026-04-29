@@ -540,7 +540,8 @@ async def my_deposit_requests(
 @router.get("/admin/deposits", dependencies=[Depends(get_admin_user)])
 async def list_deposit_requests(db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(
-        select(DepositRequest).order_by(DepositRequest.created_at.desc()).limit(100)
+        select(DepositRequest).where(DepositRequest.pool_type == "crypto")
+        .order_by(DepositRequest.created_at.desc()).limit(100)
     )).scalars().all()
     result = []
     for r in rows:
@@ -636,7 +637,8 @@ async def my_withdrawal_requests(
 @router.get("/admin/withdrawals", dependencies=[Depends(get_admin_user)])
 async def list_withdrawal_requests(db: AsyncSession = Depends(get_db)):
     rows = (await db.execute(
-        select(WithdrawalRequest).order_by(WithdrawalRequest.created_at.desc()).limit(100)
+        select(WithdrawalRequest).where(WithdrawalRequest.pool_type == "crypto")
+        .order_by(WithdrawalRequest.created_at.desc()).limit(100)
     )).scalars().all()
     result = []
     for r in rows:

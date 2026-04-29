@@ -258,7 +258,7 @@ export default function AdminPage() {
     if (!f) return;
     setForexSavingId(id);
     try {
-      await updateUserForexFinancials(id, parseFloat(f.forex_investment_usdt) || 0, parseFloat(f.forex_withdrawal_usdt) || 0);
+      await updateUserForexFinancials(id, parseFloat(f.forex_investment_usdt) || 0, parseFloat(f.forex_withdrawal_usdt) || 0, f.note);
       setForexSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
       setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
       fetchData();

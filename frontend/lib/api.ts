@@ -84,9 +84,9 @@ export async function rejectForexWithdrawal(id: string) {
   return res.data;
 }
 
-export async function updateUserForexFinancials(id: string, forex_investment_usdt: number, forex_withdrawal_usdt: number) {
+export async function updateUserForexFinancials(id: string, forex_investment_usdt: number, forex_withdrawal_usdt: number, note: string) {
   await api.patch(`/auth/admin/users/${id}/forex-financials`, null, {
-    params: { forex_investment_usdt, forex_withdrawal_usdt }
+    params: { forex_investment_usdt, forex_withdrawal_usdt, note }
   });
 }
 

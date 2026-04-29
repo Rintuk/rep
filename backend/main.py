@@ -78,8 +78,7 @@ async def lifespan(app: FastAPI):
                 reason TEXT
             )""",
             """CREATE TABLE IF NOT EXISTS forex_virtual_accounts (
-                id TEXT PRIMARY KEY,
-                user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+                user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                 balance_usdt FLOAT DEFAULT 0,
                 start_balance FLOAT DEFAULT 0,
                 start_real_total FLOAT DEFAULT 0,
