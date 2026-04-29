@@ -5,7 +5,7 @@ import {
   getDemoAccount, startDemoAccount, resetDemoAccount,
   getForexDemoAccount, startForexDemoAccount, resetForexDemoAccount,
 } from "@/lib/api";
-import { TrendingUp, TrendingDown, Wallet, Activity, RotateCcw } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Activity, RotateCcw, Settings } from "lucide-react";
 
 interface Position { symbol: string; amount: number; avg_price: number; value: number; }
 interface VirtualTrade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }
@@ -116,6 +116,7 @@ export default function DemoPage() {
   const [starting, setStarting] = useState(false);
   const [amountInput, setAmountInput] = useState("1000");
   const [activePool, setActivePool] = useState<"crypto" | "forex">("crypto");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const card: React.CSSProperties = {
     background: "rgba(8,12,35,0.85)",
@@ -220,35 +221,55 @@ export default function DemoPage() {
           ))}
         </div>
 
-        {/* Реал/Демо переключатель + Сброс */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: muted }}>Реал</span>
-            <button
-              onClick={() => router.push("/dashboard")}
-              style={{
-                position: "relative", width: 48, height: 24, borderRadius: 12, cursor: "pointer",
-                background: "rgba(245,158,11,0.27)", border: "1px solid rgba(245,158,11,0.53)",
-              }}
-              title="Вернуться в реальный счёт"
-            >
-              <span style={{
-                position: "absolute", left: 4, top: 4, width: 16, height: 16, borderRadius: "50%",
-                background: "#f59e0b", display: "block", transform: "translateX(24px)",
-              }} />
-            </button>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b" }}>Демо</span>
-          </div>
-          {data?.is_started && (
-            <button onClick={handleReset} disabled={resetting}
-              style={{
-                display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "6px 12px",
-                borderRadius: 8, border: "1px solid rgba(255,77,77,0.33)", color: "#ff4d4d",
-                background: "rgba(26,0,0,0.6)", cursor: "pointer", opacity: resetting ? 0.5 : 1,
+        {/* Меню */}
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setMenuOpen(v => !v)} style={{
+            padding: "8px", borderRadius: 10, cursor: "pointer",
+            background: menuOpen ? "rgba(0,180,255,0.1)" : "transparent",
+            border: `1px solid ${menuOpen ? "rgba(0,180,255,0.4)" : "rgba(0,180,255,0.15)"}`,
+            color: menuOpen ? "#00cfff" : "#4a6a9a", transition: "all 0.2s",
+          }}>
+            <Settings size={20} />
+          </button>
+
+          {menuOpen && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
+              <div style={{
+                position: "absolute", right: 0, top: 44, zIndex: 50, width: 220,
+                background: "rgba(8,12,35,0.97)", border: "1px solid rgba(0,180,255,0.15)",
+                borderRadius: 14, backdropFilter: "blur(12px)", overflow: "hidden",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
               }}>
-              <RotateCcw size={13} />
-              <span>{resetting ? "Сброс..." : "Сбросить"}</span>
-            </button>
+                {/* Реал / Демо */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
+                  <span style={{ color: "#fff", fontSize: 13 }}>Режим</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ color: "#4a6a9a", fontSize: 11, fontWeight: 600 }}>Реал</span>
+                    <button onClick={() => { setMenuOpen(false); router.push("/dashboard"); }}
+                      style={{ width: 44, height: 24, borderRadius: 12, background: "rgba(245,158,11,0.27)", border: "1px solid rgba(245,158,11,0.53)", cursor: "pointer", position: "relative" }}>
+                      <span style={{ position: "absolute", left: 4, top: 4, width: 14, height: 14, borderRadius: "50%", background: "#f59e0b", display: "block", transform: "translateX(22px)" }} />
+                    </button>
+                    <span style={{ color: "#f59e0b", fontSize: 11, fontWeight: 600 }}>Демо</span>
+                  </div>
+                </div>
+                {/* Сбросить */}
+                {data?.is_started && (
+                  <button onClick={() => { setMenuOpen(false); handleReset(); }} disabled={resetting}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10,
+                      padding: "12px 16px", color: "#ff4d4d", fontSize: 13, cursor: "pointer",
+                      background: "none", border: "none", textAlign: "left", opacity: resetting ? 0.5 : 1,
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "none")}
+                  >
+                    <RotateCcw size={15} />
+                    {resetting ? "Сброс..." : "Сбросить демо"}
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
       </header>
