@@ -86,14 +86,10 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         for va in virtual_accounts:
             if va.start_real_total <= 0:
                 va.start_real_total = real_total_now
-                va.start_balance = va.balance_usdt if va.balance_usdt > 0 else va.start_balance
                 va.updated_at = datetime.utcnow()
                 continue
-            if va.start_real_total > 0:
-                pool_pnl_pct = (real_total_now - va.start_real_total) / va.start_real_total
-                va.balance_usdt = round(va.start_balance * (1 + pool_pnl_pct), 4)
-            va.updated_at = datetime.utcnow()
-            scale = va.start_balance / va.start_real_total
+            # Баланс меняется только при новых закрытых сделках
+            scale = va.start_balance / va.start_real_total if va.start_real_total > 0 else 1.0
             for t in new_real_trades:
                 exists = (await db.execute(
                     select(VirtualTrade).where(and_(
@@ -104,10 +100,13 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                 )).scalars().first()
                 if exists:
                     continue
+                scaled_pnl = round(t.pnl * scale, 4) if t.pnl is not None else None
+                if scaled_pnl is not None:
+                    va.balance_usdt = round(va.balance_usdt + scaled_pnl, 4)
                 db.add(VirtualTrade(user_id=va.user_id, symbol=t.symbol, action=t.action,
                                     amount=round((t.amount or 0) * scale, 6), price=t.price,
-                                    pnl=round(t.pnl * scale, 4) if t.pnl is not None else None,
-                                    timestamp=t.timestamp))
+                                    pnl=scaled_pnl, timestamp=t.timestamp))
+            va.updated_at = datetime.utcnow()
 
     await db.commit()
 
