@@ -482,7 +482,7 @@ export default function DashboardPage() {
           <style>{`.two-col { @media (max-width:640px) { grid-template-columns: 1fr !important; } }`}</style>
 
           {/* ── Позиции ────────────────────────────────────────────────────── */}
-          <div style={{ ...card, padding: 20, maxHeight: 320, display: "flex", flexDirection: "column" }}>
+          <div style={{ ...card, padding: 20, height: 320, display: "flex", flexDirection: "column" }}>
             <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16, flexShrink: 0 }}>💼 Открытые позиции</h2>
             <div style={{ overflowY: "auto", flex: 1 }}>
             {poolPositions.length === 0
@@ -509,8 +509,9 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Последние сделки ───────────────────────────────────────────── */}
-          <div style={{ ...card, padding: 20 }}>
-            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>📋 Последние сделки</h2>
+          <div style={{ ...card, padding: 20, height: 320, display: "flex", flexDirection: "column" }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16, flexShrink: 0 }}>📋 Последние сделки</h2>
+            <div style={{ overflowY: "auto", flex: 1 }}>
             {poolTrades.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Сделок нет</p>
               : poolTrades.slice(0, 8).map((t, i) => (
@@ -531,6 +532,7 @@ export default function DashboardPage() {
                 </div>
               ))
             }
+            </div>
           </div>
         </div>
 
