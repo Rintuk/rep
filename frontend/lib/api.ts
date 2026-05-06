@@ -12,8 +12,8 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export async function login(email: string, password: string) {
-  const res = await api.post("/auth/login", { email, password });
+export async function login(email: string, password: string, remember_me = false) {
+  const res = await api.post("/auth/login", { email, password, remember_me });
   return res.data as { access_token: string; is_admin: boolean };
 }
 

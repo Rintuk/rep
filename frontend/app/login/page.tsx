@@ -205,13 +205,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const data = await login(email, password);
+      const data = await login(email, password, rememberMe);
       localStorage.setItem("token", data.access_token);
       router.push(data.is_admin ? "/admin" : "/dashboard");
     } catch (err: unknown) {
@@ -409,6 +410,17 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Remember me */}
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: "#2b6bff", cursor: "pointer" }}
+                />
+                <span style={{ color: "#8899bb", fontSize: 13 }}>Запомнить меня на 30 дней</span>
+              </label>
 
               {error && <p style={{ color: "#ff5555", fontSize: 13, textAlign: "center" }}>{error}</p>}
 
