@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
 from models import (User, UserFinancials, ForexBotSnapshot, ForexPosition, ForexTrade,
-                    ForexAIFeedEntry, DepositRequest, WithdrawalRequest)
+                    ForexAIFeedEntry, ForexVirtualAccount, ForexVirtualTrade,
+                    DepositRequest, WithdrawalRequest)
 from security import get_admin_user, get_current_user
 from datetime import datetime, timedelta
 from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
@@ -477,4 +478,44 @@ async def adjust_forex_net_invested(add_amount: float, db: AsyncSession = Depend
         "updated_snapshots": len(snaps),
         "add_amount": add_amount,
         "message": f"Форекс net_invested скорректирован на +{add_amount} $ в {len(snaps)} снимках",
+    }
+
+
+@router.post("/admin/forex-full-reset", dependencies=[Depends(get_admin_user)])
+async def forex_full_reset(db: AsyncSession = Depends(get_db)):
+    """Полный сброс форекс-пула: снапшоты, финансы пользователей, демо-счета."""
+    # Удаляем все снапшоты (CASCADE: позиции, сделки, AI-фид)
+    all_snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
+    for s in all_snaps:
+        await db.delete(s)
+
+    # Обнуляем форекс-поля у всех пользователей
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    for fin in all_fins:
+        fin.forex_investment_usdt = 0.0
+        fin.forex_withdrawal_usdt = 0.0
+        fin.forex_entry_pool_pnl_pct = 0.0
+        fin.updated_at = datetime.utcnow()
+
+    # Сбрасываем форекс виртуальные счета
+    all_va = (await db.execute(select(ForexVirtualAccount))).scalars().all()
+    for va in all_va:
+        va.balance_usdt = 0.0
+        va.start_balance = 0.0
+        va.start_real_total = 0.0
+        va.is_started = False
+        va.updated_at = datetime.utcnow()
+        # Удаляем все виртуальные сделки этого счёта
+        trades = (await db.execute(
+            select(ForexVirtualTrade).where(ForexVirtualTrade.user_id == va.user_id)
+        )).scalars().all()
+        for t in trades:
+            await db.delete(t)
+
+    await db.commit()
+    return {
+        "deleted_snapshots": len(all_snaps),
+        "reset_investors": len(all_fins),
+        "reset_demo_accounts": len(all_va),
+        "message": f"Форекс сброшен: {len(all_snaps)} снапшотов удалено, {len(all_fins)} инвесторов обнулено, {len(all_va)} демо-счетов сброшено",
     }

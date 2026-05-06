@@ -12,7 +12,7 @@ import {
   cleanupDemoSnapshots, adjustNetInvested,
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
-  cleanupForexDemoSnapshots, adjustForexNetInvested,
+  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -131,6 +131,8 @@ export default function AdminPage() {
   const [historyData, setHistoryData] = useState<{deposits:{id:string;amount:number;comment:string;status:string;pool_type:string;created_at:string}[];withdrawals:{id:string;amount:number;comment:string;status:string;pool_type:string;created_at:string}[]} | null>(null);
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [fullResetMsg, setFullResetMsg] = useState<string | null>(null);
+  const [fullResetLoading, setFullResetLoading] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
@@ -606,6 +608,37 @@ export default function AdminPage() {
                   background: "rgba(127,29,29,0.7)", color: "#fca5a5", cursor: "pointer", border: "none",
                   opacity: cleanupLoading ? 0.5 : 1 }}>
                 {cleanupLoading ? "..." : "Очистить"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Полный сброс форекс-пула */}
+        {activeTab === "overview" && isForex && (
+          <div style={{ ...card, padding: 16, border: "1px solid rgba(255,77,77,0.4)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ color: "#fca5a5", fontSize: 13, fontWeight: 600 }}>⚠️ Полный сброс форекс-пула</p>
+                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>
+                  Удаляет все снапшоты, обнуляет инвестиции и выводы всех пользователей, сбрасывает демо-счета.
+                </p>
+                {fullResetMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{fullResetMsg}</p>}
+              </div>
+              <button
+                onClick={async () => {
+                  if (!confirm("ПОЛНЫЙ СБРОС форекс-пула?\n\nБудут удалены все снапшоты и обнулены данные ВСЕХ пользователей. Это необратимо.")) return;
+                  setFullResetLoading(true); setFullResetMsg(null);
+                  try {
+                    const r = await forexFullReset();
+                    setFullResetMsg(r.message); fetchData();
+                  } catch { setFullResetMsg("Ошибка"); }
+                  finally { setFullResetLoading(false); }
+                }}
+                disabled={fullResetLoading}
+                style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  background: "rgba(127,29,29,0.9)", color: "#fca5a5", cursor: "pointer", border: "1px solid rgba(255,77,77,0.4)",
+                  opacity: fullResetLoading ? 0.5 : 1 }}>
+                {fullResetLoading ? "..." : "Сбросить всё"}
               </button>
             </div>
           </div>
