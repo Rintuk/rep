@@ -137,15 +137,13 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     except Exception:
         ts = datetime.utcnow()
 
-    # Центовый счёт: все денежные значения делим на 100 для перевода в доллары
-    CENT = 100.0
-    balance_usd        = payload.balance_usdt        / CENT
-    hwm_usd            = payload.hwm                 / CENT
-    real_start_usd     = payload.real_start_balance  / CENT
-    net_invested_usd   = payload.net_invested        / CENT
+    balance_usd      = payload.balance_usdt
+    hwm_usd          = payload.hwm
+    real_start_usd   = payload.real_start_balance
+    net_invested_usd = payload.net_invested
 
     real_total_now = balance_usd + sum(
-        (p.amount / CENT) * (p.current_price if p.current_price > 0 else p.avg_price)
+        p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
         for p in payload.positions
     )
 
@@ -160,7 +158,7 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
 
     for p in payload.positions:
         db.add(ForexPosition(snapshot_id=snapshot.id, symbol=p.symbol,
-                             amount=round(p.amount / CENT, 4),
+                             amount=p.amount,
                              avg_price=p.avg_price,
                              current_price=p.current_price if p.current_price > 0 else p.avg_price))
 
@@ -174,7 +172,7 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
             continue
         db.add(ForexTrade(snapshot_id=snapshot.id, symbol=t.symbol, action=t.action,
                           amount=t.amount, price=t.price,
-                          pnl=round(t.pnl / CENT, 4) if t.pnl is not None else None,
+                          pnl=t.pnl,
                           timestamp=t.timestamp))
         new_real_trades.append(t)
 
@@ -203,8 +201,7 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                 )).scalars().first()
                 if exists:
                     continue
-                pnl_usd = (t.pnl / CENT) if t.pnl is not None else None
-                scaled_pnl = round(pnl_usd * scale, 4) if pnl_usd is not None else None
+                scaled_pnl = round(t.pnl * scale, 4) if t.pnl is not None else None
                 if scaled_pnl is not None:
                     va.balance_usdt = round(va.balance_usdt + scaled_pnl, 4)
                 db.add(ForexVirtualTrade(user_id=va.user_id, symbol=t.symbol, action=t.action,
