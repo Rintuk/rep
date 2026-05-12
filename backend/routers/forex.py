@@ -519,3 +519,45 @@ async def forex_full_reset(db: AsyncSession = Depends(get_db)):
         "reset_demo_accounts": len(all_va),
         "message": f"Форекс сброшен: {len(all_snaps)} снапшотов удалено, {len(all_fins)} инвесторов обнулено, {len(all_va)} демо-счетов сброшено",
     }
+
+
+@router.post("/admin/forex-import-from-crypto", dependencies=[Depends(get_admin_user)])
+async def forex_import_from_crypto(db: AsyncSession = Depends(get_db)):
+    """Сброс форекс-пула + перенос депозитов из крипто. Точка входа у всех с нуля (сегодня)."""
+    # 1. Удаляем все снапшоты форекс (CASCADE: позиции, сделки, AI-фид)
+    all_snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
+    for s in all_snaps:
+        await db.delete(s)
+
+    # 2. Сбрасываем форекс виртуальные счета
+    all_va = (await db.execute(select(ForexVirtualAccount))).scalars().all()
+    for va in all_va:
+        va.balance_usdt = 0.0
+        va.start_balance = 0.0
+        va.start_real_total = 0.0
+        va.is_started = False
+        va.updated_at = datetime.utcnow()
+        trades = (await db.execute(
+            select(ForexVirtualTrade).where(ForexVirtualTrade.user_id == va.user_id)
+        )).scalars().all()
+        for t in trades:
+            await db.delete(t)
+
+    # 3. Переносим депозиты из крипто → форекс, точка входа = 0 (с сегодня)
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    imported = 0
+    for fin in all_fins:
+        fin.forex_investment_usdt = fin.investment_usdt
+        fin.forex_withdrawal_usdt = fin.withdrawal_usdt
+        fin.forex_entry_pool_pnl_pct = 0.0
+        fin.updated_at = datetime.utcnow()
+        if fin.investment_usdt > 0:
+            imported += 1
+
+    await db.commit()
+    return {
+        "deleted_snapshots": len(all_snaps),
+        "reset_demo_accounts": len(all_va),
+        "imported_investors": imported,
+        "message": f"Форекс сброшен и импортирован из крипто: {imported} инвесторов перенесено, точка входа у всех с нуля",
+    }

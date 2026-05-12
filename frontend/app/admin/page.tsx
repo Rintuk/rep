@@ -12,7 +12,7 @@ import {
   cleanupDemoSnapshots, adjustNetInvested,
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
-  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset,
+  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -133,6 +133,8 @@ export default function AdminPage() {
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [fullResetMsg, setFullResetMsg] = useState<string | null>(null);
   const [fullResetLoading, setFullResetLoading] = useState(false);
+  const [importFromCryptoMsg, setImportFromCryptoMsg] = useState<string | null>(null);
+  const [importFromCryptoLoading, setImportFromCryptoLoading] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
@@ -639,6 +641,33 @@ export default function AdminPage() {
                   background: "rgba(127,29,29,0.9)", color: "#fca5a5", cursor: "pointer", border: "1px solid rgba(255,77,77,0.4)",
                   opacity: fullResetLoading ? 0.5 : 1 }}>
                 {fullResetLoading ? "..." : "Сбросить всё"}
+              </button>
+            </div>
+
+            {/* Импорт депозитов из крипто */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div>
+                <p style={{ color: "#fcd34d", fontSize: 13, fontWeight: 600 }}>⬇️ Перенести депозиты из крипто-пула</p>
+                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>
+                  Сбрасывает форекс-пул, затем копирует суммы депозитов/выводов из крипто. Точка входа у всех — с нуля (с сегодня).
+                </p>
+                {importFromCryptoMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{importFromCryptoMsg}</p>}
+              </div>
+              <button
+                onClick={async () => {
+                  if (!confirm("Перенести депозиты из крипто-пула в форекс?\n\nФорекс-пул будет сброшен, затем депозиты скопированы. Точка входа — с нуля.")) return;
+                  setImportFromCryptoLoading(true); setImportFromCryptoMsg(null);
+                  try {
+                    const r = await forexImportFromCrypto();
+                    setImportFromCryptoMsg(r.message); fetchData();
+                  } catch { setImportFromCryptoMsg("Ошибка"); }
+                  finally { setImportFromCryptoLoading(false); }
+                }}
+                disabled={importFromCryptoLoading}
+                style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  background: "rgba(120,83,0,0.9)", color: "#fcd34d", cursor: "pointer", border: "1px solid rgba(252,211,77,0.4)",
+                  opacity: importFromCryptoLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                {importFromCryptoLoading ? "..." : "Перенести"}
               </button>
             </div>
           </div>
