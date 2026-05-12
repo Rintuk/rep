@@ -138,6 +138,7 @@ export default function AdminPage() {
   const [importFromCryptoLoading, setImportFromCryptoLoading] = useState(false);
   const [cryptoResetMsg, setCryptoResetMsg] = useState<string | null>(null);
   const [cryptoResetLoading, setCryptoResetLoading] = useState(false);
+  const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
@@ -589,156 +590,160 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Очистка демо */}
+        {/* Служебные операции — сворачивающийся блок */}
         {activeTab === "overview" && (
-          <div style={{ ...card, padding: 16, border: "1px solid rgba(255,77,77,0.2)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <p style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>🧹 Очистка демо-снимков ({poolLabel})</p>
-                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Удаляет аномальные снимки и сбрасывает точки входа инвесторов.</p>
-                {cleanupMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{cleanupMsg}</p>}
-              </div>
-              <button
-                onClick={async () => {
-                  if (!confirm("Удалить демо-снимки и сбросить точки входа инвесторов?")) return;
-                  setCleanupLoading(true); setCleanupMsg(null);
-                  try {
-                    const r = isForex ? await cleanupForexDemoSnapshots() : await cleanupDemoSnapshots();
-                    setCleanupMsg(r.message); fetchData();
-                  } catch { setCleanupMsg("Ошибка"); }
-                  finally { setCleanupLoading(false); }
-                }}
-                disabled={cleanupLoading}
-                style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  background: "rgba(127,29,29,0.7)", color: "#fca5a5", cursor: "pointer", border: "none",
-                  opacity: cleanupLoading ? 0.5 : 1 }}>
-                {cleanupLoading ? "..." : "Очистить"}
-              </button>
-            </div>
-          </div>
-        )}
+          <div style={{ ...card, padding: 0, border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden" }}>
+            <button
+              onClick={() => setDangerZoneOpen(o => !o)}
+              style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "14px 16px", background: "transparent", border: "none", cursor: "pointer", color: muted }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>🛠 Служебные операции</span>
+              {dangerZoneOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
 
-        {/* Полный сброс крипто-пула */}
-        {activeTab === "overview" && !isForex && (
-          <div style={{ ...card, padding: 16, border: "1px solid rgba(255,77,77,0.4)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <p style={{ color: "#fca5a5", fontSize: 13, fontWeight: 600 }}>⚠️ Полный сброс крипто-пула</p>
-                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>
-                  Удаляет все снапшоты, обнуляет инвестиции и выводы всех пользователей, сбрасывает демо-счета.
-                </p>
-                {cryptoResetMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{cryptoResetMsg}</p>}
-              </div>
-              <button
-                onClick={async () => {
-                  if (!confirm("ПОЛНЫЙ СБРОС крипто-пула?\n\nБудут удалены все снапшоты и обнулены данные ВСЕХ пользователей. Это необратимо.")) return;
-                  setCryptoResetLoading(true); setCryptoResetMsg(null);
-                  try {
-                    const r = await cryptoFullReset();
-                    setCryptoResetMsg(r.message); fetchData();
-                  } catch { setCryptoResetMsg("Ошибка"); }
-                  finally { setCryptoResetLoading(false); }
-                }}
-                disabled={cryptoResetLoading}
-                style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  background: "rgba(127,29,29,0.9)", color: "#fca5a5", cursor: "pointer", border: "1px solid rgba(255,77,77,0.4)",
-                  opacity: cryptoResetLoading ? 0.5 : 1 }}>
-                {cryptoResetLoading ? "..." : "Сбросить всё"}
-              </button>
-            </div>
-          </div>
-        )}
+            {dangerZoneOpen && (
+              <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
 
-        {/* Полный сброс форекс-пула */}
-        {activeTab === "overview" && isForex && (
-          <div style={{ ...card, padding: 16, border: "1px solid rgba(255,77,77,0.4)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <p style={{ color: "#fca5a5", fontSize: 13, fontWeight: 600 }}>⚠️ Полный сброс форекс-пула</p>
-                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>
-                  Удаляет все снапшоты, обнуляет инвестиции и выводы всех пользователей, сбрасывает демо-счета.
-                </p>
-                {fullResetMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{fullResetMsg}</p>}
-              </div>
-              <button
-                onClick={async () => {
-                  if (!confirm("ПОЛНЫЙ СБРОС форекс-пула?\n\nБудут удалены все снапшоты и обнулены данные ВСЕХ пользователей. Это необратимо.")) return;
-                  setFullResetLoading(true); setFullResetMsg(null);
-                  try {
-                    const r = await forexFullReset();
-                    setFullResetMsg(r.message); fetchData();
-                  } catch { setFullResetMsg("Ошибка"); }
-                  finally { setFullResetLoading(false); }
-                }}
-                disabled={fullResetLoading}
-                style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  background: "rgba(127,29,29,0.9)", color: "#fca5a5", cursor: "pointer", border: "1px solid rgba(255,77,77,0.4)",
-                  opacity: fullResetLoading ? 0.5 : 1 }}>
-                {fullResetLoading ? "..." : "Сбросить всё"}
-              </button>
-            </div>
+                {/* Очистка демо */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,77,77,0.15)" }}>
+                  <div>
+                    <p style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>🧹 Очистка демо-снимков ({poolLabel})</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Удаляет аномальные снимки и сбрасывает точки входа инвесторов.</p>
+                    {cleanupMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{cleanupMsg}</p>}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Удалить демо-снимки и сбросить точки входа инвесторов?")) return;
+                      setCleanupLoading(true); setCleanupMsg(null);
+                      try {
+                        const r = isForex ? await cleanupForexDemoSnapshots() : await cleanupDemoSnapshots();
+                        setCleanupMsg(r.message); fetchData();
+                      } catch { setCleanupMsg("Ошибка"); }
+                      finally { setCleanupLoading(false); }
+                    }}
+                    disabled={cleanupLoading}
+                    style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: "rgba(127,29,29,0.7)", color: "#fca5a5", cursor: "pointer", border: "none",
+                      opacity: cleanupLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                    {cleanupLoading ? "..." : "Очистить"}
+                  </button>
+                </div>
 
-            {/* Импорт депозитов из крипто */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-              <div>
-                <p style={{ color: "#fcd34d", fontSize: 13, fontWeight: 600 }}>⬇️ Перенести депозиты из крипто-пула</p>
-                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>
-                  Сбрасывает форекс-пул, затем копирует суммы депозитов/выводов из крипто. Точка входа у всех — с нуля (с сегодня).
-                </p>
-                {importFromCryptoMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{importFromCryptoMsg}</p>}
-              </div>
-              <button
-                onClick={async () => {
-                  if (!confirm("Перенести депозиты из крипто-пула в форекс?\n\nФорекс-пул будет сброшен, затем депозиты скопированы. Точка входа — с нуля.")) return;
-                  setImportFromCryptoLoading(true); setImportFromCryptoMsg(null);
-                  try {
-                    const r = await forexImportFromCrypto();
-                    setImportFromCryptoMsg(r.message); fetchData();
-                  } catch { setImportFromCryptoMsg("Ошибка"); }
-                  finally { setImportFromCryptoLoading(false); }
-                }}
-                disabled={importFromCryptoLoading}
-                style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  background: "rgba(120,83,0,0.9)", color: "#fcd34d", cursor: "pointer", border: "1px solid rgba(252,211,77,0.4)",
-                  opacity: importFromCryptoLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
-                {importFromCryptoLoading ? "..." : "Перенести"}
-              </button>
-            </div>
-          </div>
-        )}
+                {/* Полный сброс крипто */}
+                {!isForex && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,77,77,0.3)" }}>
+                    <div>
+                      <p style={{ color: "#fca5a5", fontSize: 13, fontWeight: 600 }}>⚠️ Полный сброс крипто-пула</p>
+                      <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Удаляет все снапшоты, обнуляет инвестиции и выводы всех пользователей, сбрасывает демо-счета.</p>
+                      {cryptoResetMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{cryptoResetMsg}</p>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!confirm("ПОЛНЫЙ СБРОС крипто-пула?\n\nБудут удалены все снапшоты и обнулены данные ВСЕХ пользователей. Это необратимо.")) return;
+                        setCryptoResetLoading(true); setCryptoResetMsg(null);
+                        try {
+                          const r = await cryptoFullReset();
+                          setCryptoResetMsg(r.message); fetchData();
+                        } catch { setCryptoResetMsg("Ошибка"); }
+                        finally { setCryptoResetLoading(false); }
+                      }}
+                      disabled={cryptoResetLoading}
+                      style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                        background: "rgba(127,29,29,0.9)", color: "#fca5a5", cursor: "pointer", border: "1px solid rgba(255,77,77,0.4)",
+                        opacity: cryptoResetLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                      {cryptoResetLoading ? "..." : "Сбросить всё"}
+                    </button>
+                  </div>
+                )}
 
-        {/* Корректировка net_invested */}
-        {activeTab === "overview" && (
-          <div style={{ ...card, padding: 16, border: `1px solid ${isForex ? "rgba(245,158,11,0.25)" : "rgba(68,136,221,0.25)"}` }}>
-            <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>💰 Корректировка депозита в пул ({poolLabel})</p>
-            <p style={{ color: muted, fontSize: 12, marginBottom: 10 }}>
-              Если в пул добавлен капитал напрямую — введи сумму в USDT. Значение прибавится ко всем снимкам.
-            </p>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="number" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)}
-                placeholder="Сумма депозита в USDT"
-                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13,
-                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
-                  color: "#fff", outline: "none" }} />
-              <button disabled={adjustLoading || !adjustAmount}
-                onClick={async () => {
-                  const amt = parseFloat(adjustAmount);
-                  if (!amt || isNaN(amt)) return;
-                  if (!confirm(`Прибавить ${amt} $ к net_invested во всех снимках?`)) return;
-                  setAdjustLoading(true); setAdjustMsg(null);
-                  try {
-                    const r = isForex ? await adjustForexNetInvested(amt) : await adjustNetInvested(amt);
-                    setAdjustMsg(r.message); setAdjustAmount(""); fetchData();
-                  } catch { setAdjustMsg("Ошибка"); }
-                  finally { setAdjustLoading(false); }
-                }}
-                style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
-                  background: isForex ? "rgba(245,158,11,0.6)" : "rgba(68,136,221,0.6)", color: "#fff",
-                  cursor: "pointer", opacity: (adjustLoading || !adjustAmount) ? 0.5 : 1 }}>
-                {adjustLoading ? "..." : "Применить"}
-              </button>
-            </div>
-            {adjustMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 8 }}>{adjustMsg}</p>}
+                {/* Полный сброс форекс + перенос из крипто */}
+                {isForex && (
+                  <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,77,77,0.3)", display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div>
+                        <p style={{ color: "#fca5a5", fontSize: 13, fontWeight: 600 }}>⚠️ Полный сброс форекс-пула</p>
+                        <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Удаляет все снапшоты, обнуляет инвестиции и выводы всех пользователей, сбрасывает демо-счета.</p>
+                        {fullResetMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{fullResetMsg}</p>}
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!confirm("ПОЛНЫЙ СБРОС форекс-пула?\n\nБудут удалены все снапшоты и обнулены данные ВСЕХ пользователей. Это необратимо.")) return;
+                          setFullResetLoading(true); setFullResetMsg(null);
+                          try {
+                            const r = await forexFullReset();
+                            setFullResetMsg(r.message); fetchData();
+                          } catch { setFullResetMsg("Ошибка"); }
+                          finally { setFullResetLoading(false); }
+                        }}
+                        disabled={fullResetLoading}
+                        style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                          background: "rgba(127,29,29,0.9)", color: "#fca5a5", cursor: "pointer", border: "1px solid rgba(255,77,77,0.4)",
+                          opacity: fullResetLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                        {fullResetLoading ? "..." : "Сбросить всё"}
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div>
+                        <p style={{ color: "#fcd34d", fontSize: 13, fontWeight: 600 }}>⬇️ Перенести депозиты из крипто-пула</p>
+                        <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Сбрасывает форекс-пул, затем копирует суммы депозитов/выводов из крипто. Точка входа у всех — с нуля.</p>
+                        {importFromCryptoMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{importFromCryptoMsg}</p>}
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!confirm("Перенести депозиты из крипто-пула в форекс?\n\nФорекс-пул будет сброшен, затем депозиты скопированы. Точка входа — с нуля.")) return;
+                          setImportFromCryptoLoading(true); setImportFromCryptoMsg(null);
+                          try {
+                            const r = await forexImportFromCrypto();
+                            setImportFromCryptoMsg(r.message); fetchData();
+                          } catch { setImportFromCryptoMsg("Ошибка"); }
+                          finally { setImportFromCryptoLoading(false); }
+                        }}
+                        disabled={importFromCryptoLoading}
+                        style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                          background: "rgba(120,83,0,0.9)", color: "#fcd34d", cursor: "pointer", border: "1px solid rgba(252,211,77,0.4)",
+                          opacity: importFromCryptoLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                        {importFromCryptoLoading ? "..." : "Перенести"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Корректировка net_invested */}
+                <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)",
+                  border: `1px solid ${isForex ? "rgba(245,158,11,0.2)" : "rgba(68,136,221,0.2)"}` }}>
+                  <p style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>💰 Корректировка депозита в пул ({poolLabel})</p>
+                  <p style={{ color: muted, fontSize: 12, marginBottom: 10 }}>Если в пул добавлен капитал напрямую — введи сумму в USDT. Значение прибавится ко всем снимкам.</p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input type="number" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)}
+                      placeholder="Сумма депозита в USDT"
+                      style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                        background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                        color: "#fff", outline: "none" }} />
+                    <button disabled={adjustLoading || !adjustAmount}
+                      onClick={async () => {
+                        const amt = parseFloat(adjustAmount);
+                        if (!amt || isNaN(amt)) return;
+                        if (!confirm(`Прибавить ${amt} $ к net_invested во всех снимках?`)) return;
+                        setAdjustLoading(true); setAdjustMsg(null);
+                        try {
+                          const r = isForex ? await adjustForexNetInvested(amt) : await adjustNetInvested(amt);
+                          setAdjustMsg(r.message); setAdjustAmount(""); fetchData();
+                        } catch { setAdjustMsg("Ошибка"); }
+                        finally { setAdjustLoading(false); }
+                      }}
+                      style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
+                        background: isForex ? "rgba(245,158,11,0.6)" : "rgba(68,136,221,0.6)", color: "#fff",
+                        cursor: "pointer", opacity: (adjustLoading || !adjustAmount) ? 0.5 : 1 }}>
+                      {adjustLoading ? "..." : "Применить"}
+                    </button>
+                  </div>
+                  {adjustMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 8 }}>{adjustMsg}</p>}
+                </div>
+
+              </div>
+            )}
           </div>
         )}
 
