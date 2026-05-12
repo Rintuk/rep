@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from datetime import datetime
 from config import settings
 from database import get_db
 from models import (BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade,
                     ForexBotSnapshot, ForexPosition, ForexTrade, ForexAIFeedEntry,
-                    ForexVirtualAccount, ForexVirtualTrade, User, DEMO_START_BALANCE)
+                    ForexVirtualAccount, ForexVirtualTrade, UserFinancials, User, DEMO_START_BALANCE)
 from schemas import BotUpdateIn
 
 router = APIRouter(prefix="/api", tags=["bot"])
@@ -142,6 +142,12 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     real_start_usd   = payload.real_start_balance
     net_invested_usd = payload.net_invested
 
+    # Проверяем — первый ли это снапшот (пул только что сброшен/запущен)
+    existing_count = (await db.execute(
+        select(func.count()).select_from(ForexBotSnapshot)
+    )).scalar_one()
+    is_first_snapshot = existing_count == 0
+
     real_total_now = balance_usd + sum(
         p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
         for p in payload.positions
@@ -155,6 +161,14 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     )
     db.add(snapshot)
     await db.flush()
+
+    # При первом снапшоте калибруем точку входа всех инвесторов под текущий PnL пула,
+    # чтобы incremental = 0 и прибыль у всех стартовала с нуля
+    if is_first_snapshot and net_invested_usd > 0:
+        current_pnl_pct = round((balance_usd - net_invested_usd) / net_invested_usd * 100, 4)
+        all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+        for fin in all_fins:
+            fin.forex_entry_pool_pnl_pct = current_pnl_pct
 
     for p in payload.positions:
         db.add(ForexPosition(snapshot_id=snapshot.id, symbol=p.symbol,
