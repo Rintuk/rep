@@ -139,6 +139,7 @@ export default function AdminPage() {
   const [cryptoResetMsg, setCryptoResetMsg] = useState<string | null>(null);
   const [cryptoResetLoading, setCryptoResetLoading] = useState(false);
   const [dangerZoneOpen, setDangerZoneOpen] = useState(false);
+  const [investorDangerOpen, setInvestorDangerOpen] = useState<Record<string, boolean>>({});
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
@@ -853,23 +854,36 @@ export default function AdminPage() {
                                       </div>
                                     )}
 
-                                    {/* Удалить + смена пароля */}
-                                    <div style={{ display: "flex", gap: 12, borderTop: `1px solid ${border}`, paddingTop: 16 }}>
-                                      <button onClick={() => handleDelete(u.id, u.email)}
-                                        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(58,13,13,0.8)", color: "#ff4d4d", cursor: "pointer", border: "none" }}>
-                                        <Trash2 size={13} /> Удалить
+                                    {/* Служебные операции инвестора */}
+                                    <div style={{ borderTop: `1px solid ${border}`, marginTop: 4 }}>
+                                      <button
+                                        onClick={() => setInvestorDangerOpen(prev => ({ ...prev, [u.id]: !prev[u.id] }))}
+                                        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "10px 0",
+                                          background: "transparent", border: "none", cursor: "pointer", color: muted }}>
+                                        <span>🛠 Служебные операции</span>
+                                        {investorDangerOpen[u.id] ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                                       </button>
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 12, borderTop: `1px solid ${border}`, paddingTop: 12 }}>
-                                      <input type="text" value={newPasswords[u.id] || ""}
-                                        onChange={e => setNewPasswords(prev => ({ ...prev, [u.id]: e.target.value }))}
-                                        placeholder="Новый пароль..."
-                                        style={{ ...inputStyle, width: 200 }} />
-                                      <button onClick={() => handleResetPassword(u.id)}
-                                        style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(26,26,58,0.8)", color: "#aabbff", cursor: "pointer", border: "none" }}>
-                                        Сбросить пароль
-                                      </button>
-                                      {resetMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: resetMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{resetMsg[u.id]}</span>}
+                                      {investorDangerOpen[u.id] && (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingBottom: 4 }}>
+                                          <div style={{ display: "flex", gap: 12 }}>
+                                            <button onClick={() => handleDelete(u.id, u.email)}
+                                              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(58,13,13,0.8)", color: "#ff4d4d", cursor: "pointer", border: "none" }}>
+                                              <Trash2 size={13} /> Удалить
+                                            </button>
+                                          </div>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                            <input type="text" value={newPasswords[u.id] || ""}
+                                              onChange={e => setNewPasswords(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                              placeholder="Новый пароль..."
+                                              style={{ ...inputStyle, width: 200 }} />
+                                            <button onClick={() => handleResetPassword(u.id)}
+                                              style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(26,26,58,0.8)", color: "#aabbff", cursor: "pointer", border: "none" }}>
+                                              Сбросить пароль
+                                            </button>
+                                            {resetMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: resetMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{resetMsg[u.id]}</span>}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 )}
