@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 from database import get_db
 from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade, DepositRequest, WithdrawalRequest
 from schemas import RegisterIn, LoginIn, TokenOut
-from security import hash_password, verify_password, create_access_token, get_admin_user
+from security import hash_password, verify_password, create_access_token, get_admin_user, get_current_user
 from datetime import datetime, timedelta
 from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
 
@@ -719,3 +719,20 @@ async def reject_withdrawal(request_id: str, db: AsyncSession = Depends(get_db))
     req.updated_at = datetime.utcnow()
     await db.commit()
     return {"status": "rejected"}
+
+
+@router.post("/change-password")
+async def change_password(
+    old_password: str,
+    new_password: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Неверный текущий пароль")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Новый пароль должен содержать не менее 6 символов")
+    user.password_hash = hash_password(new_password)
+    await db.commit()
+    return {"status": "ok"}
+

@@ -22,6 +22,11 @@ export async function register(email: string, password: string, referral_code?: 
   return res.data;
 }
 
+export async function changePassword(old_password: string, new_password: string) {
+  const res = await api.post("/auth/change-password", null, { params: { old_password, new_password } });
+  return res.data as { status: string };
+}
+
 export async function getDashboard() {
   const res = await api.get("/api/dashboard");
   return res.data;

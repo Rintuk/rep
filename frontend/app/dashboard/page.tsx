@@ -5,6 +5,7 @@ import {
   getDashboard,
   createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals,
   createForexDepositRequest, getMyForexDeposits, createForexWithdrawalRequest, getMyForexWithdrawals,
+  changePassword,
 } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -142,6 +143,12 @@ export default function DashboardPage() {
 
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showChangePass, setShowChangePass] = useState(false);
+  const [oldPass, setOldPass] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [newPass2, setNewPass2] = useState("");
+  const [changePassLoading, setChangePassLoading] = useState(false);
+  const [changePassMsg, setChangePassMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -336,6 +343,7 @@ export default function DashboardPage() {
                   { label: "Пополнить счёт", color: "#22c97a", icon: <PlusCircle size={15}/>, action: openDeposit },
                   { label: "Вывести средства", color: "#ff9944", icon: <Wallet size={15}/>, action: openWithdraw },
                   { label: copied ? "Скопировано!" : "Реф. ссылка", color: "#6b8ab0", icon: <Copy size={15}/>, action: () => { setMenuOpen(false); copyRefLink(); } },
+                  { label: "Сменить пароль", color: "#a78bfa", icon: <Settings size={15}/>, action: () => { setMenuOpen(false); setShowChangePass(true); setChangePassMsg(null); setOldPass(""); setNewPass(""); setNewPass2(""); } },
                   { label: "Выйти", color: "#ff4d4d", icon: <LogOut size={15}/>, action: () => { setMenuOpen(false); logout(); } },
                 ].map((item, i) => item.special === "toggle" ? (
                   <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
@@ -587,6 +595,60 @@ export default function DashboardPage() {
           </p>
         )}
       </main>
+
+      {/* ── Модал: Смена пароля ─────────────────────────────────────────────── */}
+      {showChangePass && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowChangePass(false); }}>
+          <div style={{ background: "#0a0f2a", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: 28, width: "100%", maxWidth: 380, boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>🔒 Смена пароля</h3>
+              <button onClick={() => setShowChangePass(false)} style={{ background: "none", border: "none", color: "#4a6a9a", cursor: "pointer" }}><X size={18} /></button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {[
+                { label: "Текущий пароль", value: oldPass, set: setOldPass },
+                { label: "Новый пароль", value: newPass, set: setNewPass },
+                { label: "Повторите новый пароль", value: newPass2, set: setNewPass2 },
+              ].map(({ label, value, set }) => (
+                <div key={label}>
+                  <label style={{ fontSize: 11, color: "#4a6a9a", display: "block", marginBottom: 6 }}>{label}</label>
+                  <input type="password" value={value} onChange={e => set(e.target.value)}
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 13,
+                      background: "rgba(255,255,255,0.05)", border: "1px solid rgba(167,139,250,0.25)",
+                      color: "#fff", outline: "none", boxSizing: "border-box" }} />
+                </div>
+              ))}
+              {changePassMsg && (
+                <p style={{ fontSize: 13, fontWeight: 600, color: changePassMsg.ok ? "#22c97a" : "#ff4d4d", textAlign: "center" }}>
+                  {changePassMsg.text}
+                </p>
+              )}
+              <button
+                disabled={changePassLoading || !oldPass || !newPass || !newPass2}
+                onClick={async () => {
+                  if (newPass !== newPass2) { setChangePassMsg({ ok: false, text: "Пароли не совпадают" }); return; }
+                  if (newPass.length < 6) { setChangePassMsg({ ok: false, text: "Минимум 6 символов" }); return; }
+                  setChangePassLoading(true); setChangePassMsg(null);
+                  try {
+                    await changePassword(oldPass, newPass);
+                    setChangePassMsg({ ok: true, text: "✓ Пароль успешно изменён" });
+                    setOldPass(""); setNewPass(""); setNewPass2("");
+                  } catch (e: any) {
+                    setChangePassMsg({ ok: false, text: e?.response?.data?.detail || "Ошибка" });
+                  } finally {
+                    setChangePassLoading(false);
+                  }
+                }}
+                style={{ marginTop: 4, padding: "12px", borderRadius: 8, fontSize: 14, fontWeight: 600, border: "none",
+                  background: "rgba(167,139,250,0.2)", color: "#a78bfa", cursor: "pointer",
+                  opacity: (changePassLoading || !oldPass || !newPass || !newPass2) ? 0.5 : 1 }}>
+                {changePassLoading ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Модал: Пополнение ────────────────────────────────────────────────── */}
       {showDeposit && (
