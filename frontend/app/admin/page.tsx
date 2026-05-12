@@ -107,7 +107,7 @@ function CircuitBackground() {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [activePool, setActivePool] = useState<"crypto" | "forex">("crypto");
+  const [activePool, setActivePool] = useState<"crypto" | "forex">("forex");
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
