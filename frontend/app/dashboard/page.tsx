@@ -121,6 +121,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState("");
+  const [refreshWarn, setRefreshWarn] = useState(false);
   const [activePool, setActivePool] = useState<"crypto" | "forex">("forex");
   const [referralCode, setReferralCode] = useState("");
   const [copied, setCopied] = useState(false);
@@ -153,21 +154,35 @@ export default function DashboardPage() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
-    fetchData();
+    fetchData(true);
     getMyDeposits().then(setMyDeposits).catch(() => {});
     getMyWithdrawals().then(setMyWithdrawals).catch(() => {});
     getMyForexDeposits().then(setMyForexDeposits).catch(() => {});
     getMyForexWithdrawals().then(setMyForexWithdrawals).catch(() => {});
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(() => fetchData(false), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  async function fetchData() {
+  async function fetchData(initial = false) {
     try {
       const d = await getDashboard();
       setData(d);
+      setRefreshWarn(false);
       if (d.referral_code) setReferralCode(d.referral_code);
-    } catch { setError("Ошибка загрузки. Возможно сессия истекла."); }
+    } catch (e: any) {
+      if (initial) {
+        // При первичной загрузке — показываем полный экран ошибки только если 401/403
+        const status = e?.response?.status;
+        if (status === 401 || status === 403) {
+          setError("Сессия истекла. Войдите снова.");
+        } else {
+          setError("Сервер недоступен. Попробуйте обновить страницу.");
+        }
+      } else {
+        // При фоновом рефреше — только маленький баннер, страницу не заменяем
+        setRefreshWarn(true);
+      }
+    }
   }
 
   function logout() { localStorage.removeItem("token"); router.push("/login"); }
@@ -375,6 +390,12 @@ export default function DashboardPage() {
           )}
         </div>
       </header>
+
+      {refreshWarn && (
+        <div style={{ background: "rgba(245,158,11,0.12)", borderBottom: "1px solid rgba(245,158,11,0.25)", padding: "8px 16px", textAlign: "center", fontSize: 12, color: "#f59e0b", position: "relative", zIndex: 5 }}>
+          ⚠️ Нет связи с сервером — данные могут быть устаревшими. Обновление продолжается автоматически.
+        </div>
+      )}
 
       <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
 
