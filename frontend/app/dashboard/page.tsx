@@ -120,7 +120,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState("");
-  const [activePool, setActivePool] = useState<"crypto" | "forex">("crypto");
+  const [activePool, setActivePool] = useState<"crypto" | "forex">("forex");
   const [referralCode, setReferralCode] = useState("");
   const [copied, setCopied] = useState(false);
 
