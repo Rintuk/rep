@@ -24,69 +24,74 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     user_investment = fin.investment_usdt if fin else 0.0
 
     if not snap:
-        return DashboardOut(
-            balance_usdt=0, pool_total_usdt=0, pool_positions_usdt=0,
-            mode="OFFLINE", hwm=0, drawdown_pct=0, server_online=False, last_updated=None,
-            user_investment=user_investment, user_pnl=0, user_pnl_pct=0,
-            ref_bonus=0, referral_code=user.referral_code, referrals=[],
-            positions=[], recent_trades=[], ai_feed=[],
+        # Крипто офлайн — всё равно считаем форекс ниже
+        positions = []
+        trades = []
+        ai_feed = []
+        pool_positions_usdt = 0.0
+        pool_total_usdt = 0.0
+        pool_pnl_pct = 0.0
+        server_online = False
+        user_pnl = 0.0
+        user_pnl_pct = 0.0
+        ref_bonus = 0.0
+        referrals_info: list[ReferralInfo] = []
+    else:
+        positions = (await db.execute(
+            select(Position).where(Position.snapshot_id == snap.id)
+        )).scalars().all()
+
+        seen = set()
+        all_trades = (await db.execute(
+            select(Trade).order_by(Trade.timestamp.desc()).limit(200)
+        )).scalars().all()
+        trades = []
+        for t in all_trades:
+            key = (t.symbol, t.action, t.timestamp, t.price)
+            if key not in seen:
+                seen.add(key)
+                trades.append(t)
+            if len(trades) >= 15:
+                break
+
+        ai_feed = (await db.execute(
+            select(AIFeedEntry).order_by(AIFeedEntry.timestamp.desc()).limit(20)
+        )).scalars().all()
+
+        pool_positions_usdt = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
+        pool_total_usdt = snap.balance_usdt + pool_positions_usdt
+        server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
+
+        net_inv = snap.net_invested if snap.net_invested > 0 else (
+            snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         )
+        pool_pnl_pct = round((pool_total_usdt - net_inv) / net_inv * 100, 4) if net_inv > 0 else 0.0
 
-    positions = (await db.execute(
-        select(Position).where(Position.snapshot_id == snap.id)
-    )).scalars().all()
+        entry_pnl_pct = fin.entry_pool_pnl_pct if fin else 0.0
+        incremental_pnl_pct = pool_pnl_pct - entry_pnl_pct
+        gross_pnl = user_investment * (incremental_pnl_pct / 100) if user_investment > 0 else 0.0
+        user_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
+        user_pnl_pct = round(incremental_pnl_pct * INVESTOR_SHARE, 2)
 
-    seen = set()
-    all_trades = (await db.execute(
-        select(Trade).order_by(Trade.timestamp.desc()).limit(200)
-    )).scalars().all()
-    trades = []
-    for t in all_trades:
-        key = (t.symbol, t.action, t.timestamp, t.price)
-        if key not in seen:
-            seen.add(key)
-            trades.append(t)
-        if len(trades) >= 15:
-            break
-
-    ai_feed = (await db.execute(
-        select(AIFeedEntry).order_by(AIFeedEntry.timestamp.desc()).limit(20)
-    )).scalars().all()
-
-    pool_positions_usdt = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
-    pool_total_usdt = snap.balance_usdt + pool_positions_usdt
-    server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
-
-    net_inv = snap.net_invested if snap.net_invested > 0 else (
-        snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-    )
-    pool_pnl_pct = round((pool_total_usdt - net_inv) / net_inv * 100, 4) if net_inv > 0 else 0.0
-
-    entry_pnl_pct = fin.entry_pool_pnl_pct if fin else 0.0
-    incremental_pnl_pct = pool_pnl_pct - entry_pnl_pct
-    gross_pnl = user_investment * (incremental_pnl_pct / 100) if user_investment > 0 else 0.0
-    user_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
-    user_pnl_pct = round(incremental_pnl_pct * INVESTOR_SHARE, 2)
-
-    ref_bonus = 0.0
-    referrals_info: list[ReferralInfo] = []
-    all_referrals = (await db.execute(
-        select(User).where(User.referred_by == user.id, User.is_active == True)
-    )).scalars().all()
-    referrer_qualifies = user_investment >= MIN_REF_INVESTMENT
-    for ref in all_referrals:
-        ref_fin = (await db.execute(
-            select(UserFinancials).where(UserFinancials.user_id == ref.id)
-        )).scalar_one_or_none()
-        ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
-        ref_entry_pct = ref_fin.entry_pool_pnl_pct if ref_fin else 0.0
-        ref_incremental_pct = pool_pnl_pct - ref_entry_pct
-        bonus = ref_inv * (ref_incremental_pct / 100) * L1_REF_FEE if (ref_incremental_pct > 0 and referrer_qualifies) else 0.0
-        ref_bonus += bonus
-        parts = ref.email.split("@")
-        masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else ref.email
-        referrals_info.append(ReferralInfo(email=masked, investment_usdt=ref_inv, bonus_usdt=bonus))
-    ref_bonus = round(ref_bonus, 2)
+        ref_bonus = 0.0
+        referrals_info: list[ReferralInfo] = []
+        all_referrals = (await db.execute(
+            select(User).where(User.referred_by == user.id, User.is_active == True)
+        )).scalars().all()
+        referrer_qualifies = user_investment >= MIN_REF_INVESTMENT
+        for ref in all_referrals:
+            ref_fin = (await db.execute(
+                select(UserFinancials).where(UserFinancials.user_id == ref.id)
+            )).scalar_one_or_none()
+            ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
+            ref_entry_pct = ref_fin.entry_pool_pnl_pct if ref_fin else 0.0
+            ref_incremental_pct = pool_pnl_pct - ref_entry_pct
+            bonus = ref_inv * (ref_incremental_pct / 100) * L1_REF_FEE if (ref_incremental_pct > 0 and referrer_qualifies) else 0.0
+            ref_bonus += bonus
+            parts = ref.email.split("@")
+            masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else ref.email
+            referrals_info.append(ReferralInfo(email=masked, investment_usdt=ref_inv, bonus_usdt=bonus))
+        ref_bonus = round(ref_bonus, 2)
 
     # ── Форекс пул ────────────────────────────────────────────────
     forex_snap = (await db.execute(
@@ -166,11 +171,14 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     forex_ref_bonus = round(forex_ref_bonus, 2)
 
     return DashboardOut(
-        balance_usdt=snap.balance_usdt,
+        balance_usdt=snap.balance_usdt if snap else 0.0,
         pool_total_usdt=round(pool_total_usdt, 2),
         pool_positions_usdt=round(pool_positions_usdt, 2),
-        mode=snap.mode, hwm=snap.hwm, drawdown_pct=snap.drawdown_pct,
-        server_online=server_online, last_updated=snap.timestamp.isoformat(),
+        mode=snap.mode if snap else "OFFLINE",
+        hwm=snap.hwm if snap else 0.0,
+        drawdown_pct=snap.drawdown_pct if snap else 0.0,
+        server_online=server_online,
+        last_updated=snap.timestamp.isoformat() if snap else None,
         user_investment=user_investment, user_pnl=user_pnl, user_pnl_pct=user_pnl_pct,
         ref_bonus=ref_bonus, referral_code=user.referral_code, referrals=referrals_info,
         positions=[PositionOut(symbol=p.symbol, amount=p.amount, avg_price=p.avg_price,
