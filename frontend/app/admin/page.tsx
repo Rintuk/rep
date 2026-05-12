@@ -13,6 +13,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
+  cryptoFullReset,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -135,6 +136,8 @@ export default function AdminPage() {
   const [fullResetLoading, setFullResetLoading] = useState(false);
   const [importFromCryptoMsg, setImportFromCryptoMsg] = useState<string | null>(null);
   const [importFromCryptoLoading, setImportFromCryptoLoading] = useState(false);
+  const [cryptoResetMsg, setCryptoResetMsg] = useState<string | null>(null);
+  const [cryptoResetLoading, setCryptoResetLoading] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
@@ -610,6 +613,37 @@ export default function AdminPage() {
                   background: "rgba(127,29,29,0.7)", color: "#fca5a5", cursor: "pointer", border: "none",
                   opacity: cleanupLoading ? 0.5 : 1 }}>
                 {cleanupLoading ? "..." : "Очистить"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Полный сброс крипто-пула */}
+        {activeTab === "overview" && !isForex && (
+          <div style={{ ...card, padding: 16, border: "1px solid rgba(255,77,77,0.4)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ color: "#fca5a5", fontSize: 13, fontWeight: 600 }}>⚠️ Полный сброс крипто-пула</p>
+                <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>
+                  Удаляет все снапшоты, обнуляет инвестиции и выводы всех пользователей, сбрасывает демо-счета.
+                </p>
+                {cryptoResetMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{cryptoResetMsg}</p>}
+              </div>
+              <button
+                onClick={async () => {
+                  if (!confirm("ПОЛНЫЙ СБРОС крипто-пула?\n\nБудут удалены все снапшоты и обнулены данные ВСЕХ пользователей. Это необратимо.")) return;
+                  setCryptoResetLoading(true); setCryptoResetMsg(null);
+                  try {
+                    const r = await cryptoFullReset();
+                    setCryptoResetMsg(r.message); fetchData();
+                  } catch { setCryptoResetMsg("Ошибка"); }
+                  finally { setCryptoResetLoading(false); }
+                }}
+                disabled={cryptoResetLoading}
+                style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  background: "rgba(127,29,29,0.9)", color: "#fca5a5", cursor: "pointer", border: "1px solid rgba(255,77,77,0.4)",
+                  opacity: cryptoResetLoading ? 0.5 : 1 }}>
+                {cryptoResetLoading ? "..." : "Сбросить всё"}
               </button>
             </div>
           </div>

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
-from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry, DepositRequest, WithdrawalRequest
+from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade, DepositRequest, WithdrawalRequest
 from schemas import RegisterIn, LoginIn, TokenOut
 from security import hash_password, verify_password, create_access_token, get_admin_user
 from datetime import datetime, timedelta
@@ -479,6 +479,42 @@ async def cleanup_demo_snapshots(db: AsyncSession = Depends(get_db)):
         "deleted_snapshots": deleted_snaps,
         "reset_investors": reset_count,
         "message": f"Удалено {deleted_snaps} демо-снимков, сброшено точек входа: {reset_count}",
+    }
+
+
+@router.post("/admin/crypto-full-reset", dependencies=[Depends(get_admin_user)])
+async def crypto_full_reset(db: AsyncSession = Depends(get_db)):
+    """Полный сброс крипто-пула: снапшоты, финансы пользователей, демо-счета."""
+    all_snaps = (await db.execute(select(BotSnapshot))).scalars().all()
+    for s in all_snaps:
+        await db.delete(s)
+
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    for fin in all_fins:
+        fin.investment_usdt = 0.0
+        fin.withdrawal_usdt = 0.0
+        fin.entry_pool_pnl_pct = 0.0
+        fin.updated_at = datetime.utcnow()
+
+    all_va = (await db.execute(select(VirtualAccount))).scalars().all()
+    for va in all_va:
+        va.balance_usdt = 0.0
+        va.start_balance = 0.0
+        va.start_real_total = 0.0
+        va.is_started = False
+        va.updated_at = datetime.utcnow()
+        trades = (await db.execute(
+            select(VirtualTrade).where(VirtualTrade.user_id == va.user_id)
+        )).scalars().all()
+        for t in trades:
+            await db.delete(t)
+
+    await db.commit()
+    return {
+        "deleted_snapshots": len(all_snaps),
+        "reset_investors": len(all_fins),
+        "reset_demo_accounts": len(all_va),
+        "message": f"Крипто сброшен: {len(all_snaps)} снапшотов удалено, {len(all_fins)} инвесторов обнулено, {len(all_va)} демо-счетов сброшено",
     }
 
 
