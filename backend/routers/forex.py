@@ -12,14 +12,26 @@ from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
 router = APIRouter(prefix="/auth", tags=["forex"])
 
 
+def _forex_net_invested_override() -> float:
+    import os
+    v = os.environ.get("FOREX_NET_INVESTED", "")
+    try:
+        return float(v) if v else 0.0
+    except ValueError:
+        return 0.0
+
+
 async def _get_forex_pool_pnl_pct(db: AsyncSession) -> float:
     snap = (await db.execute(
         select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
     if not snap:
         return 0.0
-    ref = snap.net_invested if snap.net_invested > 0 else (
-        snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+    override = _forex_net_invested_override()
+    ref = override if override > 0 else (
+        snap.net_invested if snap.net_invested > 0 else (
+            snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        )
     )
     return round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
 
@@ -95,8 +107,11 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
 
     pool_pnl_usdt = pool_pnl_pct = net_invested_pool = real_start = 0.0
     if snap:
-        net_invested_pool = snap.net_invested if snap.net_invested > 0 else (
-            snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        override = _forex_net_invested_override()
+        net_invested_pool = override if override > 0 else (
+            snap.net_invested if snap.net_invested > 0 else (
+                snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+            )
         )
         real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         if net_invested_pool > 0:
