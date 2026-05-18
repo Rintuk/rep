@@ -137,20 +137,10 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     except Exception:
         ts = datetime.utcnow()
 
-    balance_usd    = payload.balance_usdt
-    hwm_usd        = payload.hwm
-    real_start_usd = payload.real_start_balance
-
-    # net_invested наследуется из предыдущего снапшота (чтобы ручная корректировка не терялась).
-    # EA присылает своё значение только при первом снапшоте (когда базы ещё нет).
-    prev_snap = (await db.execute(
-        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
-    )).scalar_one_or_none()
-
-    if prev_snap and prev_snap.net_invested > 0:
-        net_invested_usd = prev_snap.net_invested   # сохраняем скорректированное значение
-    else:
-        net_invested_usd = payload.net_invested     # первый запуск — берём от EA
+    balance_usd      = payload.balance_usdt
+    hwm_usd          = payload.hwm
+    real_start_usd   = payload.real_start_balance
+    net_invested_usd = payload.net_invested
 
     # Проверяем — первый ли это снапшот (пул только что сброшен/запущен)
     existing_count = (await db.execute(

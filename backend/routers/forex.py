@@ -496,21 +496,6 @@ async def adjust_forex_net_invested(add_amount: float, db: AsyncSession = Depend
     }
 
 
-@router.post("/admin/forex-set-net-invested", dependencies=[Depends(get_admin_user)])
-async def set_forex_net_invested(value: float, db: AsyncSession = Depends(get_db)):
-    """Устанавливает net_invested абсолютным значением во всех снапшотах."""
-    if value <= 0:
-        raise HTTPException(status_code=400, detail="value должен быть > 0")
-    snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
-    for s in snaps:
-        s.net_invested = round(value, 4)
-    await db.commit()
-    return {
-        "updated_snapshots": len(snaps),
-        "net_invested": value,
-        "message": f"net_invested установлен в {value} $ для {len(snaps)} снимков",
-    }
-
 
 @router.post("/admin/forex-full-reset", dependencies=[Depends(get_admin_user)])
 async def forex_full_reset(db: AsyncSession = Depends(get_db)):
