@@ -205,22 +205,51 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [waking, setWaking] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  async function tryLogin(emailVal: string, passwordVal: string, rememberVal: boolean): Promise<boolean> {
+    try {
+      const data = await login(emailVal, passwordVal, rememberVal);
+      localStorage.setItem("token", data.access_token);
+      router.push(data.is_admin ? "/admin" : "/dashboard");
+      return true;
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { detail?: string } }; code?: string };
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      // Сетевая ошибка или 503 — сервер спит
+      if (!status || status === 503 || status === 502 || e?.code === "ERR_NETWORK") {
+        return false; // retry
+      }
+      setError(detail || "Ошибка входа");
+      return true; // не повторяем
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
-    try {
-      const data = await login(email, password, rememberMe);
-      localStorage.setItem("token", data.access_token);
-      router.push(data.is_admin ? "/admin" : "/dashboard");
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || "Ошибка входа");
-    } finally {
-      setLoading(false);
-    }
+    setWaking(false);
+
+    const ok = await tryLogin(email, password, rememberMe);
+    if (ok) { setLoading(false); return; }
+
+    // Сервер не ответил — ждём пока проснётся
+    setWaking(true);
+    let attempts = 0;
+    const MAX = 6;
+    const interval = setInterval(async () => {
+      attempts++;
+      const done = await tryLogin(email, password, rememberMe);
+      if (done || attempts >= MAX) {
+        clearInterval(interval);
+        setWaking(false);
+        setLoading(false);
+        if (!done) setError("Сервер не отвечает. Попробуйте ещё раз.");
+      }
+    }, 8000);
   }
 
   return (
@@ -424,6 +453,12 @@ export default function LoginPage() {
 
               {error && <p style={{ color: "#ff5555", fontSize: 13, textAlign: "center" }}>{error}</p>}
 
+              {waking && (
+                <p style={{ color: "#f5a623", fontSize: 12, textAlign: "center", lineHeight: 1.4 }}>
+                  ⏳ Сервер просыпается после простоя, подождите ~30 сек...
+                </p>
+              )}
+
               {/* Submit */}
               <button
                 type="submit" disabled={loading}
@@ -456,7 +491,7 @@ export default function LoginPage() {
                   }
                 }}
               >
-                {loading ? "Вход..." : "Войти"}
+                {waking ? "Запускается..." : loading ? "Вход..." : "Войти"}
               </button>
             </form>
 
