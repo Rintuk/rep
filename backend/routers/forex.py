@@ -28,11 +28,16 @@ async def _get_forex_pool_pnl_pct(db: AsyncSession) -> float:
     if not snap:
         return 0.0
     override = _forex_net_invested_override()
-    ref = override if override > 0 else (
+    base = override if override > 0 else (
         snap.net_invested if snap.net_invested > 0 else (
             snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         )
     )
+    total_inv = (await db.execute(select(func.sum(UserFinancials.forex_investment_usdt)))).scalar() or 0.0
+    total_wd = (await db.execute(select(func.sum(UserFinancials.forex_withdrawal_usdt)))).scalar() or 0.0
+    ref = base + total_inv - total_wd
+    if ref <= 0:
+        ref = base
     return round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
 
 
@@ -108,12 +113,15 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     pool_pnl_usdt = pool_pnl_pct = net_invested_pool = real_start = 0.0
     if snap:
         override = _forex_net_invested_override()
-        net_invested_pool = override if override > 0 else (
+        base = override if override > 0 else (
             snap.net_invested if snap.net_invested > 0 else (
                 snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
             )
         )
         real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        net_invested_pool = base + total_invested - total_withdrawn
+        if net_invested_pool <= 0:
+            net_invested_pool = base
         if net_invested_pool > 0:
             pool_pnl_usdt = round(pool_free - net_invested_pool, 2)
             pool_pnl_pct = round((pool_free - net_invested_pool) / net_invested_pool * 100, 4)

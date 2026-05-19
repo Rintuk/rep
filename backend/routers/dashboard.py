@@ -123,11 +123,16 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         forex_pool_total = forex_balance
 
         _override = _forex_net_invested_override()
-        fx_net_inv = _override if _override > 0 else (
+        _fx_base = _override if _override > 0 else (
             forex_snap.net_invested if forex_snap.net_invested > 0 else (
                 forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
             )
         )
+        _fx_total_inv = (await db.execute(select(func.sum(UserFinancials.forex_investment_usdt)))).scalar() or 0.0
+        _fx_total_wd = (await db.execute(select(func.sum(UserFinancials.forex_withdrawal_usdt)))).scalar() or 0.0
+        fx_net_inv = _fx_base + _fx_total_inv - _fx_total_wd
+        if fx_net_inv <= 0:
+            fx_net_inv = _fx_base
         forex_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4) if fx_net_inv > 0 else 0.0
 
         forex_entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
@@ -158,12 +163,13 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
 
     forex_ref_bonus = 0.0
     if forex_snap and forex_investment >= MIN_REF_INVESTMENT:
-        _override2 = _forex_net_invested_override()
-        fx_net_inv = _override2 if _override2 > 0 else (
-            forex_snap.net_invested if forex_snap.net_invested > 0 else (
-                forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
+        if fx_net_inv <= 0:
+            _override2 = _forex_net_invested_override()
+            fx_net_inv = _override2 if _override2 > 0 else (
+                forex_snap.net_invested if forex_snap.net_invested > 0 else (
+                    forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
+                )
             )
-        )
         if fx_net_inv > 0:
             fx_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4)
             all_forex_refs = (await db.execute(
