@@ -320,7 +320,23 @@ async def approve_forex_deposit(request_id: str, actual_amount: float, db: Async
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="Заявка уже обработана")
 
-    current_pnl_pct = await _get_forex_pool_pnl_pct(db)
+    # Деньги уже пришли в MT4 до одобрения — считаем PnL БЕЗ этого депозита,
+    # иначе сумма депозита войдёт в прибыль инвестора как будто это доход.
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if snap:
+        override = _forex_net_invested_override()
+        ref = override if override > 0 else (
+            snap.net_invested if snap.net_invested > 0 else (
+                snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+            )
+        )
+        balance_before = snap.balance_usdt - actual_amount
+        current_pnl_pct = round((balance_before - ref) / ref * 100, 4) if ref > 0 else 0.0
+    else:
+        current_pnl_pct = 0.0
+
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
         old_inv = fin.forex_investment_usdt

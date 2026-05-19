@@ -605,12 +605,31 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="Заявка уже обработана")
 
-    # Прибавляем фактически полученную сумму к investment_usdt
-    current_pnl_pct = await _get_pool_pnl_pct(db)
+    # Деньги уже пришли в пул до одобрения — считаем PnL БЕЗ этого депозита,
+    # иначе сумма депозита войдёт в прибыль инвестора как будто это доход.
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if snap:
+        positions = (await db.execute(
+            select(Position).where(Position.snapshot_id == snap.id)
+        )).scalars().all()
+        pool_total_without_deposit = snap.balance_usdt - actual_amount + sum(
+            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
+        )
+        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+        total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+        ref = start + total_inv - total_wd
+        if ref <= 0:
+            ref = snap.net_invested if snap.net_invested > 0 else start
+        current_pnl_pct = round((pool_total_without_deposit - ref) / ref * 100, 4) if ref > 0 else 0.0
+    else:
+        current_pnl_pct = 0.0
+
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
         old_inv = fin.investment_usdt
-        # Взвешенная точка входа: старая доля + новый депозит по текущей цене пула
         new_inv = old_inv + actual_amount
         if old_inv <= 0:
             fin.entry_pool_pnl_pct = current_pnl_pct
