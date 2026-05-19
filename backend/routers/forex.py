@@ -205,10 +205,13 @@ async def admin_forex_pool_history(db: AsyncSession = Depends(get_db)):
     if not clean_snaps:
         return []
 
+    override = _forex_net_invested_override()
+
     result = []
     for s in clean_snaps:
-        pnl = round(s.balance_usdt - s.net_invested, 2)
-        pnl_pct = round((pnl / s.net_invested) * 100, 2)
+        ref = override if override > 0 else s.net_invested
+        pnl = round(s.balance_usdt - ref, 2)
+        pnl_pct = round((pnl / ref) * 100, 2)
         result.append({"ts": s.timestamp.strftime("%d.%m %H:%M"), "pool_total": round(s.balance_usdt, 2),
                         "pnl": pnl, "pnl_pct": pnl_pct})
     return result
