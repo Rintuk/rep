@@ -135,9 +135,9 @@ async def get_forex_demo_account(user: User = Depends(get_current_user), db: Asy
         scale = va.start_balance / va.start_real_total
         for p in real_positions:
             cur_price = p.current_price if p.current_price > 0 else p.avg_price
-            pool_positions_pnl += p.amount * scale
+            pool_positions_pnl += p.amount * cur_price * scale
             positions.append({"symbol": p.symbol, "amount": round(p.amount * scale, 6),
-                               "avg_price": p.avg_price, "value": round(p.amount * scale, 2)})
+                               "avg_price": p.avg_price, "value": round(p.amount * cur_price * scale, 2)})
 
     net_balance = round(va.balance_usdt, 2)
     net_pnl = round(net_balance - va.start_balance, 2)
