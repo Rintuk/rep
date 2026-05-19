@@ -12,7 +12,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 async def _get_pool_pnl_pct(db: AsyncSession) -> float:
-    """Текущий PnL% пула от net_invested — используется как точка входа инвестора."""
+    """Текущий PnL% пула — использует реальный net_invested из БД (депозиты инвесторов),
+    чтобы пополнения не отображались как прибыль."""
     snap = (await db.execute(
         select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
@@ -25,9 +26,12 @@ async def _get_pool_pnl_pct(db: AsyncSession) -> float:
         p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
         for p in positions
     )
-    ref = snap.net_invested if snap.net_invested > 0 else (
-        snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-    )
+    start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+    total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+    total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+    ref = start + total_inv - total_wd
+    if ref <= 0:
+        ref = snap.net_invested if snap.net_invested > 0 else start
     return round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
 
 @router.post("/register")
@@ -335,11 +339,11 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     real_start = 0.0
     net_invested_pool = 0.0
     if snap:
-        # net_invested учитывает стартовый депозит + пополнения - снятия
-        net_invested_pool = snap.net_invested if snap.net_invested > 0 else (
-            snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        )
         real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        # Считаем net_invested из БД: стартовый капитал + депозиты инвесторов - снятия
+        net_invested_pool = real_start + total_invested - total_withdrawn
+        if net_invested_pool <= 0:
+            net_invested_pool = snap.net_invested if snap.net_invested > 0 else real_start
         if net_invested_pool > 0:
             pool_pnl_usdt = round(pool_total - net_invested_pool, 2)
             pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 4)
