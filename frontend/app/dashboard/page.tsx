@@ -7,7 +7,7 @@ import {
   createForexDepositRequest, getMyForexDeposits, createForexWithdrawalRequest, getMyForexWithdrawals,
   changePassword, getNews, NewsItem as NewsItemType, getMyTickets, markTicketsRead,
 } from "@/lib/api";
-import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
+import { Wallet, ArrowRight, ArrowDownLeft, ArrowUpRight, Copy, LogOut, Loader2, CheckCircle2, TrendingUp, Info, TrendingDown, Activity, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 interface Position { symbol: string; amount: number; avg_price: number; current_price?: number; }
@@ -477,16 +477,28 @@ export default function DashboardPage() {
               <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Партнерская программа</h2>
               <p style={{ color: "#4a6a9a", fontSize: 12 }}>Приглашайте друзей и получайте процент от их прибыли</p>
             </div>
-            <button onClick={copyRefLink} style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-              background: copied ? "rgba(34,201,122,0.15)" : "rgba(68,136,221,0.12)",
-              border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(68,136,221,0.3)"}`,
-              color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
-            }}>
-              <Copy size={14} />
-              {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={() => router.push("/referral")} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+                background: "rgba(139,92,246,0.15)",
+                border: "1px solid rgba(139,92,246,0.3)",
+                color: "#a78bfa", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
+              }}>
+                <Info size={16} />
+                Как это работает?
+              </button>
+              <button onClick={copyRefLink} style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+                background: copied ? "rgba(34,201,122,0.15)" : "rgba(68,136,221,0.12)",
+                border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(68,136,221,0.3)"}`,
+                color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
+              }}>
+                <Copy size={14} />
+                {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
+              </button>
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 24 }}>
