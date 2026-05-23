@@ -145,50 +145,11 @@ export default function SupportPage() {
 
       <main style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
 
-        {/* Форма нового обращения */}
-        <div style={{ ...card, padding: 24 }}>
-          <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Новое обращение</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <label style={{ color: "#4a6a9a", fontSize: 12, display: "block", marginBottom: 6 }}>Тема вопроса</label>
-              <input
-                value={subject}
-                onChange={e => setSubject(e.target.value)}
-                placeholder="Например: проблема с выводом средств"
-                style={{ width: "100%", boxSizing: "border-box", background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.2)", borderRadius: 10, padding: "11px 14px", color: "#e0e8ff", fontSize: 14, outline: "none" }}
-              />
-            </div>
-            <div>
-              <label style={{ color: "#4a6a9a", fontSize: 12, display: "block", marginBottom: 6 }}>Описание вопроса</label>
-              <textarea
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                placeholder="Опишите вашу проблему или вопрос подробно..."
-                rows={4}
-                style={{ width: "100%", boxSizing: "border-box", background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.2)", borderRadius: 10, padding: "11px 14px", color: "#e0e8ff", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit" }}
-              />
-            </div>
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !subject.trim() || !message.trim()}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 10, background: "linear-gradient(180deg,#22c97a,#16a360)", color: "#fff", fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer", opacity: (loading || !subject.trim() || !message.trim()) ? 0.5 : 1 }}
-            >
-              <Send size={16} />
-              {loading ? "Отправка..." : "Отправить обращение"}
-            </button>
-            {msg && (
-              <div style={{ padding: "10px 14px", borderRadius: 8, background: msg.ok ? "rgba(34,201,122,0.08)" : "rgba(255,77,77,0.08)", border: `1px solid ${msg.ok ? "rgba(34,201,122,0.3)" : "rgba(255,77,77,0.3)"}`, color: msg.ok ? "#22c97a" : "#ff4d4d", fontSize: 13 }}>
-                {msg.text}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* История обращений */}
+        {/* История обращений — СВЕРХУ, чтобы сразу видно на мобильном */}
         {tickets.length > 0 && (
           <div style={{ ...card, padding: 24 }}>
             <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Мои обращения</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: 480, overflowY: "auto", paddingRight: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {tickets.map((t, i) => (
                 <div key={t.id} style={{ padding: "16px 0", borderBottom: i < tickets.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none", flexShrink: 0 }}>
                   {/* Шапка тикета */}
@@ -231,6 +192,45 @@ export default function SupportPage() {
             </div>
           </div>
         )}
+
+        {/* Форма нового обращения */}
+        <div style={{ ...card, padding: 24 }}>
+          <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Новое обращение</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={{ color: "#8aa0c0", fontSize: 12, fontWeight: 600, marginBottom: 6, display: "block" }}>Тема вопроса</label>
+              <input
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                placeholder="Кратко опишите тему"
+                style={{ width: "100%", background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.18)", borderRadius: 8, padding: "10px 14px", color: "#e0e8ff", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ color: "#8aa0c0", fontSize: 12, fontWeight: 600, marginBottom: 6, display: "block" }}>Ваш вопрос</label>
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="Опишите ваш вопрос подробно"
+                rows={4}
+                style={{ width: "100%", background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.18)", borderRadius: 8, padding: "10px 14px", color: "#e0e8ff", fontSize: 14, outline: "none", resize: "vertical", boxSizing: "border-box" }}
+              />
+            </div>
+            {msg && (
+              <div style={{ padding: "10px 14px", borderRadius: 8, background: msg.ok ? "rgba(34,201,122,0.1)" : "rgba(255,60,60,0.1)", border: `1px solid ${msg.ok ? "rgba(34,201,122,0.3)" : "rgba(255,60,60,0.3)"}`, color: msg.ok ? "#22c97a" : "#ff6b6b", fontSize: 13 }}>
+                {msg.text}
+              </div>
+            )}
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !subject.trim() || !message.trim()}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "linear-gradient(135deg,#0070f3,#0040c0)", color: "#fff", fontWeight: 700, fontSize: 14, padding: "12px 24px", borderRadius: 10, border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading || !subject.trim() || !message.trim() ? 0.5 : 1 }}
+            >
+              <Send size={16} /> {loading ? "Отправка…" : "Отправить обращение"}
+            </button>
+          </div>
+        </div>
+
       </main>
     </div>
   );
