@@ -416,14 +416,20 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             entry_pct = fin.entry_pool_pnl_pct if fin else 0.0
             incremental = pool_pnl_pct - entry_pct
             gross_pnl = inv * (incremental / 100)
-            pnl = round(gross_pnl * INVESTOR_SHARE + fin.locked_crypto_pnl, 2)
-            total_gross_pnl += gross_pnl
+            
+            locked_crypto_pnl = fin.locked_crypto_pnl if fin else 0.0
+            pnl = round(gross_pnl * INVESTOR_SHARE + locked_crypto_pnl, 2)
+            
+            # Reconstruct historical gross profit that was locked during migration
+            locked_gross = locked_crypto_pnl / 0.77
+            
+            total_gross_pnl += (gross_pnl + locked_gross)
             
             # Временно упрощаем для админской статы: 
             # Админ получает POOL_FEE (20%) со всех. 
             # Невыплаченные реферальные % из оставшихся 5% тоже идут админу, но для простоты здесь пока оставим базовые 20%
             admin_fee = POOL_FEE 
-            total_admin_pnl += gross_pnl * admin_fee
+            total_admin_pnl += (gross_pnl + locked_gross) * admin_fee
         
         status, total_volume, next_vol, crypto_ref, forex_ref, refs_info = await _calc_referral_tree(
             u.id, db, pool_pnl_pct, forex_pool_pct, fin, u.manual_status_override
