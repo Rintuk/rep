@@ -15,6 +15,7 @@ import {
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
   cryptoFullReset,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
+  getAdminTickets, replyToTicket, SupportTicket,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -112,7 +113,7 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits" | "withdrawals" | "news">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits" | "withdrawals" | "news" | "support">("overview");
   const [deposits, setDeposits] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [withdrawals, setWithdrawals] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
@@ -152,6 +153,11 @@ export default function AdminPage() {
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsMsg, setNewsMsg] = useState<string | null>(null);
 
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
+  const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
+  const [replyLoading, setReplyLoading] = useState<string | null>(null);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
@@ -162,6 +168,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (activeTab === "news") fetchNews();
+    if (activeTab === "support") fetchTickets();
   }, [activeTab]);
 
   async function fetchNews() {
@@ -196,6 +203,25 @@ export default function AdminPage() {
       await deleteNews(id);
       await fetchNews();
     } catch { /* ignore */ }
+  }
+
+  async function fetchTickets() {
+    try {
+      const data = await getAdminTickets();
+      setTickets(data);
+    } catch { /* ignore */ }
+  }
+
+  async function handleReply(ticketId: string) {
+    const body = (replyTexts[ticketId] || "").trim();
+    if (!body) return;
+    setReplyLoading(ticketId);
+    try {
+      await replyToTicket(ticketId, body);
+      setReplyTexts(prev => ({ ...prev, [ticketId]: "" }));
+      await fetchTickets();
+    } catch { /* ignore */ }
+    finally { setReplyLoading(null); }
   }
 
   async function fetchData() {
@@ -386,6 +412,7 @@ export default function AdminPage() {
     { key: "trades",      label: "📋 Сделки" },
     ...(!isForex ? [{ key: "ai", label: "🧠 ИИ" }] : []),
     { key: "news", label: "📰 Новости" },
+    { key: "support", label: "🎧 Поддержка", badge: tickets.filter(t => t.status === "open").length },
   ];
 
   return (
@@ -1237,6 +1264,94 @@ export default function AdminPage() {
                 </div>
               }
             </div>
+          </div>
+        )}
+
+        {/* Поддержка */}
+        {activeTab === "support" && (
+          <div style={{ ...card, padding: 20 }}>
+            <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 15, marginBottom: 16 }}>
+              Обращения в поддержку
+              {tickets.filter(t => t.status === "open").length > 0 && (
+                <span style={{ marginLeft: 8, fontSize: 12, padding: "2px 8px", borderRadius: 10, background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}>
+                  {tickets.filter(t => t.status === "open").length} новых
+                </span>
+              )}
+            </h3>
+            {tickets.length === 0
+              ? <p style={{ color: muted, fontSize: 13 }}>Обращений пока нет</p>
+              : <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {tickets.map(t => (
+                  <div key={t.id} style={{ borderBottom: `1px solid ${border}` }}>
+                    {/* Строка тикета */}
+                    <button
+                      onClick={() => setExpandedTicket(expandedTicket === t.id ? null : t.id)}
+                      style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "14px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, textAlign: "left" }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                          <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{t.subject}</span>
+                          <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 600,
+                            background: t.status === "open" ? "rgba(245,158,11,0.15)" : "rgba(34,201,122,0.12)",
+                            color: t.status === "open" ? "#f59e0b" : "#22c97a" }}>
+                            {t.status === "open" ? "Открыт" : "Отвечен"}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <span style={{ color: muted, fontSize: 12 }}>{t.user_email}</span>
+                          <span style={{ color: muted, fontSize: 11 }}>{new Date(t.created_at).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                      </div>
+                      <span style={{ color: muted, fontSize: 16 }}>{expandedTicket === t.id ? "▲" : "▼"}</span>
+                    </button>
+
+                    {/* Раскрытый тикет */}
+                    {expandedTicket === t.id && (
+                      <div style={{ paddingBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                        {/* Вопрос */}
+                        <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "12px 14px" }}>
+                          <p style={{ color: muted, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>ВОПРОС</p>
+                          <p style={{ color: "#e0e8ff", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{t.message}</p>
+                        </div>
+
+                        {/* Существующие ответы */}
+                        {t.replies.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {t.replies.map(r => (
+                              <div key={r.id} style={{ background: "rgba(34,201,122,0.06)", border: "1px solid rgba(34,201,122,0.15)", borderRadius: 8, padding: "10px 14px" }}>
+                                <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+                                  <span style={{ color: "#22c97a", fontSize: 11, fontWeight: 700 }}>Ваш ответ</span>
+                                  <span style={{ color: muted, fontSize: 11 }}>{new Date(r.created_at).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                                </div>
+                                <p style={{ color: "#e0e8ff", fontSize: 13, lineHeight: 1.6 }}>{r.body}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Форма ответа */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <textarea
+                            value={replyTexts[t.id] || ""}
+                            onChange={e => setReplyTexts(prev => ({ ...prev, [t.id]: e.target.value }))}
+                            placeholder="Ваш ответ..."
+                            rows={3}
+                            style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${border}`, borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 13, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+                          />
+                          <button
+                            onClick={() => handleReply(t.id)}
+                            disabled={replyLoading === t.id || !(replyTexts[t.id] || "").trim()}
+                            style={{ alignSelf: "flex-start", background: "#22c97a", color: "#000", fontWeight: 700, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", opacity: (replyLoading === t.id || !(replyTexts[t.id] || "").trim()) ? 0.5 : 1 }}
+                          >
+                            {replyLoading === t.id ? "Отправка..." : "Ответить"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            }
           </div>
         )}
 

@@ -80,6 +80,27 @@ class ReferralInfo(BaseModel):
     investment_usdt: float
     bonus_usdt: float   # сколько реферер зарабатывает с этого человека
 
+class SupportTicketCreate(BaseModel):
+    subject: str
+    message: str
+
+class SupportReplyOut(BaseModel):
+    id: str
+    body: str
+    created_at: datetime
+
+class SupportTicketOut(BaseModel):
+    id: str
+    subject: str
+    message: str
+    status: str
+    created_at: datetime
+    replies: list[SupportReplyOut] = []
+
+class SupportTicketAdminOut(SupportTicketOut):
+    user_email: str
+
+
 class NewsItemCreate(BaseModel):
     title: str
     body: str

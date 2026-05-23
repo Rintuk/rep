@@ -7,7 +7,7 @@ import {
   createForexDepositRequest, getMyForexDeposits, createForexWithdrawalRequest, getMyForexWithdrawals,
   changePassword, getNews, NewsItem as NewsItemType,
 } from "@/lib/api";
-import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 interface Position { symbol: string; amount: number; avg_price: number; current_price?: number; }
@@ -360,6 +360,7 @@ export default function DashboardPage() {
                   { label: "Пополнить счёт", color: "#22c97a", icon: <PlusCircle size={15}/>, action: openDeposit },
                   { label: "Вывести средства", color: "#ff9944", icon: <Wallet size={15}/>, action: openWithdraw },
                   { label: copied ? "Скопировано!" : "Реф. ссылка", color: "#6b8ab0", icon: <Copy size={15}/>, action: () => { setMenuOpen(false); copyRefLink(); } },
+                  { label: "Поддержка", color: "#38bdf8", icon: <Headphones size={15}/>, action: () => { setMenuOpen(false); router.push("/support"); } },
                   { label: "Сменить пароль", color: "#a78bfa", icon: <Settings size={15}/>, action: () => { setMenuOpen(false); setShowChangePass(true); setChangePassMsg(null); setOldPass(""); setNewPass(""); setNewPass2(""); } },
                   { label: "Выйти", color: "#ff4d4d", icon: <LogOut size={15}/>, action: () => { setMenuOpen(false); logout(); } },
                 ].map((item, i) => item.special === "toggle" ? (
@@ -378,7 +379,7 @@ export default function DashboardPage() {
                   <button key={i} onClick={item.action} style={{
                     width: "100%", display: "flex", alignItems: "center", gap: 10,
                     padding: "12px 16px", color: item.color, fontSize: 13, cursor: "pointer",
-                    background: "none", border: "none", borderBottom: i < 4 ? "1px solid rgba(0,180,255,0.08)" : "none",
+                    background: "none", border: "none", borderBottom: i < 5 ? "1px solid rgba(0,180,255,0.08)" : "none",
                     textAlign: "left", transition: "background 0.15s",
                   }}
                     onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}

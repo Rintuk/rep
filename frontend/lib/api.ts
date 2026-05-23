@@ -247,6 +247,44 @@ export async function adjustNetInvested(add_amount: number) {
   return res.data as { updated_snapshots: number; add_amount: number; message: string };
 }
 
+// ── Поддержка ────────────────────────────────────────────────────────────────
+
+export interface SupportReply {
+  id: string;
+  body: string;
+  created_at: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  message: string;
+  status: string;
+  created_at: string;
+  replies: SupportReply[];
+  user_email?: string;
+}
+
+export async function createSupportTicket(subject: string, message: string) {
+  const res = await api.post("/auth/support/ticket", { subject, message });
+  return res.data as SupportTicket;
+}
+
+export async function getMyTickets() {
+  const res = await api.get("/auth/support/my-tickets");
+  return res.data as SupportTicket[];
+}
+
+export async function getAdminTickets() {
+  const res = await api.get("/auth/admin/support");
+  return res.data as SupportTicket[];
+}
+
+export async function replyToTicket(ticketId: string, body: string) {
+  const res = await api.post(`/auth/admin/support/${ticketId}/reply`, null, { params: { body } });
+  return res.data as SupportTicket;
+}
+
 // ── Новости ──────────────────────────────────────────────────────────────────
 
 export interface NewsItem {

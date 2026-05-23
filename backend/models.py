@@ -260,6 +260,31 @@ class ForexAIFeedEntry(Base):
     snapshot: Mapped["ForexBotSnapshot"] = relationship("ForexBotSnapshot", back_populates="ai_feed")
 
 
+class SupportTicket(Base):
+    __tablename__ = "support_tickets"
+
+    id:         Mapped[str]      = mapped_column(String, primary_key=True, default=gen_uuid)
+    user_id:    Mapped[str]      = mapped_column(String, ForeignKey("users.id"))
+    subject:    Mapped[str]      = mapped_column(String)
+    message:    Mapped[str]      = mapped_column(Text)
+    status:     Mapped[str]      = mapped_column(String, default="open")  # open / answered
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user:    Mapped["User"]               = relationship("User")
+    replies: Mapped[list["SupportReply"]] = relationship("SupportReply", back_populates="ticket", cascade="all, delete-orphan")
+
+
+class SupportReply(Base):
+    __tablename__ = "support_replies"
+
+    id:         Mapped[str]      = mapped_column(String, primary_key=True, default=gen_uuid)
+    ticket_id:  Mapped[str]      = mapped_column(String, ForeignKey("support_tickets.id"))
+    body:       Mapped[str]      = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    ticket: Mapped["SupportTicket"] = relationship("SupportTicket", back_populates="replies")
+
+
 class NewsItem(Base):
     __tablename__ = "news_items"
 
