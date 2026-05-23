@@ -41,7 +41,7 @@ class BotUpdateIn(BaseModel):
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str
-    referral_code: str | None = None
+    referral_code: str
 
 class LoginIn(BaseModel):
     email: EmailStr
