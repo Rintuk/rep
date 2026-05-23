@@ -109,7 +109,7 @@ function CircuitBackground() {
 }
 
 const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", SILVER: "#c0c0c0", GOLD: "#ffd700", VIP: "#f59e0b" };
-const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Партнёр", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
+const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Инвестор", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
 
 export default function AdminPage() {
   const router = useRouter();
@@ -1032,7 +1032,7 @@ export default function AdminPage() {
                                 color: u.status ? STATUS_COLORS[u.status] : "#6b8ab0", 
                                 fontWeight: 600 
                               }}>
-                                {u.status ? STATUS_LABELS[u.status] || u.status : "🔰 Партнёр"}
+                                {u.status ? STATUS_LABELS[u.status] || u.status : "🔰 Инвестор"}
                               </div>
                               {u.next_vol ? (
                                 <div style={{ marginTop: 8, width: 120 }}>

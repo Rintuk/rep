@@ -34,7 +34,7 @@ const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", 
 const ACTION_LABEL: Record<string, string> = { BUY: "BUY", SELL: "SELL", HOLD: "HOLD", DEPOSIT: "Пополнение" };
 
 const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", SILVER: "#c0c0c0", GOLD: "#ffd700", VIP: "#f59e0b" };
-const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Партнёр", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
+const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Инвестор", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
 const STATUS_LEVELS: Record<string, number> = { PARTNER: 1, BRONZE: 2, GOLD: 3, VIP: 5 };
 
 // ─── Circuit board background ─────────────────────────────────────────────────
@@ -486,12 +486,8 @@ export default function DashboardPage() {
             <div style={{ flex: "1 1 200px", padding: 16, background: "rgba(0,0,0,0.2)", borderRadius: 12, border: "1px solid rgba(0,180,255,0.1)" }}>
               <div style={{ color: "#4a6a9a", fontSize: 12, marginBottom: 8 }}>Ваш статус</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ 
-                  color: STATUS_COLORS[data.status] || "#fff", 
-                  fontWeight: 700, fontSize: 20,
-                  textShadow: `0 0 10px ${STATUS_COLORS[data.status] || "#fff"}40`
-                }}>
-                  {STATUS_LABELS[data.status] || data.status}
+                <span style={{ fontSize: 18, fontWeight: 700, color: data.status ? STATUS_COLORS[data.status] : "#fff" }}>
+                  {data.status ? STATUS_LABELS[data.status] || data.status : "🔰 Инвестор"}
                 </span>
                 <span style={{ fontSize: 11, padding: "2px 8px", background: "rgba(255,255,255,0.05)", borderRadius: 10, color: "#aaa" }}>
                   {STATUS_LEVELS[data.status]} {STATUS_LEVELS[data.status] === 1 ? "уровень" : STATUS_LEVELS[data.status] === 5 ? "уровней" : "уровня"} в глубину
