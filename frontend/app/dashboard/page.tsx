@@ -5,7 +5,7 @@ import {
   getDashboard,
   createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals,
   createForexDepositRequest, getMyForexDeposits, createForexWithdrawalRequest, getMyForexWithdrawals,
-  changePassword, getNews, NewsItem as NewsItemType,
+  changePassword, getNews, NewsItem as NewsItemType, getMyTickets,
 } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -145,6 +145,7 @@ export default function DashboardPage() {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [newsFeed, setNewsFeed] = useState<NewsItemType[]>([]);
+  const [supportBadge, setSupportBadge] = useState(0);
   const [showChangePass, setShowChangePass] = useState(false);
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
@@ -161,7 +162,9 @@ export default function DashboardPage() {
     getMyForexDeposits().then(setMyForexDeposits).catch(() => {});
     getMyForexWithdrawals().then(setMyForexWithdrawals).catch(() => {});
     getNews().then(setNewsFeed).catch(() => {});
-    const interval = setInterval(() => fetchData(false), 60000);
+    const refreshBadge = () => getMyTickets().then(t => setSupportBadge(t.filter(x => x.status === "answered").length)).catch(() => {});
+    refreshBadge();
+    const interval = setInterval(() => { fetchData(false); refreshBadge(); }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -343,12 +346,25 @@ export default function DashboardPage() {
         {/* Меню */}
         <div style={{ position: "relative" }}>
           <button onClick={() => setMenuOpen(v => !v)} style={{
-            padding: "8px", borderRadius: 10, cursor: "pointer",
+            padding: "8px", borderRadius: 10, cursor: "pointer", position: "relative",
             background: menuOpen ? "rgba(0,180,255,0.1)" : "transparent",
             border: `1px solid ${menuOpen ? "rgba(0,180,255,0.4)" : "rgba(0,180,255,0.15)"}`,
             color: menuOpen ? "#00cfff" : "#4a6a9a", transition: "all 0.2s",
           }}>
             <Settings size={20} />
+            {supportBadge > 0 && (
+              <span style={{
+                position: "absolute", top: -6, right: -6,
+                minWidth: 18, height: 18, borderRadius: 9,
+                background: "#ff3c3c", color: "#fff",
+                fontSize: 11, fontWeight: 700, lineHeight: "18px",
+                textAlign: "center", padding: "0 4px",
+                boxShadow: "0 0 6px rgba(255,60,60,0.7)",
+                pointerEvents: "none",
+              }}>
+                {supportBadge}
+              </span>
+            )}
           </button>
 
           {menuOpen && (
@@ -360,7 +376,7 @@ export default function DashboardPage() {
                   { label: "Пополнить счёт", color: "#22c97a", icon: <PlusCircle size={15}/>, action: openDeposit },
                   { label: "Вывести средства", color: "#ff9944", icon: <Wallet size={15}/>, action: openWithdraw },
                   { label: copied ? "Скопировано!" : "Реф. ссылка", color: "#6b8ab0", icon: <Copy size={15}/>, action: () => { setMenuOpen(false); copyRefLink(); } },
-                  { label: "Поддержка", color: "#38bdf8", icon: <Headphones size={15}/>, action: () => { setMenuOpen(false); router.push("/support"); } },
+                  { label: "Поддержка", color: "#38bdf8", icon: <Headphones size={15}/>, badge: supportBadge, action: () => { setMenuOpen(false); setSupportBadge(0); router.push("/support"); } },
                   { label: "Сменить пароль", color: "#a78bfa", icon: <Settings size={15}/>, action: () => { setMenuOpen(false); setShowChangePass(true); setChangePassMsg(null); setOldPass(""); setNewPass(""); setNewPass2(""); } },
                   { label: "Выйти", color: "#ff4d4d", icon: <LogOut size={15}/>, action: () => { setMenuOpen(false); logout(); } },
                 ].map((item, i) => item.special === "toggle" ? (
@@ -386,6 +402,11 @@ export default function DashboardPage() {
                     onMouseLeave={e => (e.currentTarget.style.background = "none")}
                   >
                     {item.icon} {item.label}
+                    {"badge" in item && (item as any).badge > 0 && (
+                      <span style={{ marginLeft: "auto", minWidth: 18, height: 18, borderRadius: 9, background: "#ff3c3c", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center", padding: "0 5px" }}>
+                        {(item as any).badge}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
