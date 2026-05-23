@@ -80,6 +80,19 @@ class ReferralInfo(BaseModel):
     investment_usdt: float
     bonus_usdt: float   # сколько реферер зарабатывает с этого человека
 
+class NewsItemCreate(BaseModel):
+    title: str
+    body: str
+    pool_type: str = "all"  # "all", "crypto", "forex"
+
+class NewsItemOut(BaseModel):
+    id: str
+    title: str
+    body: str
+    pool_type: str
+    created_at: datetime
+
+
 class DashboardOut(BaseModel):
     # Крипто пул
     balance_usdt: float

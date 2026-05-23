@@ -247,6 +247,35 @@ export async function adjustNetInvested(add_amount: number) {
   return res.data as { updated_snapshots: number; add_amount: number; message: string };
 }
 
+// ── Новости ──────────────────────────────────────────────────────────────────
+
+export interface NewsItem {
+  id: string;
+  title: string;
+  body: string;
+  pool_type: string;
+  created_at: string;
+}
+
+export async function getAdminNews() {
+  const res = await api.get("/auth/admin/news");
+  return res.data as NewsItem[];
+}
+
+export async function createNews(title: string, body: string, pool_type: string) {
+  const res = await api.post("/auth/admin/news", { title, body, pool_type });
+  return res.data as NewsItem;
+}
+
+export async function deleteNews(id: string) {
+  await api.delete(`/auth/admin/news/${id}`);
+}
+
+export async function getNews() {
+  const res = await api.get("/api/news");
+  return res.data as NewsItem[];
+}
+
 export async function getDemoAccount() {
   const res = await api.get("/api/demo/account");
   return res.data;

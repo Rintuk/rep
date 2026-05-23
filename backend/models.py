@@ -258,3 +258,13 @@ class ForexAIFeedEntry(Base):
     reason:      Mapped[str] = mapped_column(Text)
 
     snapshot: Mapped["ForexBotSnapshot"] = relationship("ForexBotSnapshot", back_populates="ai_feed")
+
+
+class NewsItem(Base):
+    __tablename__ = "news_items"
+
+    id:         Mapped[str]      = mapped_column(String, primary_key=True, default=gen_uuid)
+    title:      Mapped[str]      = mapped_column(String)
+    body:       Mapped[str]      = mapped_column(Text)
+    pool_type:  Mapped[str]      = mapped_column(String, default="all")  # "all", "crypto", "forex"
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

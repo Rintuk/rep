@@ -4,13 +4,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
 from models import (BotSnapshot, Position, Trade, AIFeedEntry, UserFinancials, User,
-                    ForexBotSnapshot, ForexPosition, ForexTrade)
-from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo
+                    ForexBotSnapshot, ForexPosition, ForexTrade, NewsItem)
+from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo, NewsItemOut
 from security import get_current_user
 from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
 from routers.forex import _forex_net_invested_override
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
+
+@router.get("/news", response_model=list[NewsItemOut])
+async def get_news(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    items = (await db.execute(
+        select(NewsItem).order_by(NewsItem.created_at.desc())
+    )).scalars().all()
+    return items
+
 
 @router.get("/dashboard", response_model=DashboardOut)
 async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

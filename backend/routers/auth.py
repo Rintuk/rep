@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
-from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade, DepositRequest, WithdrawalRequest
-from schemas import RegisterIn, LoginIn, TokenOut
+from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade, DepositRequest, WithdrawalRequest, NewsItem
+from schemas import RegisterIn, LoginIn, TokenOut, NewsItemCreate, NewsItemOut
 from security import hash_password, verify_password, create_access_token, get_admin_user, get_current_user
 from datetime import datetime, timedelta
 from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
@@ -742,6 +742,44 @@ async def reject_withdrawal(request_id: str, db: AsyncSession = Depends(get_db))
     req.updated_at = datetime.utcnow()
     await db.commit()
     return {"status": "rejected"}
+
+
+@router.get("/admin/news", response_model=list[NewsItemOut])
+async def admin_list_news(
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    items = (await db.execute(
+        select(NewsItem).order_by(NewsItem.created_at.desc())
+    )).scalars().all()
+    return items
+
+
+@router.post("/admin/news", response_model=NewsItemOut)
+async def admin_create_news(
+    data: NewsItemCreate,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    item = NewsItem(title=data.title, body=data.body, pool_type=data.pool_type)
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    return item
+
+
+@router.delete("/admin/news/{news_id}")
+async def admin_delete_news(
+    news_id: str,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    item = (await db.execute(select(NewsItem).where(NewsItem.id == news_id))).scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Новость не найдена")
+    await db.delete(item)
+    await db.commit()
+    return {"status": "deleted"}
 
 
 @router.post("/change-password")

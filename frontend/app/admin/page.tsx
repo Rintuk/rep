@@ -14,6 +14,7 @@ import {
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
   cryptoFullReset,
+  getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -111,7 +112,7 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits" | "withdrawals">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits" | "withdrawals" | "news">("overview");
   const [deposits, setDeposits] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [withdrawals, setWithdrawals] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
@@ -144,6 +145,13 @@ export default function AdminPage() {
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
 
+  const [newsList, setNewsList] = useState<NewsItemType[]>([]);
+  const [newsTitle, setNewsTitle] = useState("");
+  const [newsBody, setNewsBody] = useState("");
+  const [newsPool, setNewsPool] = useState<"all" | "crypto" | "forex">("all");
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsMsg, setNewsMsg] = useState<string | null>(null);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
@@ -151,6 +159,44 @@ export default function AdminPage() {
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
   }, [activePool]);
+
+  useEffect(() => {
+    if (activeTab === "news") fetchNews();
+  }, [activeTab]);
+
+  async function fetchNews() {
+    try {
+      const items = await getAdminNews();
+      setNewsList(items);
+    } catch { /* ignore */ }
+  }
+
+  async function handleCreateNews() {
+    if (!newsTitle.trim() || !newsBody.trim()) return;
+    setNewsLoading(true);
+    setNewsMsg(null);
+    try {
+      await createNews(newsTitle.trim(), newsBody.trim(), newsPool);
+      setNewsTitle("");
+      setNewsBody("");
+      setNewsPool("all");
+      setNewsMsg("Новость опубликована");
+      await fetchNews();
+    } catch {
+      setNewsMsg("Ошибка публикации");
+    } finally {
+      setNewsLoading(false);
+      setTimeout(() => setNewsMsg(null), 3000);
+    }
+  }
+
+  async function handleDeleteNews(id: string) {
+    if (!confirm("Удалить новость?")) return;
+    try {
+      await deleteNews(id);
+      await fetchNews();
+    } catch { /* ignore */ }
+  }
 
   async function fetchData() {
     try {
@@ -339,6 +385,7 @@ export default function AdminPage() {
     { key: "referrals",   label: `🔗 Реф. (${data.referrals.length})` },
     { key: "trades",      label: "📋 Сделки" },
     ...(!isForex ? [{ key: "ai", label: "🧠 ИИ" }] : []),
+    { key: "news", label: "📰 Новости" },
   ];
 
   return (
@@ -1113,6 +1160,83 @@ export default function AdminPage() {
                 ))}
               </div>
             }
+          </div>
+        )}
+
+        {/* Новости */}
+        {activeTab === "news" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Форма создания */}
+            <div style={{ ...card, padding: 20 }}>
+              <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Новая новость</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <input
+                  value={newsTitle}
+                  onChange={e => setNewsTitle(e.target.value)}
+                  placeholder="Заголовок"
+                  style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${border}`, borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none" }}
+                />
+                <textarea
+                  value={newsBody}
+                  onChange={e => setNewsBody(e.target.value)}
+                  placeholder="Текст новости..."
+                  rows={4}
+                  style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${border}`, borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <select
+                    value={newsPool}
+                    onChange={e => setNewsPool(e.target.value as "all" | "crypto" | "forex")}
+                    style={{ background: "rgba(5,10,30,0.95)", border: `1px solid ${border}`, borderRadius: 8, padding: "8px 12px", color: "#e0e8ff", fontSize: 13, outline: "none", cursor: "pointer" }}
+                  >
+                    <option value="all">Все пулы</option>
+                    <option value="crypto">Крипто пул</option>
+                    <option value="forex">Форекс пул</option>
+                  </select>
+                  <button
+                    onClick={handleCreateNews}
+                    disabled={newsLoading || !newsTitle.trim() || !newsBody.trim()}
+                    style={{ background: poolColor, color: "#000", fontWeight: 700, fontSize: 13, padding: "8px 20px", borderRadius: 8, border: "none", cursor: "pointer", opacity: (newsLoading || !newsTitle.trim() || !newsBody.trim()) ? 0.5 : 1 }}
+                  >
+                    {newsLoading ? "Публикация..." : "Опубликовать"}
+                  </button>
+                  {newsMsg && <span style={{ fontSize: 13, color: newsMsg.includes("Ошибка") ? "#ff4d4d" : "#22c97a" }}>{newsMsg}</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Список новостей */}
+            <div style={{ ...card, padding: 20 }}>
+              <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Опубликованные новости</h3>
+              {newsList.length === 0
+                ? <p style={{ color: muted, fontSize: 13 }}>Новостей пока нет</p>
+                : <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                  {newsList.map(n => (
+                    <div key={n.id} style={{ padding: "14px 0", borderBottom: `1px solid ${border}`, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                          <span style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{n.title}</span>
+                          <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 600,
+                            background: n.pool_type === "forex" ? "rgba(245,158,11,0.15)" : n.pool_type === "crypto" ? "rgba(68,136,221,0.15)" : "rgba(34,201,122,0.12)",
+                            color: n.pool_type === "forex" ? "#f59e0b" : n.pool_type === "crypto" ? "#4488dd" : "#22c97a" }}>
+                            {n.pool_type === "forex" ? "Форекс" : n.pool_type === "crypto" ? "Крипто" : "Все пулы"}
+                          </span>
+                          <span style={{ color: muted, fontSize: 11 }}>{new Date(n.created_at).toLocaleString("ru")}</span>
+                        </div>
+                        <p style={{ color: muted, fontSize: 13, whiteSpace: "pre-wrap" }}>{n.body}</p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteNews(n.id)}
+                        style={{ color: "#ff4d4d", background: "none", border: "none", cursor: "pointer", padding: 4, flexShrink: 0 }}
+                        title="Удалить"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              }
+            </div>
           </div>
         )}
 
