@@ -519,9 +519,9 @@ export default function DashboardPage() {
         {newsFeed.length > 0 && (
           <div style={{ ...card, padding: 20 }}>
             <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>📰 Новости и события</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: 360, overflowY: "auto", paddingRight: 4 }}>
               {newsFeed.map((n, i) => (
-                <div key={n.id} style={{ padding: "14px 0", borderBottom: i < newsFeed.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none" }}>
+                <div key={n.id} style={{ padding: "14px 0", borderBottom: i < newsFeed.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none", flexShrink: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                     <span style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{n.title}</span>
                     {n.pool_type !== "all" && (
