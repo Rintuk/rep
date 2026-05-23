@@ -45,6 +45,19 @@ const getNextStatusName = (vol: number) => {
   return "следующего статуса";
 };
 
+const getProgressPct = (currentVol: number, nextVol: number | null) => {
+  if (!nextVol || nextVol <= 0) return 100;
+  // Find prev threshold
+  const thresholds = [0, 3000, 3500, 4000, 5000];
+  let prevThreshold = 0;
+  for (let i = thresholds.length - 1; i >= 0; i--) {
+    if (currentVol >= thresholds[i]) { prevThreshold = thresholds[i]; break; }
+  }
+  const range = nextVol - prevThreshold;
+  const progress = currentVol - prevThreshold;
+  return Math.min(100, Math.round((progress / range) * 100));
+};
+
 // ─── Circuit board background ─────────────────────────────────────────────────
 function CircuitBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -525,13 +538,13 @@ export default function DashboardPage() {
                 <>
                   <div style={{ width: "100%", height: 6, background: "rgba(255,255,255,0.05)", borderRadius: 3, overflow: "hidden", marginBottom: 8 }}>
                     <div style={{ 
-                      width: `${Math.min(100, (data.total_volume_usdt / data.next_status_volume) * 100)}%`, 
+                      width: `${getProgressPct(data.total_volume_usdt, data.next_status_volume)}%`, 
                       height: "100%", background: "linear-gradient(90deg, #4488dd, #22c97a)", borderRadius: 3
                     }} />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#4a6a9a" }}>
                     <span>До {getNextStatusName(data.next_status_volume)}</span>
-                    <span>{data.next_status_volume} $</span>
+                    <span>{Math.max(0, (data.next_status_volume ?? 0) - data.total_volume_usdt).toFixed(0)} $ осталось</span>
                   </div>
                 </>
               ) : (

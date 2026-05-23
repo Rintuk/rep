@@ -21,18 +21,22 @@ def _get_status_and_limits(total_volume: float, manual_override: str | None):
             status = "VIP"
         elif total_volume >= STATUS_THRESHOLDS["GOLD"]:
             status = "GOLD"
+        elif total_volume >= STATUS_THRESHOLDS["SILVER"]:
+            status = "SILVER"
         elif total_volume >= STATUS_THRESHOLDS["BRONZE"]:
             status = "BRONZE"
             
     next_vol = None
-    if status == "PARTNER": next_vol = STATUS_THRESHOLDS["BRONZE"]
-    elif status == "BRONZE": next_vol = STATUS_THRESHOLDS["GOLD"]
-    elif status == "GOLD": next_vol = STATUS_THRESHOLDS["VIP"]
+    if status == "PARTNER":  next_vol = STATUS_THRESHOLDS["BRONZE"]
+    elif status == "BRONZE": next_vol = STATUS_THRESHOLDS["SILVER"]
+    elif status == "SILVER": next_vol = STATUS_THRESHOLDS["GOLD"]
+    elif status == "GOLD":   next_vol = STATUS_THRESHOLDS["VIP"]
     
     levels_allowed = 1
-    if status == "BRONZE": levels_allowed = 2
-    elif status == "GOLD": levels_allowed = 3
-    elif status == "VIP": levels_allowed = 5
+    if status == "BRONZE":   levels_allowed = 2
+    elif status == "SILVER": levels_allowed = 2
+    elif status == "GOLD":   levels_allowed = 3
+    elif status == "VIP":    levels_allowed = 5
     
     return status, next_vol, levels_allowed
 
