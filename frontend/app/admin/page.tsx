@@ -34,7 +34,7 @@ interface Overview {
   positions: { symbol: string; amount: number; avg_price: number; current_price: number; value: number }[];
   trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
   ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
-  investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; }[];
+  investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; next_vol?: number; }[];
   referrals: { id: string; email: string; is_active: boolean; referred_by_email: string; investment: number }[];
   pending_users: { id: string; email: string; created_at: string }[];
 }
@@ -1019,9 +1019,24 @@ export default function AdminPage() {
                             </td>
                             <td style={{ padding: "12px 16px" }}>
                               <div style={{ color: "#fff", fontSize: 13 }}>{u.referrals_count} чел.</div>
-                              <div style={{ fontSize: 11, color: u.status ? STATUS_COLORS[u.status] : muted, marginTop: 2 }}>
-                                {u.status ? STATUS_LABELS[u.status] || u.status : "Партнёр"} (Оборот: {u.total_volume ? u.total_volume.toFixed(0) : "0"} $)
+                              <div style={{ fontSize: 11, color: u.status ? STATUS_COLORS[u.status] : muted, marginTop: 2, fontWeight: 500 }}>
+                                {u.status ? STATUS_LABELS[u.status] || u.status : "Партнёр"}
                               </div>
+                              {u.next_vol ? (
+                                <div style={{ marginTop: 6, width: 120 }}>
+                                  <div style={{ fontSize: 9, color: muted, marginBottom: 2, display: "flex", justifyContent: "space-between" }}>
+                                    <span>{u.total_volume ? u.total_volume.toFixed(0) : 0} $</span>
+                                    <span>{u.next_vol} $</span>
+                                  </div>
+                                  <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" }}>
+                                    <div style={{ width: `${Math.min(((u.total_volume || 0) / u.next_vol) * 100, 100)}%`, height: "100%", background: u.status && STATUS_COLORS[u.status] ? STATUS_COLORS[u.status] : "#6b8ab0" }} />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>
+                                  Оборот: {u.total_volume ? u.total_volume.toFixed(0) : "0"} $
+                                </div>
+                              )}
                             </td>
                             <td style={{ padding: "12px 16px", fontSize: 11, color: muted }}>{new Date(u.created_at).toLocaleDateString("ru")}</td>
                             <td style={{ padding: "12px 16px" }}>

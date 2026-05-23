@@ -442,6 +442,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             "ref_income": round(crypto_ref, 2),
             "status": status,
             "total_volume": round(total_volume, 2),
+            "next_vol": next_vol,
         })
 
     pool_profit = round(total_gross_pnl, 2)

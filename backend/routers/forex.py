@@ -154,6 +154,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             "ref_income": round(forex_ref, 2),
             "status": status,
             "total_volume": round(total_volume, 2),
+            "next_vol": next_vol,
         })
 
     admin_income = round(total_admin_pnl, 2) if total_admin_pnl > 0 else 0.0
