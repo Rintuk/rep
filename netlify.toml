@@ -1,0 +1,9 @@
+[build]
+  base    = "frontend"
+  command = "npm run build"
+  publish = "out"
+
+[build.environment]
+  NEXT_PUBLIC_WALLET_ADDRESS = "TWDLBDKEoA8kGdR7bvUkG5f5a2ZLUbvNuw"
+  NEXT_PUBLIC_WALLET_NETWORK = "USDT TRC20"
+  NEXT_PUBLIC_API_URL        = "https://rep-production-cf90.up.railway.app"
