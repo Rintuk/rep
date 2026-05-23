@@ -524,7 +524,11 @@ async def cleanup_demo_snapshots(db: AsyncSession = Depends(get_db)):
             await db.delete(s)
         deleted_snaps = len(bad_snaps)
 
-    # Сбрасываем entry_pool_pnl_pct всем инвесторам → 0
+    # АВТО-МИГРАЦИЯ PNL: фиксируем прибыль всех инвесторов ДО сброса точек входа,
+    # иначе вся накопленная прибыль будет стёрта при обнулении entry_pool_pnl_pct
+    await _migrate_pnl_internal(db)
+
+    # Сбрасываем entry_pool_pnl_pct всем инвесторам → 0 (после фиксации прибыли)
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     for fin in all_fins:
         fin.entry_pool_pnl_pct = 0.0

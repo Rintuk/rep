@@ -518,6 +518,10 @@ async def cleanup_forex_demo_snapshots(db: AsyncSession = Depends(get_db)):
             await db.delete(s)
         deleted_snaps = len(bad_snaps)
 
+    # АВТО-МИГРАЦИЯ PNL: фиксируем форекс-прибыль всех инвесторов ДО сброса точек входа
+    from routers.auth import _migrate_pnl_internal
+    await _migrate_pnl_internal(db)
+
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     for fin in all_fins:
         fin.forex_entry_pool_pnl_pct = 0.0
