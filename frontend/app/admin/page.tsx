@@ -959,7 +959,7 @@ export default function AdminPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640, fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${border}` }}>
-                    {["Email", "Инвестировано", "Выведено", "PnL", "Реф. доход", "Рефералов", "Дата", ""].map((h, i) => (
+                    {["Email", "Инвестировано", "Выведено", "PnL", "Реф. доход", "Рефералы / Статус", "Дата", ""].map((h, i) => (
                       <th key={i} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 500, color: muted }}>{h}</th>
                     ))}
                   </tr>
@@ -982,7 +982,12 @@ export default function AdminPage() {
                             <td style={{ padding: "12px 16px", fontWeight: 600, color: u.ref_income > 0 ? "#f59e0b" : muted }}>
                               {u.ref_income > 0 ? `+${u.ref_income.toFixed(2)} $` : "—"}
                             </td>
-                            <td style={{ padding: "12px 16px", color: "#fff" }}>{u.referrals_count}</td>
+                            <td style={{ padding: "12px 16px" }}>
+                              <div style={{ color: "#fff", fontSize: 13 }}>{u.referrals_count} чел.</div>
+                              <div style={{ fontSize: 11, color: u.status === "VIP" ? "#f59e0b" : u.status === "GOLD" ? "#ffd700" : u.status === "BRONZE" ? "#cd7f32" : muted, marginTop: 2 }}>
+                                {u.status} ({u.total_volume ? u.total_volume.toFixed(0) : "0"} $)
+                              </div>
+                            </td>
                             <td style={{ padding: "12px 16px", fontSize: 11, color: muted }}>{new Date(u.created_at).toLocaleDateString("ru")}</td>
                             <td style={{ padding: "12px 16px" }}>
                               <div style={{ display: "flex", gap: 8 }}>

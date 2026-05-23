@@ -403,6 +403,10 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     total_gross_pnl = 0.0
     total_admin_pnl = 0.0
     investors_table = []
+    from routers.forex import _get_forex_pool_pnl_pct
+    from routers.dashboard import _calc_referral_tree
+    forex_pool_pct = await _get_forex_pool_pnl_pct(db)
+
     for u in investors:
         fin = fins_map.get(u.id)
         inv = fin.investment_usdt if fin else 0.0
@@ -421,13 +425,17 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             admin_fee = POOL_FEE 
             total_admin_pnl += gross_pnl * admin_fee
         
-        # Реф. доход временно опускаем в сводной таблице (он будет считаться динамически в дашборде)
-        ref_income = 0.0
+        status, total_volume, next_vol, crypto_ref, forex_ref, refs_info = await _calc_referral_tree(
+            u.id, db, pool_pnl_pct, forex_pool_pct, fin, u.manual_status_override
+        )
+        
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
             "pnl": pnl, "referrals_count": refs_count,
-            "ref_income": round(ref_income, 2),
+            "ref_income": round(crypto_ref, 2),
+            "status": status,
+            "total_volume": round(total_volume, 2),
         })
 
     pool_profit = round(total_gross_pnl, 2)
