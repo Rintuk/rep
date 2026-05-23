@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MaklerSite — Design Preview</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0A0A0F;
+  --surf:     rgba(255,255,255,0.03);
+  --border:   rgba(255,255,255,0.07);
+  --teal:     #00D4AA;
+  --teal-dim: rgba(0,212,170,0.1);
+  --red:      #FF5C5C;
+  --text:     #E8E8F0;
+  --muted:    #6B6B80;
+  --up:       #00D4AA;
+  --dn:       #FF5C5C;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    linear-gradient(rgba(0,212,170,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,170,0.035) 1px, transparent 1px),
+    radial-gradient(ellipse 700px 500px at 15% 20%, rgba(0,212,170,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 400px at 85% 80%, rgba(99,102,241,0.05) 0%, transparent 70%);
+  background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
+}
+
+/* ── TYPOGRAPHY ───────────────────────────── */
+.display { font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; }
+.label   { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.teal    { color: var(--teal); }
+.muted   { color: var(--muted); }
+.up      { color: var(--up); }
+.dn      { color: var(--dn); }
+
+/* ── GLASS CARD ───────────────────────────── */
+.card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.card-teal {
+  background: rgba(0,212,170,0.05);
+  border: 1px solid rgba(0,212,170,0.15);
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,212,170,0.08);
+}
+
+/* ── NAVBAR ───────────────────────────────── */
+nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.nav-inner {
+  max-width: 1100px; margin: 0 auto;
+  padding: 0 24px;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 17px; letter-spacing: -0.02em; color: #fff;
+  text-decoration: none;
+}
+.logo-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--teal);
+  display: flex; align-items: center; justify-content: center;
+}
+.nav-links { display: flex; gap: 28px; }
+.nav-links a {
+  color: var(--muted); text-decoration: none; font-size: 14px;
+  transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-right { display: flex; align-items: center; gap: 12px; }
+
+/* ── BUTTONS ──────────────────────────────── */
+.btn {
+  border: none; cursor: pointer; border-radius: 10px;
+  font-size: 14px; font-weight: 600;
+  padding: 9px 18px; line-height: 1;
+  transition: opacity 0.15s, transform 0.12s;
+}
+.btn:hover   { opacity: 0.88; transform: translateY(-1px); }
+.btn:active  { transform: translateY(0); }
+.btn-primary { background: var(--teal); color: #0A0A0F; box-shadow: 0 4px 16px rgba(0,212,170,0.28); }
+.btn-ghost   {
+  background: transparent; color: var(--text);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.btn-ghost:hover { border-color: rgba(0,212,170,0.35); background: rgba(0,212,170,0.05); }
+.btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+
+/* ── STATUS DOT ───────────────────────────── */
+.dot-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--muted);
+}
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--teal);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:.4; transform:scale(.8); }
+}
+
+/* ── TAG ──────────────────────────────────── */
+.tag {
+  display: inline-block;
+  background: rgba(0,212,170,0.1);
+  border: 1px solid rgba(0,212,170,0.25);
+  color: var(--teal);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+
+/* ── LAYOUT ───────────────────────────────── */
+.container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+/* ── HERO ─────────────────────────────────── */
+.hero { padding: 56px 0 32px; }
+.hero h1 { font-size: clamp(32px, 5vw, 48px); }
+.hero p { font-size: 17px; line-height: 1.7; color: var(--muted); margin: 16px 0 28px; max-width: 520px; }
+.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* ── STATS GRID ───────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 8px 0 16px;
+}
+.stat-card { padding: 18px 20px; }
+.stat-card .val { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; margin: 4px 0 2px; }
+.stat-card .chg { font-size: 12px; }
+
+/* ── DASHBOARD CARD ───────────────────────── */
+.dash { padding: 24px; margin-bottom: 14px; }
+.dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.dash-header h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.dash-body { display: grid; grid-template-columns: 1fr 220px; gap: 20px; }
+
+.big-num { font-size: 34px; font-weight: 700; letter-spacing: -0.04em; }
+
+/* Mini chart */
+.chart-bars { display: flex; align-items: flex-end; gap: 4px; height: 56px; margin-top: 16px; }
+.bar {
+  flex: 1; border-radius: 4px 4px 0 0;
+  background: rgba(0,212,170,0.14);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.bar:hover, .bar.active { background: rgba(0,212,170,0.55); }
+
+/* Side stats */
+.side-stats { display: flex; flex-direction: column; gap: 10px; }
+.mini-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.mini-card .lbl { font-size: 11px; color: var(--muted); }
+.mini-card .num { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; }
+
+/* Trades table */
+.trades-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 20px 0 10px; }
+.trades-table { border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; }
+.trade-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.12s;
+}
+.trade-row:last-child { border-bottom: none; }
+.trade-row:hover { background: rgba(255,255,255,0.02); }
+.trade-left  { display: flex; align-items: center; gap: 10px; }
+.trade-sym   { font-size: 14px; font-weight: 500; }
+.trade-route { font-size: 12px; color: var(--muted); }
+.trade-pnl   { font-size: 14px; font-weight: 600; }
+.tag-sell {
+  display: inline-block;
+  background: rgba(255,92,92,0.1);
+  border: 1px solid rgba(255,92,92,0.25);
+  color: var(--red);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+
+/* ── REFERRAL CARD ────────────────────────── */
+.ref-card { padding: 24px; }
+.ref-card h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+.ref-card p  { font-size: 14px; line-height: 1.7; color: var(--muted); margin-bottom: 16px; }
+.ref-body { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; }
+.ref-link-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(0,212,170,0.05);
+  border: 1px solid rgba(0,212,170,0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.ref-link { font-size: 13px; font-family: monospace; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ref-nums { display: flex; gap: 10px; }
+.ref-num { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 16px; text-align: center; min-width: 70px; }
+.ref-num .n { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.ref-num .l { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* ── ANIMATIONS ───────────────────────────── */
+.fade-up { animation: fadeUp 0.55s cubic-bezier(.22,1,.36,1) both; }
+.d1 { animation-delay: .05s; }
+.d2 { animation-delay: .12s; }
+.d3 { animation-delay: .20s; }
+.d4 { animation-delay: .28s; }
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(14px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ── MOBILE NAV ───────────────────────────── */
+.mobile-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  background: rgba(12,12,18,0.96);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px);
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+}
+.mobile-nav-inner { display: flex; justify-content: space-around; }
+.nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 16px; border: none; background: none; cursor: pointer; color: var(--muted); transition: color 0.15s; }
+.nav-btn.active { color: var(--teal); }
+.nav-btn span { font-size: 10px; font-weight: 500; }
+
+/* ── HAMBURGER ────────────────────────────── */
+.hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 4px; }
+.hamburger span { display: block; width: 20px; height: 2px; background: var(--muted); border-radius: 2px; }
+
+/* ── RESPONSIVE ───────────────────────────── */
+@media (max-width: 768px) {
+  .nav-links, .nav-right { display: none; }
+  .hamburger { display: flex; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .dash-body { grid-template-columns: 1fr; }
+  .side-stats { flex-direction: row; }
+  .mini-card { flex: 1; }
+  .ref-body { grid-template-columns: 1fr; }
+  .ref-nums { justify-content: flex-start; }
+  .trade-route { display: none; }
+  .mobile-nav { display: block; }
+  body { padding-bottom: 80px; }
+  .hero { padding: 36px 0 24px; }
+}
+@media (max-width: 400px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .container { padding: 0 16px; }
+  .side-stats { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="logo">
+      <div class="logo-icon">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M2 10L5 6.5L8 8.5L12 3" stroke="#0A0A0F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      Makler<span class="teal">.</span>
+    </a>
+    <div class="nav-links">
+      <a href="#">Портфель</a>
+      <a href="#">Рефералы</a>
+      <a href="#">История</a>
+    </div>
+    <div class="nav-right">
+      <div class="dot-live">
+        <span class="dot"></span>
+        Бот активен
+      </div>
+      <button class="btn btn-ghost">Войти</button>
+      <button class="btn btn-primary">Регистрация</button>
+    </div>
+    <button class="hamburger">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero container fade-up d1">
+  <div class="tag" style="margin-bottom:16px">Алго-трейдинг · Bybit</div>
+  <h1 class="display">
+    Торговый бот<br>
+    <span class="teal">работает за вас</span>
+  </h1>
+  <p>Алгоритмическая торговля криптовалютами. Вы получаете 77% прибыли — бот берёт остальное.</p>
+  <div class="hero-actions">
+    <button class="btn btn-primary">Начать инвестировать</button>
+    <button class="btn btn-ghost">Демо-режим →</button>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="container">
+  <div class="stats-grid">
+    <div class="card stat-card fade-up d1">
+      <div class="label">Баланс пула</div>
+      <div class="val display">$50 088</div>
+      <div class="chg up">+2.1% за неделю</div>
+    </div>
+    <div class="card stat-card fade-up d2">
+      <div class="label">Доходность</div>
+      <div class="val display up">+8.4%</div>
+      <div class="chg muted">с начала месяца</div>
+    </div>
+    <div class="card stat-card fade-up d3">
+      <div class="label">Сделок</div>
+      <div class="val display">2 847</div>
+      <div class="chg muted">Win rate 64%</div>
+    </div>
+    <div class="card-teal stat-card fade-up d4">
+      <div class="label">Ваша доля</div>
+      <div class="val display teal">77%</div>
+      <div class="chg muted">от прибыли пула</div>
+    </div>
+  </div>
+</section>
+
+<!-- PORTFOLIO DASHBOARD -->
+<section class="container fade-up d2">
+  <div class="card dash">
+    <div class="dash-header">
+      <h2>Ваш портфель</h2>
+      <div class="dot-live"><span class="dot"></span> Live</div>
+    </div>
+    <div class="dash-body">
+      <div>
+        <div class="label">Вложено</div>
+        <div class="big-num" style="margin-top:6px">$1 000.00</div>
+        <div class="up" style="font-size:14px;margin-top:4px">+$77.00 · +7.7% ваша прибыль</div>
+        <div class="chart-bars">
+          <div class="bar" style="height:40%"></div>
+          <div class="bar" style="height:55%"></div>
+          <div class="bar" style="height:35%"></div>
+          <div class="bar" style="height:70%"></div>
+          <div class="bar" style="height:50%"></div>
+          <div class="bar" style="height:80%"></div>
+          <div class="bar" style="height:60%"></div>
+          <div class="bar active" style="height:100%"></div>
+          <div class="bar" style="height:72%"></div>
+          <div class="bar" style="height:88%"></div>
+          <div class="bar" style="height:65%"></div>
+          <div class="bar" style="height:78%"></div>
+        </div>
+        <div class="trades-title">Последние сделки</div>
+        <div class="trades-table">
+          <div class="trade-row">
+            <div class="trade-left">
+              <span class="tag">BUY</span>
+              <span class="trade-sym">BTCUSDT</span>
+              <span class="trade-route">78 092 → 78 212</span>
+            </div>
+            <span class="trade-pnl up">+$0.104</span>
+          </div>
+          <div class="trade-row">
+            <div class="trade-left">
+              <span class="tag-sell">SELL</span>
+              <span class="trade-sym">BTCUSDT</span>
+              <span class="trade-route">78 200 → 78 251</span>
+            </div>
+            <span class="trade-pnl dn">-$0.094</span>
+          </div>
+          <div class="trade-row">
+            <div class="trade-left">
+              <span class="tag">BUY</span>
+              <span class="trade-sym">BTCUSDT</span>
+              <span class="trade-route">77 996 → 77 876</span>
+            </div>
+            <span class="trade-pnl up">+$0.104</span>
+          </div>
+        </div>
+      </div>
+      <div class="side-stats">
+        <div class="mini-card">
+          <div class="lbl">Реф. бонус</div>
+          <div class="num">$12.40</div>
+        </div>
+        <div class="mini-card">
+          <div class="lbl">Рефералов</div>
+          <div class="num">3 / 3</div>
+        </div>
+        <div class="mini-card">
+          <div class="lbl">Drawdown</div>
+          <div class="num up">0.00%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REFERRAL -->
+<section class="container fade-up d3" style="margin-bottom: 20px">
+  <div class="card ref-card">
+    <h2>Реферальная программа</h2>
+    <p>Приглашайте друзей и получайте <span class="teal" style="font-weight:600">3%</span> от их прибыли автоматически.</p>
+    <div class="ref-body">
+      <div>
+        <div class="ref-link-row">
+          <span class="ref-link">makler.app/ref/a8f3k2</span>
+          <button class="btn btn-primary btn-sm">Копировать</button>
+        </div>
+      </div>
+      <div class="ref-nums">
+        <div class="ref-num">
+          <div class="n">3</div>
+          <div class="l">Рефералов</div>
+        </div>
+        <div class="ref-num">
+          <div class="n teal">$12</div>
+          <div class="l">Бонус</div>
+        </div>
+        <div class="ref-num">
+          <div class="n">3%</div>
+          <div class="l">С прибыли</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MOBILE BOTTOM NAV -->
+<div class="mobile-nav">
+  <div class="mobile-nav-inner">
+    <button class="nav-btn active">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="10" width="7" height="8" rx="1.5" fill="currentColor" opacity="0.9"/>
+        <rect x="11" y="2" width="7" height="16" rx="1.5" fill="currentColor"/>
+      </svg>
+      <span>Портфель</span>
+    </button>
+    <button class="nav-btn">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M10 7v3l2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span>История</span>
+    </button>
+    <button class="nav-btn">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M10 2C7.24 2 5 4.24 5 7c0 3.93 5 11 5 11s5-7.07 5-11c0-2.76-2.24-5-5-5zm0 6.5A1.5 1.5 0 1110 5.5a1.5 1.5 0 010 3z" fill="currentColor"/>
+      </svg>
+      <span>Рефералы</span>
+    </button>
+    <button class="nav-btn">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M4 17c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span>Профиль</span>
+    </button>
+  </div>
+</div>
+
+</body>
+</html>

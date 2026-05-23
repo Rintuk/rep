@@ -38,9 +38,13 @@ async def my_tickets(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(SupportTicket).order_by(SupportTicket.created_at.desc()) \
-        if user.is_admin else \
-        select(SupportTicket).where(SupportTicket.user_id == user.id).order_by(SupportTicket.created_at.desc())
+    # Администратор видит все тикеты, инвестор — только свои
+    if user.is_admin:
+        query = select(SupportTicket).order_by(SupportTicket.created_at.desc())
+    else:
+        query = select(SupportTicket).where(
+            SupportTicket.user_id == user.id
+        ).order_by(SupportTicket.created_at.desc())
 
     tickets = (await db.execute(query)).scalars().all()
 
