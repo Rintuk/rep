@@ -7,10 +7,109 @@ from models import (BotSnapshot, Position, Trade, AIFeedEntry, UserFinancials, U
                     ForexBotSnapshot, ForexPosition, ForexTrade, NewsItem)
 from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo, NewsItemOut
 from security import get_current_user
-from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
+from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS
 from routers.forex import _forex_net_invested_override
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
+
+def _get_status_and_limits(total_volume: float, manual_override: str | None):
+    if manual_override and manual_override in STATUS_THRESHOLDS:
+        status = manual_override
+    else:
+        status = "PARTNER"
+        if total_volume >= STATUS_THRESHOLDS["VIP"]:
+            status = "VIP"
+        elif total_volume >= STATUS_THRESHOLDS["GOLD"]:
+            status = "GOLD"
+        elif total_volume >= STATUS_THRESHOLDS["BRONZE"]:
+            status = "BRONZE"
+            
+    next_vol = None
+    if status == "PARTNER": next_vol = STATUS_THRESHOLDS["BRONZE"]
+    elif status == "BRONZE": next_vol = STATUS_THRESHOLDS["GOLD"]
+    elif status == "GOLD": next_vol = STATUS_THRESHOLDS["VIP"]
+    
+    levels_allowed = 1
+    if status == "BRONZE": levels_allowed = 2
+    elif status == "GOLD": levels_allowed = 3
+    elif status == "VIP": levels_allowed = 5
+    
+    return status, next_vol, levels_allowed
+
+async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: float, forex_pool_pct: float, my_fin: UserFinancials | None, manual_override: str | None):
+    all_users = (await db.execute(select(User))).scalars().all()
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    fins_map = {f.user_id: f for f in all_fins}
+    
+    children_map = {}
+    for u in all_users:
+        if u.referred_by:
+            children_map.setdefault(u.referred_by, []).append(u)
+            
+    my_inv = my_fin.investment_usdt if my_fin else 0.0
+    my_fx = my_fin.forex_investment_usdt if my_fin else 0.0
+    total_volume = my_inv + my_fx
+    
+    queue = [(user_id, 1)]
+    crypto_bonus = 0.0
+    forex_bonus = 0.0
+    refs_info = []
+    
+    # BFS для подсчета total_volume
+    q = [user_id]
+    while q:
+        curr = q.pop(0)
+        for child in children_map.get(curr, []):
+            if child.is_active:
+                f = fins_map.get(child.id)
+                if f:
+                    total_volume += f.investment_usdt + f.forex_investment_usdt
+                q.append(child.id)
+                
+    status, next_vol, levels_allowed = _get_status_and_limits(total_volume, manual_override)
+    
+    # BFS для подсчета бонусов до 5 уровней
+    queue = [(user_id, 1)]
+    while queue:
+        curr, depth = queue.pop(0)
+        if depth > 5:
+            continue
+            
+        for child in children_map.get(curr, []):
+            if not child.is_active:
+                continue
+            
+            f = fins_map.get(child.id)
+            inv = f.investment_usdt if f else 0.0
+            fx = f.forex_investment_usdt if f else 0.0
+            
+            # Crypto bonus
+            cb = 0.0
+            if inv > 0 and depth <= levels_allowed and depth in REF_FEES:
+                ref_entry = f.entry_pool_pnl_pct if f else 0.0
+                incr = crypto_pool_pct - ref_entry
+                if incr > 0:
+                    cb = inv * (incr / 100) * REF_FEES[depth]
+                    crypto_bonus += cb
+            
+            # Forex bonus
+            fb = 0.0
+            if fx > 0 and depth <= levels_allowed and depth in REF_FEES:
+                fx_entry = f.forex_entry_pool_pnl_pct if f else 0.0
+                fx_incr = forex_pool_pct - fx_entry
+                if fx_incr > 0:
+                    fb = fx * (fx_incr / 100) * REF_FEES[depth]
+                    forex_bonus += fb
+                    
+            if cb > 0 or fb > 0 or depth == 1:
+                parts = child.email.split("@")
+                masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else child.email
+                refs_info.append(ReferralInfo(email=masked, investment_usdt=inv + fx, bonus_usdt=cb + fb, level=depth))
+            
+            queue.append((child.id, depth + 1))
+            
+    return status, total_volume, next_vol, crypto_bonus, forex_bonus, refs_info
+
 
 @router.get("/news", response_model=list[NewsItemOut])
 async def get_news(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -82,28 +181,13 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         entry_pnl_pct = fin.entry_pool_pnl_pct if fin else 0.0
         incremental_pnl_pct = pool_pnl_pct - entry_pnl_pct
         gross_pnl = user_investment * (incremental_pnl_pct / 100) if user_investment > 0 else 0.0
-        user_pnl = round(gross_pnl * INVESTOR_SHARE, 2)
+        locked_crypto_pnl = fin.locked_crypto_pnl if fin else 0.0
+        user_pnl = round(gross_pnl * INVESTOR_SHARE + locked_crypto_pnl, 2)
         user_pnl_pct = round(incremental_pnl_pct * INVESTOR_SHARE, 2)
 
+        # Бонусы посчитаем позже вместе с форексом
+
         ref_bonus = 0.0
-        referrals_info: list[ReferralInfo] = []
-        all_referrals = (await db.execute(
-            select(User).where(User.referred_by == user.id, User.is_active == True)
-        )).scalars().all()
-        referrer_qualifies = user_investment >= MIN_REF_INVESTMENT
-        for ref in all_referrals:
-            ref_fin = (await db.execute(
-                select(UserFinancials).where(UserFinancials.user_id == ref.id)
-            )).scalar_one_or_none()
-            ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
-            ref_entry_pct = ref_fin.entry_pool_pnl_pct if ref_fin else 0.0
-            ref_incremental_pct = pool_pnl_pct - ref_entry_pct
-            bonus = ref_inv * (ref_incremental_pct / 100) * L1_REF_FEE if (ref_incremental_pct > 0 and referrer_qualifies) else 0.0
-            ref_bonus += bonus
-            parts = ref.email.split("@")
-            masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else ref.email
-            referrals_info.append(ReferralInfo(email=masked, investment_usdt=ref_inv, bonus_usdt=bonus))
-        ref_bonus = round(ref_bonus, 2)
 
     # ── Форекс пул ────────────────────────────────────────────────
     forex_snap = (await db.execute(
@@ -141,7 +225,8 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         forex_entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
         forex_incremental = forex_pool_pnl_pct - forex_entry_pct
         forex_gross = forex_investment * (forex_incremental / 100) if forex_investment > 0 else 0.0
-        forex_pnl = round(forex_gross * INVESTOR_SHARE, 2)
+        locked_forex_pnl = fin.locked_forex_pnl if fin else 0.0
+        forex_pnl = round(forex_gross * INVESTOR_SHARE + locked_forex_pnl, 2)
         forex_pnl_pct = round(forex_incremental * INVESTOR_SHARE, 2)
 
         forex_positions_out = [
@@ -164,29 +249,13 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             if len(forex_trades_out) >= 15:
                 break
 
-    forex_ref_bonus = 0.0
-    if forex_snap and forex_investment >= MIN_REF_INVESTMENT:
-        _override2 = _forex_net_invested_override()
-        fx_net_inv = _override2 if _override2 > 0 else (
-            forex_snap.net_invested if forex_snap.net_invested > 0 else (
-                forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
-            )
-        )
-        if fx_net_inv > 0:
-            fx_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4)
-            all_forex_refs = (await db.execute(
-                select(User).where(User.referred_by == user.id, User.is_active == True)
-            )).scalars().all()
-            for ref in all_forex_refs:
-                ref_fin = (await db.execute(
-                    select(UserFinancials).where(UserFinancials.user_id == ref.id)
-                )).scalar_one_or_none()
-                ref_inv = ref_fin.forex_investment_usdt if ref_fin else 0.0
-                ref_entry = ref_fin.forex_entry_pool_pnl_pct if ref_fin else 0.0
-                ref_incr = fx_pool_pnl_pct - ref_entry
-                if ref_inv > 0 and ref_incr > 0:
-                    forex_ref_bonus += ref_inv * (ref_incr / 100) * L1_REF_FEE
-    forex_ref_bonus = round(forex_ref_bonus, 2)
+    # Расчет статусов и бонусов (общий для крипты и форекса)
+    status, total_volume, next_vol, crypto_ref, forex_ref, refs_info = await _calc_referral_tree(
+        user.id, db, pool_pnl_pct, forex_pool_pnl_pct, fin, user.manual_status_override
+    )
+    
+    ref_bonus = round(crypto_ref, 2)
+    forex_ref_bonus = round(forex_ref, 2)
 
     return DashboardOut(
         balance_usdt=snap.balance_usdt if snap else 0.0,
@@ -198,7 +267,8 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         server_online=server_online,
         last_updated=snap.timestamp.isoformat() if snap else None,
         user_investment=user_investment, user_pnl=user_pnl, user_pnl_pct=user_pnl_pct,
-        ref_bonus=ref_bonus, referral_code=user.referral_code, referrals=referrals_info,
+        status=status, total_volume_usdt=round(total_volume, 2), next_status_volume=next_vol,
+        ref_bonus=ref_bonus, referral_code=user.referral_code, referrals=refs_info,
         positions=[PositionOut(symbol=p.symbol, amount=p.amount, avg_price=p.avg_price,
                                current_price=p.current_price if p.current_price > 0 else p.avg_price)
                    for p in positions],

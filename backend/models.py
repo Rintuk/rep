@@ -20,6 +20,7 @@ class User(Base):
     referral_code:  Mapped[str]  = mapped_column(String, unique=True, default=gen_uuid)
     referred_by:    Mapped[str | None] = mapped_column(String, ForeignKey("users.id"), nullable=True)
     referral_limit: Mapped[int]  = mapped_column(Integer, default=3)
+    manual_status_override: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     created_at:     Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     referrals:             Mapped[list["User"]]                  = relationship("User", foreign_keys=[referred_by])
@@ -36,10 +37,12 @@ class UserFinancials(Base):
     investment_usdt:        Mapped[float] = mapped_column(Float, default=0.0)
     withdrawal_usdt:        Mapped[float] = mapped_column(Float, default=0.0)
     entry_pool_pnl_pct:     Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    locked_crypto_pnl:      Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     # Форекс пул
     forex_investment_usdt:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     forex_withdrawal_usdt:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     forex_entry_pool_pnl_pct: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    locked_forex_pnl:       Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
 
     note:       Mapped[str]      = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

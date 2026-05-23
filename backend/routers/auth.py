@@ -6,7 +6,7 @@ from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEnt
 from schemas import RegisterIn, LoginIn, TokenOut, NewsItemCreate, NewsItemOut
 from security import hash_password, verify_password, create_access_token, get_admin_user, get_current_user
 from datetime import datetime, timedelta
-from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
+from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -361,27 +361,17 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             entry_pct = fin.entry_pool_pnl_pct if fin else 0.0
             incremental = pool_pnl_pct - entry_pct
             gross_pnl = inv * (incremental / 100)
-            pnl = round(gross_pnl * INVESTOR_SHARE, 2)
+            pnl = round(gross_pnl * INVESTOR_SHARE + fin.locked_crypto_pnl, 2)
             total_gross_pnl += gross_pnl
-            has_referrer = u.referred_by is not None and any(
-                x.id == u.referred_by and x.is_active and not x.is_admin
-                and (fins_map[x.id].investment_usdt if x.id in fins_map else 0.0) >= MIN_REF_INVESTMENT
-                for x in all_users
-            )
-            admin_fee = POOL_FEE if has_referrer else POOL_FEE + L1_REF_FEE
+            
+            # Временно упрощаем для админской статы: 
+            # Админ получает POOL_FEE (20%) со всех. 
+            # Невыплаченные реферальные % из оставшихся 5% тоже идут админу, но для простоты здесь пока оставим базовые 20%
+            admin_fee = POOL_FEE 
             total_admin_pnl += gross_pnl * admin_fee
-        # Реф. доход: 3% от прибыли приглашённых (если сам квалифицирован)
+        
+        # Реф. доход временно опускаем в сводной таблице (он будет считаться динамически в дашборде)
         ref_income = 0.0
-        if inv >= MIN_REF_INVESTMENT and snap and net_invested_pool > 0:
-            for ref_user in all_users:
-                if ref_user.referred_by != u.id or not ref_user.is_active:
-                    continue
-                ref_fin = fins_map.get(ref_user.id)
-                ref_inv = ref_fin.investment_usdt if ref_fin else 0.0
-                ref_entry = ref_fin.entry_pool_pnl_pct if ref_fin else 0.0
-                ref_incr = pool_pnl_pct - ref_entry
-                if ref_inv > 0 and ref_incr > 0:
-                    ref_income += ref_inv * (ref_incr / 100) * L1_REF_FEE
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
@@ -544,6 +534,92 @@ async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
     await db.delete(user)
     await db.commit()
     return {"status": "deleted"}
+
+
+@router.get("/admin/backup-db", dependencies=[Depends(get_admin_user)])
+async def backup_db(db: AsyncSession = Depends(get_db)):
+    """Создает бэкап пользователей и их финансов в формате JSON."""
+    users = (await db.execute(select(User))).scalars().all()
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    
+    backup_data = []
+    fins_map = {f.user_id: f for f in fins}
+    
+    for u in users:
+        f = fins_map.get(u.id)
+        backup_data.append({
+            "id": u.id, "email": u.email, "is_admin": u.is_admin, "referral_code": u.referral_code,
+            "referred_by": u.referred_by, "is_active": u.is_active,
+            "financials": {
+                "investment_usdt": f.investment_usdt if f else 0,
+                "entry_pool_pnl_pct": f.entry_pool_pnl_pct if f else 0,
+                "locked_crypto_pnl": f.locked_crypto_pnl if f else 0,
+                "forex_investment_usdt": f.forex_investment_usdt if f else 0,
+                "forex_entry_pool_pnl_pct": f.forex_entry_pool_pnl_pct if f else 0,
+                "locked_forex_pnl": f.locked_forex_pnl if f else 0
+            } if f else None
+        })
+    return {"timestamp": datetime.utcnow().isoformat(), "users_count": len(users), "data": backup_data}
+
+
+@router.post("/admin/migrate-pnl", dependencies=[Depends(get_admin_user)])
+async def migrate_pnl(db: AsyncSession = Depends(get_db)):
+    """
+    Фиксирует историческую прибыль всех инвесторов по старой ставке 77% (0.77).
+    Сбрасывает точки входа (entry_pool_pnl_pct) на текущие проценты пулов.
+    Защищает прибыль от ретроспективного урезания при переходе на 75%.
+    """
+    # 1. Получаем текущие PnL пулов
+    crypto_pool_pct = await _get_pool_pnl_pct(db)
+    
+    # 2. Получаем форекс PnL пула
+    from models import ForexBotSnapshot
+    forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+    forex_pool_pct = 0.0
+    if forex_snap:
+        from routers.forex import _forex_net_invested_override
+        fx_net_inv = _forex_net_invested_override()
+        if fx_net_inv <= 0:
+            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+        if fx_net_inv > 0:
+            forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
+
+    # 3. Фиксируем прибыль
+    OLD_SHARE = 0.77
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    updated = 0
+    total_crypto_locked = 0.0
+    
+    for f in all_fins:
+        # Crypto
+        if f.investment_usdt > 0:
+            incr = crypto_pool_pct - f.entry_pool_pnl_pct
+            gross = f.investment_usdt * (incr / 100)
+            user_profit = round(gross * OLD_SHARE, 2)
+            if user_profit > 0:
+                f.locked_crypto_pnl += user_profit
+                total_crypto_locked += user_profit
+        f.entry_pool_pnl_pct = crypto_pool_pct
+        
+        # Forex
+        if f.forex_investment_usdt > 0:
+            fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
+            fx_gross = f.forex_investment_usdt * (fx_incr / 100)
+            fx_user_profit = round(fx_gross * OLD_SHARE, 2)
+            if fx_user_profit > 0:
+                f.locked_forex_pnl += fx_user_profit
+        f.forex_entry_pool_pnl_pct = forex_pool_pct
+        
+        updated += 1
+        
+    await db.commit()
+    return {
+        "status": "success", 
+        "updated_investors": updated, 
+        "total_crypto_locked": round(total_crypto_locked, 2),
+        "new_crypto_entry_pct": crypto_pool_pct,
+        "new_forex_entry_pct": forex_pool_pct
+    }
 
 
 # ── Заявки на пополнение депозита ─────────────────────────────

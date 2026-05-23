@@ -7,7 +7,7 @@ from models import (User, UserFinancials, ForexBotSnapshot, ForexPosition, Forex
                     DepositRequest, WithdrawalRequest)
 from security import get_admin_user, get_current_user
 from datetime import datetime, timedelta
-from constants import INVESTOR_SHARE, POOL_FEE, L1_REF_FEE, MIN_REF_INVESTMENT
+from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS
 
 router = APIRouter(prefix="/auth", tags=["forex"])
 
@@ -131,29 +131,14 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             gross_pnl = inv * (incremental / 100)
             pnl = round(gross_pnl * INVESTOR_SHARE, 2)
             total_gross_pnl += gross_pnl
-            has_referrer = u.referred_by is not None and any(
-                x.id == u.referred_by and x.is_active and not x.is_admin
-                and (fins_map[x.id].forex_investment_usdt if x.id in fins_map else 0.0) >= MIN_REF_INVESTMENT
-                for x in all_users
-            )
-            admin_fee = POOL_FEE if has_referrer else POOL_FEE + L1_REF_FEE
+            admin_fee = POOL_FEE
             total_admin_pnl += gross_pnl * admin_fee
+            
         ref_income = 0.0
-        if inv >= MIN_REF_INVESTMENT and snap and net_invested_pool > 0:
-            for ref_user in all_users:
-                if ref_user.referred_by != u.id or not ref_user.is_active:
-                    continue
-                ref_fin = fins_map.get(ref_user.id)
-                ref_inv = ref_fin.forex_investment_usdt if ref_fin else 0.0
-                ref_entry = ref_fin.forex_entry_pool_pnl_pct if ref_fin else 0.0
-                ref_incr = pool_pnl_pct - ref_entry
-                if ref_inv > 0 and ref_incr > 0:
-                    ref_income += ref_inv * (ref_incr / 100) * L1_REF_FEE
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.forex_withdrawal_usdt if fin else 0.0,
             "pnl": pnl, "referrals_count": refs_count,
-            "ref_income": round(ref_income, 2),
         })
 
     admin_income = round(total_admin_pnl, 2) if total_admin_pnl > 0 else 0.0

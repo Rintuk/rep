@@ -79,6 +79,7 @@ class ReferralInfo(BaseModel):
     email: str          # замаскированный email
     investment_usdt: float
     bonus_usdt: float   # сколько реферер зарабатывает с этого человека
+    level: int = 1      # уровень вложенности
 
 class SupportTicketCreate(BaseModel):
     subject: str
@@ -130,6 +131,9 @@ class DashboardOut(BaseModel):
     user_investment: float
     user_pnl: float
     user_pnl_pct: float
+    status: str = "PARTNER"
+    total_volume_usdt: float = 0.0
+    next_status_volume: float | None = None
     ref_bonus: float = 0.0
     referral_code: str = ""
     referrals: list[ReferralInfo] = []
