@@ -38,14 +38,9 @@ async def my_tickets(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Администратор видит все тикеты, инвестор — только свои
-    if user.is_admin:
-        query = select(SupportTicket).order_by(SupportTicket.created_at.desc())
-    else:
-        query = select(SupportTicket).where(
-            SupportTicket.user_id == user.id
-        ).order_by(SupportTicket.created_at.desc())
-
+    # Все пользователи видят всю историю тикетов платформы.
+    # Email владельца тикета отображается только администраторам.
+    query = select(SupportTicket).order_by(SupportTicket.created_at.desc())
     tickets = (await db.execute(query)).scalars().all()
 
     result = []
@@ -66,6 +61,7 @@ async def my_tickets(
             user_email=email,
         ))
     return result
+
 
 
 @router.post("/support/mark-read")
