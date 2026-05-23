@@ -108,6 +108,10 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             
             queue.append((child.id, depth + 1))
             
+    if my_fin:
+        crypto_bonus += my_fin.locked_crypto_ref_bonus
+        forex_bonus += my_fin.locked_forex_ref_bonus
+            
     return status, total_volume, next_vol, crypto_bonus, forex_bonus, refs_info
 
 

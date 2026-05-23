@@ -43,6 +43,10 @@ class UserFinancials(Base):
     forex_withdrawal_usdt:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     forex_entry_pool_pnl_pct: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     locked_forex_pnl:       Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    
+    # Зафиксированный исторический реферальный доход
+    locked_crypto_ref_bonus: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    locked_forex_ref_bonus:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
 
     note:       Mapped[str]      = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

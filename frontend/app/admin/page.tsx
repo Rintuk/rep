@@ -809,6 +809,38 @@ export default function AdminPage() {
                   </button>
                 </div>
 
+                {/* Восстановление реф. дохода */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(34,201,122,0.3)", marginTop: 16 }}>
+                  <div>
+                    <p style={{ color: "#22c97a", fontSize: 13, fontWeight: 600 }}>👥 Восстановление Реф. Дохода</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Загрузите backup.json чтобы восстановить потерянный реф. доход.</p>
+                  </div>
+                  <label style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: "rgba(13,68,34,0.8)", color: "#22c97a", cursor: "pointer", border: "1px solid rgba(34,201,122,0.3)", whiteSpace: "nowrap" }}>
+                    Загрузить Backup
+                    <input type="file" accept=".json" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (!confirm("Восстановить реферальный доход из этого бэкапа?")) return;
+                      try {
+                        const formData = new FormData();
+                        formData.append("backup_file", file);
+                        const token = localStorage.getItem("access_token");
+                        const res = await fetch("https://api.makler-site.ru/api/auth/admin/restore-ref-bonus", {
+                          method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.status === "success") {
+                          alert("Успешно!\nОбновлено инвесторов: " + data.updated);
+                          fetchData();
+                        } else alert("Ошибка: " + (data.detail || JSON.stringify(data)));
+                      } catch (err: any) { alert("Ошибка: " + err.message); }
+                      finally { e.target.value = ""; }
+                    }} style={{ display: "none" }} />
+                  </label>
+                </div>
+
                 {/* Очистка демо */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                   padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,77,77,0.15)" }}>

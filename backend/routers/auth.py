@@ -680,6 +680,93 @@ async def migrate_pnl(db: AsyncSession = Depends(get_db)):
         "new_forex_entry_pct": forex_pool_pct
     }
 
+from fastapi import UploadFile, File
+import json
+
+@router.post("/admin/restore-ref-bonus", dependencies=[Depends(get_admin_user)])
+async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+    content = await backup_file.read()
+    try:
+        backup = json.loads(content)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Неверный JSON файл")
+        
+    data = backup.get("data", [])
+    backup_fins = {f["user_id"]: f for f in data}
+    
+    crypto_pool_pct = await _get_pool_pnl_pct(db)
+    from routers.forex import _get_forex_pool_pnl_pct
+    forex_pool_pct = await _get_forex_pool_pnl_pct(db)
+    
+    all_users = (await db.execute(select(User))).scalars().all()
+    children_map = {}
+    for u in all_users:
+        if u.referred_by:
+            children_map.setdefault(u.referred_by, []).append(u)
+            
+    all_fins_db = (await db.execute(select(UserFinancials))).scalars().all()
+    fins_db_map = {f.user_id: f for f in all_fins_db}
+    
+    updated = 0
+    from routers.dashboard import _get_status_and_limits
+    from constants import REF_FEES
+    
+    for u in all_users:
+        fin_db = fins_db_map.get(u.id)
+        if not fin_db: continue
+        
+        my_inv = backup_fins.get(u.id, {}).get("investment_usdt", fin_db.investment_usdt)
+        my_fx = backup_fins.get(u.id, {}).get("forex_investment_usdt", fin_db.forex_investment_usdt)
+        total_volume = my_inv + my_fx
+        
+        q = [u.id]
+        while q:
+            curr = q.pop(0)
+            for child in children_map.get(curr, []):
+                if child.is_active:
+                    child_f = backup_fins.get(child.id, {})
+                    total_volume += child_f.get("investment_usdt", 0) + child_f.get("forex_investment_usdt", 0)
+                    q.append(child.id)
+                    
+        status, next_vol, levels_allowed = _get_status_and_limits(total_volume, u.manual_status_override)
+        
+        crypto_bonus = 0.0
+        forex_bonus = 0.0
+        
+        queue = [(u.id, 1)]
+        while queue:
+            curr, depth = queue.pop(0)
+            if depth > 5: continue
+            
+            for child in children_map.get(curr, []):
+                if not child.is_active: continue
+                child_f = backup_fins.get(child.id, {})
+                
+                inv = child_f.get("investment_usdt", 0.0)
+                fx = child_f.get("forex_investment_usdt", 0.0)
+                
+                if inv > 0 and depth <= levels_allowed and depth in REF_FEES:
+                    ref_entry = child_f.get("entry_pool_pnl_pct", 0.0)
+                    incr = crypto_pool_pct - ref_entry
+                    if incr > 0:
+                        crypto_bonus += inv * (incr / 100) * REF_FEES[depth]
+                        
+                if fx > 0 and depth <= levels_allowed and depth in REF_FEES:
+                    fx_entry = child_f.get("forex_entry_pool_pnl_pct", 0.0)
+                    fx_incr = forex_pool_pct - fx_entry
+                    if fx_incr > 0:
+                        forex_bonus += fx * (fx_incr / 100) * REF_FEES[depth]
+                        
+                queue.append((child.id, depth + 1))
+                
+        if crypto_bonus > 0 or forex_bonus > 0:
+            fin_db.locked_crypto_ref_bonus = round(crypto_bonus, 2)
+            fin_db.locked_forex_ref_bonus = round(forex_bonus, 2)
+            updated += 1
+            
+    await db.commit()
+    return {"status": "success", "updated": updated}
+
 
 # ── Заявки на пополнение депозита ─────────────────────────────
 from security import get_current_user
