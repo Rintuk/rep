@@ -88,8 +88,15 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             if inv > 0 and depth <= levels_allowed and depth in REF_FEES:
                 ref_entry = f.entry_pool_pnl_pct if f else 0.0
                 incr = crypto_pool_pct - ref_entry
+                gross = 0.0
                 if incr > 0:
-                    cb = inv * (incr / 100) * REF_FEES[depth]
+                    gross = inv * (incr / 100)
+                elif f and getattr(f, "locked_crypto_pnl", 0.0) > 0:
+                    # Mathematical fallback from locked PnL (pre-migration)
+                    gross = f.locked_crypto_pnl / 0.77
+                    
+                if gross > 0:
+                    cb = gross * REF_FEES[depth]
                     crypto_bonus += cb
             
             # Forex bonus
@@ -97,8 +104,14 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             if fx > 0 and depth <= levels_allowed and depth in REF_FEES:
                 fx_entry = f.forex_entry_pool_pnl_pct if f else 0.0
                 fx_incr = forex_pool_pct - fx_entry
+                fx_gross = 0.0
                 if fx_incr > 0:
-                    fb = fx * (fx_incr / 100) * REF_FEES[depth]
+                    fx_gross = fx * (fx_incr / 100)
+                elif f and getattr(f, "locked_forex_pnl", 0.0) > 0:
+                    fx_gross = f.locked_forex_pnl / 0.77
+                    
+                if fx_gross > 0:
+                    fb = fx_gross * REF_FEES[depth]
                     forex_bonus += fb
                     
             if cb > 0 or fb > 0 or depth == 1:
