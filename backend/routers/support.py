@@ -50,11 +50,16 @@ async def my_tickets(
             select(SupportReply).where(SupportReply.ticket_id == t.id)
             .order_by(SupportReply.created_at.asc())
         )).scalars().all()
+        email = None
+        if user.is_admin:
+            owner = (await db.execute(select(User).where(User.id == t.user_id))).scalar_one_or_none()
+            email = owner.email if owner else None
         result.append(SupportTicketOut(
             id=t.id, subject=t.subject, message=t.message,
             status=t.status, created_at=t.created_at,
             has_unread=_has_unread(t),
             replies=[SupportReplyOut(id=r.id, body=r.body, created_at=r.created_at) for r in replies],
+            user_email=email,
         ))
     return result
 

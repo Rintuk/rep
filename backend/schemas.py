@@ -97,6 +97,7 @@ class SupportTicketOut(BaseModel):
     created_at: datetime
     has_unread: bool = False
     replies: list[SupportReplyOut] = []
+    user_email: str | None = None
 
 class SupportTicketAdminOut(SupportTicketOut):
     user_email: str

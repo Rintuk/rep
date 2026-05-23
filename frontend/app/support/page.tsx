@@ -179,7 +179,10 @@ export default function SupportPage() {
               {tickets.map((t, i) => (
                 <div key={t.id} style={{ padding: "16px 0", borderBottom: i < tickets.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
-                    <span style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{t.subject}</span>
+                    <div>
+                      <span style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{t.subject}</span>
+                      {t.user_email && <span style={{ display: "block", color: "#4a6a9a", fontSize: 11, marginTop: 2 }}>{t.user_email}</span>}
+                    </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                       <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, fontWeight: 600, background: STATUS_COLOR[t.status] + "18", color: STATUS_COLOR[t.status] }}>
                         {STATUS_LABEL[t.status] ?? t.status}
