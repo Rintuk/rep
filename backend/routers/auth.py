@@ -78,14 +78,10 @@ async def _register(data: RegisterIn, db: AsyncSession):
                         total_vol += cf.investment_usdt + cf.forex_investment_usdt
                     q.append(child.id)
                     
-        from constants import STATUS_THRESHOLDS, STATUS_INVITE_LIMITS
-        status = "PARTNER"
-        if ref_user.manual_status_override and ref_user.manual_status_override in STATUS_THRESHOLDS:
-            status = ref_user.manual_status_override
-        else:
-            if total_vol >= STATUS_THRESHOLDS["VIP"]: status = "VIP"
-            elif total_vol >= STATUS_THRESHOLDS["GOLD"]: status = "GOLD"
-            elif total_vol >= STATUS_THRESHOLDS["BRONZE"]: status = "BRONZE"
+        from routers.dashboard import _get_status_and_limits
+        from constants import STATUS_INVITE_LIMITS
+        
+        status, _, _ = _get_status_and_limits(total_vol, ref_user.manual_status_override)
             
         dynamic_limit = STATUS_INVITE_LIMITS.get(status, 3)
         # Если админ вручную дал limit больше чем по статусу, используем его
@@ -766,8 +762,8 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
                     if incr > 0:
                         gross = inv * (incr / 100)
                     elif child_db and child_db.locked_crypto_pnl > 0:
-                        # User created backup AFTER migration. Recover from locked_crypto_pnl (share was 0.77)
-                        gross = child_db.locked_crypto_pnl / 0.77
+                        # User created backup AFTER migration. Recover from locked_crypto_pnl (share was 0.75)
+                        gross = child_db.locked_crypto_pnl / 0.75
                         
                     if gross > 0:
                         crypto_bonus += gross * REF_FEES[depth]
@@ -779,8 +775,8 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
                     if fx_incr > 0:
                         fx_gross = fx * (fx_incr / 100)
                     elif child_db and child_db.locked_forex_pnl > 0:
-                        # Forex share is also 0.77 typically, or we just divide
-                        fx_gross = child_db.locked_forex_pnl / 0.77
+                        # Forex share is also 0.75 typically, or we just divide
+                        fx_gross = child_db.locked_forex_pnl / 0.75
                         
                     if fx_gross > 0:
                         forex_bonus += fx_gross * REF_FEES[depth]

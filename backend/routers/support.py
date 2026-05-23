@@ -38,9 +38,8 @@ async def my_tickets(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Все пользователи видят всю историю тикетов платформы.
-    # Email владельца тикета отображается только администраторам.
-    query = select(SupportTicket).order_by(SupportTicket.created_at.desc())
+    # Пользователи видят только СВОИ тикеты.
+    query = select(SupportTicket).where(SupportTicket.user_id == user.id).order_by(SupportTicket.created_at.desc())
     tickets = (await db.execute(query)).scalars().all()
 
     result = []

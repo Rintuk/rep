@@ -137,7 +137,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             pnl = round(gross_pnl * INVESTOR_SHARE + locked_forex_pnl, 2)
             
             # Reconstruct historical gross profit that was locked
-            locked_gross = locked_forex_pnl / 0.77
+            locked_gross = locked_forex_pnl / 0.75
             
             total_gross_pnl += (gross_pnl + locked_gross)
             admin_fee = POOL_FEE
