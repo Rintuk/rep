@@ -212,6 +212,7 @@ export default function LoginPage() {
     try {
       const data = await login(emailVal, passwordVal, rememberVal);
       localStorage.setItem("token", data.access_token);
+      localStorage.setItem("is_admin", data.is_admin ? "1" : "0");
       router.push(data.is_admin ? "/admin" : "/dashboard");
       return true;
     } catch (err: unknown) {

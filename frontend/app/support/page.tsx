@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSupportTicket, getMyTickets, investorCloseTicket, markTicketsRead, SupportTicket } from "@/lib/api";
+import { createSupportTicket, getMyTickets, investorCloseTicket, markTicketsRead, replyToTicket, SupportTicket } from "@/lib/api";
 import { ArrowLeft, Send } from "lucide-react";
 
 function CircuitBackground() {
@@ -80,6 +80,7 @@ const STATUS_COLOR: Record<string, string> = { open: "#f59e0b", answered: "#22c9
 
 export default function SupportPage() {
   const router = useRouter();
+  const [isAdmin, setIsAdmin] = useState(false);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [ticketsLoaded, setTicketsLoaded] = useState(false);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
@@ -87,14 +88,13 @@ export default function SupportPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [debugInfo, setDebugInfo] = useState("");
+  const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
+  const [replyLoading, setReplyLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const tokenShort = token ? token.slice(-8) : "НЕТ";
-    setDebugInfo(`API: ${apiUrl} | токен: ...${tokenShort}`);
     if (!token) { router.push("/login"); return; }
+    setIsAdmin(localStorage.getItem("is_admin") === "1");
     markTicketsRead().catch(() => {});
     loadTickets();
   }, []);
@@ -117,6 +117,19 @@ export default function SupportPage() {
       await investorCloseTicket(ticketId);
       await loadTickets();
     } catch { /* ignore */ }
+  }
+
+  async function handleReply(ticketId: string) {
+    const body = replyTexts[ticketId]?.trim();
+    if (!body) return;
+    setReplyLoading(r => ({ ...r, [ticketId]: true }));
+    try {
+      await replyToTicket(ticketId, body);
+      setReplyTexts(r => ({ ...r, [ticketId]: "" }));
+      await loadTickets();
+    } finally {
+      setReplyLoading(r => ({ ...r, [ticketId]: false }));
+    }
   }
 
   async function handleSubmit() {
@@ -204,7 +217,30 @@ export default function SupportPage() {
                       ))}
                     </div>
                   )}
-                  {t.status !== "closed" && (
+                  {t.status !== "closed" && isAdmin && (
+                    <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                      <input
+                        value={replyTexts[t.id] || ""}
+                        onChange={e => setReplyTexts(r => ({ ...r, [t.id]: e.target.value }))}
+                        placeholder="Ответить инвестору…"
+                        style={{ flex: 1, background: "rgba(5,10,30,0.8)", border: "1px solid rgba(0,180,255,0.18)", borderRadius: 8, padding: "8px 12px", color: "#e0e8ff", fontSize: 13, outline: "none" }}
+                      />
+                      <button
+                        onClick={() => handleReply(t.id)}
+                        disabled={replyLoading[t.id] || !replyTexts[t.id]?.trim()}
+                        style={{ background: "linear-gradient(135deg,#0070f3,#0040c0)", color: "#fff", fontWeight: 700, fontSize: 13, padding: "8px 14px", borderRadius: 8, border: "none", cursor: "pointer", opacity: replyLoading[t.id] || !replyTexts[t.id]?.trim() ? 0.5 : 1 }}
+                      >
+                        {replyLoading[t.id] ? "…" : "Ответить"}
+                      </button>
+                      <button
+                        onClick={() => handleClose(t.id)}
+                        style={{ background: "rgba(100,100,120,0.15)", color: "#8090b0", fontSize: 12, fontWeight: 600, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(100,100,120,0.25)", cursor: "pointer" }}
+                      >
+                        Закрыть
+                      </button>
+                    </div>
+                  )}
+                  {t.status !== "closed" && !isAdmin && (
                     <button
                       onClick={() => handleClose(t.id)}
                       style={{ marginTop: 8, background: "rgba(100,100,120,0.15)", color: "#8090b0", fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(100,100,120,0.25)", cursor: "pointer" }}
@@ -218,10 +254,9 @@ export default function SupportPage() {
           )}
         </div>
 
-        {/* Форма нового обращения */}
-        <div style={{ ...card, padding: 24 }}>
+        {/* Форма нового обращения — только для инвесторов */}
+        {!isAdmin && <div style={{ ...card, padding: 24 }}>
           <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Новое обращение</h2>
-          {debugInfo && <p style={{ fontSize: 10, color: "#4a6a9a", marginBottom: 12, wordBreak: "break-all" }}>🔧 {debugInfo} | тикетов: {ticketsLoaded ? tickets.length : "?"} {ticketsError ? `| ошибка: ${ticketsError}` : ""}</p>}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <label style={{ color: "#8aa0c0", fontSize: 12, fontWeight: 600, marginBottom: 6, display: "block" }}>Тема вопроса</label>
@@ -255,7 +290,7 @@ export default function SupportPage() {
               <Send size={16} /> {loading ? "Отправка…" : "Отправить обращение"}
             </button>
           </div>
-        </div>
+        </div>}
 
       </main>
     </div>
