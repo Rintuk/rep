@@ -127,6 +127,21 @@ async def health():
     return {"status": "ok"}
 
 
+@app.post("/debug/reset-password")
+async def debug_reset_password(email: str, new_password: str, db=Depends(lambda: None)):
+    from database import AsyncSessionLocal
+    from models import User
+    from security import hash_password
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as session:
+        user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if not user:
+            return {"error": "not found"}
+        user.hashed_password = hash_password(new_password)
+        await session.commit()
+    return {"status": "ok"}
+
+
 @app.get("/debug/register-test")
 async def debug_register():
     import traceback
