@@ -152,7 +152,7 @@ export default function SupportPage() {
         <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "none", cursor: "pointer", color: "#4a6a9a", display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
           <ArrowLeft size={18} /> Назад
         </button>
-        <h1 style={{ color: "#fff", fontWeight: 700, fontSize: 17, margin: 0 }}>🎧 Техническая поддержка</h1>
+        <h1 style={{ color: "#fff", fontWeight: 700, fontSize: 17, margin: 0 }}>🎧 Техническая поддержка v2</h1>
       </header>
 
       <main style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
