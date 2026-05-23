@@ -37,6 +37,13 @@ const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd
 const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Инвестор", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
 const STATUS_LEVELS: Record<string, number> = { PARTNER: 1, BRONZE: 2, GOLD: 3, VIP: 5 };
 
+const getNextStatusName = (vol: number) => {
+  if (vol === 3000) return "Бронзы";
+  if (vol === 4000) return "Золота";
+  if (vol === 5000) return "VIP";
+  return "следующего статуса";
+};
+
 // ─── Circuit board background ─────────────────────────────────────────────────
 function CircuitBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -510,7 +517,7 @@ export default function DashboardPage() {
                     }} />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#4a6a9a" }}>
-                    <span>До следующего статуса</span>
+                    <span>До {getNextStatusName(data.next_status_volume)}</span>
                     <span>{data.next_status_volume} $</span>
                   </div>
                 </>

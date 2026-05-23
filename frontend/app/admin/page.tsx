@@ -111,6 +111,13 @@ function CircuitBackground() {
 const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", SILVER: "#c0c0c0", GOLD: "#ffd700", VIP: "#f59e0b" };
 const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Инвестор", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
 
+const getNextStatusName = (vol: number) => {
+  if (vol === 3000) return "Бронзы";
+  if (vol === 4000) return "Золота";
+  if (vol === 5000) return "VIP";
+  return "след. статуса";
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const [activePool, setActivePool] = useState<"crypto" | "forex">("forex");
@@ -1038,7 +1045,7 @@ export default function AdminPage() {
                                 <div style={{ marginTop: 8, width: 120 }}>
                                   <div style={{ fontSize: 9, color: muted, marginBottom: 2, display: "flex", justifyContent: "space-between" }}>
                                     <span>Оборот: {u.total_volume ? u.total_volume.toFixed(0) : 0} $</span>
-                                    <span>Цель: {u.next_vol} $</span>
+                                    <span>До {getNextStatusName(u.next_vol)}: {u.next_vol} $</span>
                                   </div>
                                   <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" }}>
                                     <div style={{ width: `${Math.min(((u.total_volume || 0) / u.next_vol) * 100, 100)}%`, height: "100%", background: u.status && STATUS_COLORS[u.status] ? STATUS_COLORS[u.status] : "#6b8ab0" }} />
