@@ -81,6 +81,7 @@ const STATUS_COLOR: Record<string, string> = { open: "#f59e0b", answered: "#22c9
 export default function SupportPage() {
   const router = useRouter();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketsLoaded, setTicketsLoaded] = useState(false);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -97,7 +98,9 @@ export default function SupportPage() {
     try {
       const data = await getMyTickets();
       setTickets(data);
-    } catch { /* ignore */ }
+    } catch { /* ignore */ } finally {
+      setTicketsLoaded(true);
+    }
   }
 
   async function handleClose(ticketId: string) {
@@ -145,14 +148,18 @@ export default function SupportPage() {
 
       <main style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 20, position: "relative", zIndex: 1 }}>
 
-        {/* История обращений — СВЕРХУ, чтобы сразу видно на мобильном */}
-        {tickets.length > 0 && (
-          <div style={{ ...card, padding: 24 }}>
-            <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Мои обращения</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+        {/* История обращений — всегда видна */}
+        <div style={{ ...card, padding: 24 }}>
+          <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Мои обращения</h2>
+
+          {!ticketsLoaded ? (
+            <p style={{ color: "#4a6a9a", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Загрузка…</p>
+          ) : tickets.length === 0 ? (
+            <p style={{ color: "#4a6a9a", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Обращений пока нет</p>
+          ) : (
+            <div style={{ maxHeight: 480, overflowY: "auto", display: "flex", flexDirection: "column", gap: 0 }}>
               {tickets.map((t, i) => (
-                <div key={t.id} style={{ padding: "16px 0", borderBottom: i < tickets.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none", flexShrink: 0 }}>
-                  {/* Шапка тикета */}
+                <div key={t.id} style={{ padding: "16px 0", borderBottom: i < tickets.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
                     <span style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{t.subject}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -162,9 +169,7 @@ export default function SupportPage() {
                       <span style={{ color: "#4a6a9a", fontSize: 11 }}>{new Date(t.created_at).toLocaleDateString("ru")}</span>
                     </div>
                   </div>
-                  {/* Вопрос */}
                   <p style={{ color: "#8aa0c0", fontSize: 13, lineHeight: 1.6, marginBottom: t.replies.length ? 12 : 0 }}>{t.message}</p>
-                  {/* Ответы */}
                   {t.replies.length > 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: t.status !== "closed" ? 12 : 0 }}>
                       {t.replies.map(r => (
@@ -178,7 +183,6 @@ export default function SupportPage() {
                       ))}
                     </div>
                   )}
-                  {/* Кнопка закрытия */}
                   {t.status !== "closed" && (
                     <button
                       onClick={() => handleClose(t.id)}
@@ -190,8 +194,8 @@ export default function SupportPage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Форма нового обращения */}
         <div style={{ ...card, padding: 24 }}>
