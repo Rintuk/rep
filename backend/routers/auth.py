@@ -747,17 +747,34 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
                 inv = child_f.get("investment_usdt", 0.0)
                 fx = child_f.get("forex_investment_usdt", 0.0)
                 
+                # Fetch child's db record to use locked_pnl as fallback
+                child_db = fins_db_map.get(child.id)
+                
                 if inv > 0 and depth <= levels_allowed and depth in REF_FEES:
                     ref_entry = child_f.get("entry_pool_pnl_pct", 0.0)
                     incr = crypto_pool_pct - ref_entry
+                    gross = 0.0
                     if incr > 0:
-                        crypto_bonus += inv * (incr / 100) * REF_FEES[depth]
+                        gross = inv * (incr / 100)
+                    elif child_db and child_db.locked_crypto_pnl > 0:
+                        # User created backup AFTER migration. Recover from locked_crypto_pnl (share was 0.77)
+                        gross = child_db.locked_crypto_pnl / 0.77
+                        
+                    if gross > 0:
+                        crypto_bonus += gross * REF_FEES[depth]
                         
                 if fx > 0 and depth <= levels_allowed and depth in REF_FEES:
                     fx_entry = child_f.get("forex_entry_pool_pnl_pct", 0.0)
                     fx_incr = forex_pool_pct - fx_entry
+                    fx_gross = 0.0
                     if fx_incr > 0:
-                        forex_bonus += fx * (fx_incr / 100) * REF_FEES[depth]
+                        fx_gross = fx * (fx_incr / 100)
+                    elif child_db and child_db.locked_forex_pnl > 0:
+                        # Forex share is also 0.77 typically, or we just divide
+                        fx_gross = child_db.locked_forex_pnl / 0.77
+                        
+                    if fx_gross > 0:
+                        forex_bonus += fx_gross * REF_FEES[depth]
                         
                 queue.append((child.id, depth + 1))
                 
