@@ -692,7 +692,7 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
         raise HTTPException(status_code=400, detail="Неверный JSON файл")
         
     data = backup.get("data", [])
-    backup_fins = {f["user_id"]: f for f in data}
+    backup_fins = {f["id"]: f.get("financials") or {} for f in data}
     
     crypto_pool_pct = await _get_pool_pnl_pct(db)
     from routers.forex import _get_forex_pool_pnl_pct
@@ -715,8 +715,10 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
         fin_db = fins_db_map.get(u.id)
         if not fin_db: continue
         
-        my_inv = backup_fins.get(u.id, {}).get("investment_usdt", fin_db.investment_usdt)
-        my_fx = backup_fins.get(u.id, {}).get("forex_investment_usdt", fin_db.forex_investment_usdt)
+        # Get from backup, fallback to current db if backup didn't have financials
+        my_backup = backup_fins.get(u.id, {})
+        my_inv = my_backup.get("investment_usdt", fin_db.investment_usdt)
+        my_fx = my_backup.get("forex_investment_usdt", fin_db.forex_investment_usdt)
         total_volume = my_inv + my_fx
         
         q = [u.id]
@@ -725,7 +727,7 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
             for child in children_map.get(curr, []):
                 if child.is_active:
                     child_f = backup_fins.get(child.id, {})
-                    total_volume += child_f.get("investment_usdt", 0) + child_f.get("forex_investment_usdt", 0)
+                    total_volume += child_f.get("investment_usdt", 0.0) + child_f.get("forex_investment_usdt", 0.0)
                     q.append(child.id)
                     
         status, next_vol, levels_allowed = _get_status_and_limits(total_volume, u.manual_status_override)
