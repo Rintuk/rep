@@ -370,7 +370,7 @@ export default function DashboardPage() {
           {menuOpen && (
             <>
               <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
-              <div style={{ position: "absolute", right: 0, top: 44, zIndex: 50, width: 220, ...card, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+              <div style={{ position: "absolute", right: 0, top: 44, zIndex: 50, width: 220, ...card, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", maxHeight: "calc(100dvh - 90px)", overflowY: "auto" }}>
                 {[
                   { label: "Реал / Демо", special: "toggle" },
                   { label: "Пополнить счёт", color: "#22c97a", icon: <PlusCircle size={15}/>, action: openDeposit },
