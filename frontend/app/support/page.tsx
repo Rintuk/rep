@@ -200,7 +200,7 @@ export default function SupportPage() {
                       <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, fontWeight: 600, background: STATUS_COLOR[t.status] + "18", color: STATUS_COLOR[t.status] }}>
                         {STATUS_LABEL[t.status] ?? t.status}
                       </span>
-                      <span style={{ color: "#4a6a9a", fontSize: 11 }}>{new Date(t.created_at).toLocaleDateString("ru")}</span>
+                      <span style={{ color: "#4a6a9a", fontSize: 11 }}>{new Date(t.created_at).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                     </div>
                   </div>
                   <p style={{ color: "#8aa0c0", fontSize: 13, lineHeight: 1.6, marginBottom: t.replies.length ? 12 : 0 }}>{t.message}</p>
