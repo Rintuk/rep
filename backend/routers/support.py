@@ -38,10 +38,11 @@ async def my_tickets(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    tickets = (await db.execute(
-        select(SupportTicket).where(SupportTicket.user_id == user.id)
-        .order_by(SupportTicket.created_at.desc())
-    )).scalars().all()
+    query = select(SupportTicket).order_by(SupportTicket.created_at.desc()) \
+        if user.is_admin else \
+        select(SupportTicket).where(SupportTicket.user_id == user.id).order_by(SupportTicket.created_at.desc())
+
+    tickets = (await db.execute(query)).scalars().all()
 
     result = []
     for t in tickets:
