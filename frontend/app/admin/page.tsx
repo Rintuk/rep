@@ -159,6 +159,7 @@ export default function AdminPage() {
   const [replyLoading, setReplyLoading] = useState<string | null>(null);
   const [clearTicketsLoading, setClearTicketsLoading] = useState(false);
   const [clearTicketsMsg, setClearTicketsMsg] = useState<string | null>(null);
+  const [selectedSupportUser, setSelectedSupportUser] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -1312,125 +1313,206 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Поддержка */}
-        {activeTab === "support" && (
-          <div style={{ ...card, padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-              <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 15, margin: 0 }}>
-                Обращения в поддержку
-                {tickets.filter(t => t.status === "open").length > 0 && (
-                  <span style={{ marginLeft: 8, fontSize: 12, padding: "2px 8px", borderRadius: 10, background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}>
-                    {tickets.filter(t => t.status === "open").length} новых
-                  </span>
-                )}
-              </h3>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {clearTicketsMsg && (
-                  <span style={{ fontSize: 12, color: clearTicketsMsg.includes("Ошибка") ? "#ff4d4d" : "#22c97a" }}>
-                    {clearTicketsMsg}
-                  </span>
-                )}
-                <button
-                  onClick={handleClearAllTickets}
-                  disabled={clearTicketsLoading || tickets.length === 0}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    background: "rgba(127,29,29,0.7)", color: "#fca5a5",
-                    border: "1px solid rgba(255,77,77,0.3)",
-                    opacity: (clearTicketsLoading || tickets.length === 0) ? 0.5 : 1,
-                  }}
-                >
-                  🗑 {clearTicketsLoading ? "Удаление…" : "Очистить историю"}
-                </button>
-              </div>
-            </div>
-            {tickets.length === 0
-              ? <p style={{ color: muted, fontSize: 13 }}>Обращений пока нет</p>
-              : <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {tickets.map(t => (
-                  <div key={t.id} style={{ borderBottom: `1px solid ${border}` }}>
-                    {/* Строка тикета */}
+        {/* Поддержка — двухуровневый UI */}
+        {activeTab === "support" && (() => {
+          // Группируем тикеты по email пользователя
+          const userMap = new Map<string, typeof tickets>();
+          tickets.forEach(t => {
+            const email = t.user_email || "—";
+            if (!userMap.has(email)) userMap.set(email, []);
+            userMap.get(email)!.push(t);
+          });
+          const userList = Array.from(userMap.entries()).sort((a, b) => {
+            // Сначала пользователи с открытыми тикетами
+            const aOpen = a[1].some(t => t.status === "open") ? 0 : 1;
+            const bOpen = b[1].some(t => t.status === "open") ? 0 : 1;
+            return aOpen - bOpen;
+          });
+
+          const userTickets = selectedSupportUser ? (userMap.get(selectedSupportUser) || []) : [];
+
+          return (
+            <div style={{ ...card, padding: 20 }}>
+              {/* Шапка */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {selectedSupportUser && (
                     <button
-                      onClick={() => setExpandedTicket(expandedTicket === t.id ? null : t.id)}
-                      style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "14px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, textAlign: "left" }}
+                      onClick={() => { setSelectedSupportUser(null); setExpandedTicket(null); }}
+                      style={{ background: "rgba(0,180,255,0.1)", border: "1px solid rgba(0,180,255,0.25)", borderRadius: 8, color: "#00b4ff", fontSize: 12, fontWeight: 600, padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}
                     >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                          <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{t.subject}</span>
-                          <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 600,
-                            background: t.status === "open" ? "rgba(245,158,11,0.15)" : t.status === "closed" ? "rgba(100,100,120,0.2)" : "rgba(34,201,122,0.12)",
-                            color: t.status === "open" ? "#f59e0b" : t.status === "closed" ? "#8090b0" : "#22c97a" }}>
-                            {t.status === "open" ? "Открыт" : t.status === "closed" ? "Закрыт" : "Отвечен"}
-                          </span>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                          <span style={{ color: "#e0e8ff", fontSize: 12, fontWeight: 500 }}>👤 {t.user_email}</span>
-                          <span style={{ color: muted, fontSize: 11 }}>{new Date(t.created_at).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-                        </div>
-                      </div>
-                      <span style={{ color: muted, fontSize: 16 }}>{expandedTicket === t.id ? "▲" : "▼"}</span>
+                      ← Назад
                     </button>
-
-                    {/* Раскрытый тикет */}
-                    {expandedTicket === t.id && (
-                      <div style={{ paddingBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-                        {/* Вопрос */}
-                        <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "12px 14px" }}>
-                          <p style={{ color: muted, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>ВОПРОС</p>
-                          <p style={{ color: "#e0e8ff", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{t.message}</p>
-                        </div>
-
-                        {/* Существующие ответы */}
-                        {t.replies.length > 0 && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            {t.replies.map(r => (
-                              <div key={r.id} style={{ background: "rgba(34,201,122,0.06)", border: "1px solid rgba(34,201,122,0.15)", borderRadius: 8, padding: "10px 14px" }}>
-                                <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-                                  <span style={{ color: "#22c97a", fontSize: 11, fontWeight: 700 }}>Ваш ответ</span>
-                                  <span style={{ color: muted, fontSize: 11 }}>{new Date(r.created_at).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-                                </div>
-                                <p style={{ color: "#e0e8ff", fontSize: 13, lineHeight: 1.6 }}>{r.body}</p>
-                              </div>
-                            ))}
-                          </div>
+                  )}
+                  <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 15, margin: 0 }}>
+                    {selectedSupportUser
+                      ? <span>👤 <span style={{ color: "#00b4ff" }}>{selectedSupportUser}</span></span>
+                      : <>Обращения в поддержку
+                        {tickets.filter(t => t.status === "open").length > 0 && (
+                          <span style={{ marginLeft: 8, fontSize: 12, padding: "2px 8px", borderRadius: 10, background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}>
+                            {tickets.filter(t => t.status === "open").length} новых
+                          </span>
                         )}
+                      </>
+                    }
+                  </h3>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {clearTicketsMsg && (
+                    <span style={{ fontSize: 12, color: clearTicketsMsg.includes("Ошибка") ? "#ff4d4d" : "#22c97a" }}>
+                      {clearTicketsMsg}
+                    </span>
+                  )}
+                  {!selectedSupportUser && (
+                    <button
+                      onClick={handleClearAllTickets}
+                      disabled={clearTicketsLoading || tickets.length === 0}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                        background: "rgba(127,29,29,0.7)", color: "#fca5a5",
+                        border: "1px solid rgba(255,77,77,0.3)",
+                        opacity: (clearTicketsLoading || tickets.length === 0) ? 0.5 : 1,
+                      }}
+                    >
+                      🗑 {clearTicketsLoading ? "Удаление…" : "Очистить историю"}
+                    </button>
+                  )}
+                </div>
+              </div>
 
-                        {/* Форма ответа */}
-                        {t.status !== "closed" && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                            <textarea
-                              value={replyTexts[t.id] || ""}
-                              onChange={e => setReplyTexts(prev => ({ ...prev, [t.id]: e.target.value }))}
-                              placeholder="Ваш ответ..."
-                              rows={3}
-                              style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${border}`, borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 13, outline: "none", resize: "vertical", fontFamily: "inherit" }}
-                            />
-                            <div style={{ display: "flex", gap: 10 }}>
-                              <button
-                                onClick={() => handleReply(t.id)}
-                                disabled={replyLoading === t.id || !(replyTexts[t.id] || "").trim()}
-                                style={{ background: "#22c97a", color: "#000", fontWeight: 700, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", opacity: (replyLoading === t.id || !(replyTexts[t.id] || "").trim()) ? 0.5 : 1 }}
-                              >
-                                {replyLoading === t.id ? "Отправка..." : "Ответить"}
-                              </button>
-                              <button
-                                onClick={() => handleAdminClose(t.id)}
-                                style={{ background: "rgba(100,100,120,0.2)", color: "#8090b0", fontWeight: 600, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "1px solid rgba(100,100,120,0.3)", cursor: "pointer" }}
-                              >
-                                Закрыть тикет
-                              </button>
+              {/* Уровень 1: список пользователей */}
+              {!selectedSupportUser && (
+                tickets.length === 0
+                  ? <p style={{ color: muted, fontSize: 13 }}>Обращений пока нет</p>
+                  : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {userList.map(([email, userTix]) => {
+                      const openCount = userTix.filter(t => t.status === "open").length;
+                      const answeredCount = userTix.filter(t => t.status === "answered").length;
+                      const lastDate = userTix[0]?.created_at;
+                      return (
+                        <button
+                          key={email}
+                          onClick={() => { setSelectedSupportUser(email); setExpandedTicket(null); }}
+                          style={{
+                            width: "100%", textAlign: "left", background: openCount > 0
+                              ? "rgba(245,158,11,0.06)"
+                              : "rgba(255,255,255,0.02)",
+                            border: `1px solid ${openCount > 0 ? "rgba(245,158,11,0.25)" : border}`,
+                            borderRadius: 10, padding: "14px 16px", cursor: "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                            transition: "background 0.15s",
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 18 }}>👤</span>
+                              <span style={{ color: "#e0e8ff", fontWeight: 600, fontSize: 14 }}>{email}</span>
+                              {openCount > 0 && (
+                                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, fontWeight: 700, background: "rgba(245,158,11,0.2)", color: "#f59e0b" }}>
+                                  {openCount} открыт{openCount === 1 ? "" : "о"}
+                                </span>
+                              )}
+                              {answeredCount > 0 && (
+                                <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, fontWeight: 700, background: "rgba(34,201,122,0.12)", color: "#22c97a" }}>
+                                  {answeredCount} отвечено
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", gap: 12, color: muted, fontSize: 12 }}>
+                              <span>Тикетов: <b style={{ color: "#8aa0c0" }}>{userTix.length}</b></span>
+                              {lastDate && <span>Последний: {new Date(lastDate).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
                             </div>
                           </div>
+                          <span style={{ color: "#4a6a9a", fontSize: 18, flexShrink: 0 }}>›</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+              )}
+
+              {/* Уровень 2: тикеты выбранного пользователя */}
+              {selectedSupportUser && (
+                userTickets.length === 0
+                  ? <p style={{ color: muted, fontSize: 13 }}>Нет тикетов</p>
+                  : <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                    {userTickets.map(t => (
+                      <div key={t.id} style={{ borderBottom: `1px solid ${border}` }}>
+                        <button
+                          onClick={() => setExpandedTicket(expandedTicket === t.id ? null : t.id)}
+                          style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "14px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, textAlign: "left" }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                              <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{t.subject}</span>
+                              <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 600,
+                                background: t.status === "open" ? "rgba(245,158,11,0.15)" : t.status === "closed" ? "rgba(100,100,120,0.2)" : "rgba(34,201,122,0.12)",
+                                color: t.status === "open" ? "#f59e0b" : t.status === "closed" ? "#8090b0" : "#22c97a" }}>
+                                {t.status === "open" ? "Открыт" : t.status === "closed" ? "Закрыт" : "Отвечен"}
+                              </span>
+                              {t.replies.length > 0 && (
+                                <span style={{ fontSize: 10, color: muted }}>💬 {t.replies.length}</span>
+                              )}
+                            </div>
+                            <span style={{ color: muted, fontSize: 11 }}>{new Date(t.created_at).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                          </div>
+                          <span style={{ color: muted, fontSize: 16 }}>{expandedTicket === t.id ? "▲" : "▼"}</span>
+                        </button>
+
+                        {expandedTicket === t.id && (
+                          <div style={{ paddingBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                            <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "12px 14px" }}>
+                              <p style={{ color: muted, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>ВОПРОС</p>
+                              <p style={{ color: "#e0e8ff", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{t.message}</p>
+                            </div>
+                            {t.replies.length > 0 && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                {t.replies.map(r => (
+                                  <div key={r.id} style={{ background: "rgba(34,201,122,0.06)", border: "1px solid rgba(34,201,122,0.15)", borderRadius: 8, padding: "10px 14px" }}>
+                                    <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+                                      <span style={{ color: "#22c97a", fontSize: 11, fontWeight: 700 }}>Ваш ответ</span>
+                                      <span style={{ color: muted, fontSize: 11 }}>{new Date(r.created_at).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                                    </div>
+                                    <p style={{ color: "#e0e8ff", fontSize: 13, lineHeight: 1.6 }}>{r.body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {t.status !== "closed" && (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                <textarea
+                                  value={replyTexts[t.id] || ""}
+                                  onChange={e => setReplyTexts(prev => ({ ...prev, [t.id]: e.target.value }))}
+                                  placeholder="Ваш ответ..."
+                                  rows={3}
+                                  style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${border}`, borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 13, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+                                />
+                                <div style={{ display: "flex", gap: 10 }}>
+                                  <button
+                                    onClick={() => handleReply(t.id)}
+                                    disabled={replyLoading === t.id || !(replyTexts[t.id] || "").trim()}
+                                    style={{ background: "#22c97a", color: "#000", fontWeight: 700, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", opacity: (replyLoading === t.id || !(replyTexts[t.id] || "").trim()) ? 0.5 : 1 }}
+                                  >
+                                    {replyLoading === t.id ? "Отправка..." : "Ответить"}
+                                  </button>
+                                  <button
+                                    onClick={() => handleAdminClose(t.id)}
+                                    style={{ background: "rgba(100,100,120,0.2)", color: "#8090b0", fontWeight: 600, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "1px solid rgba(100,100,120,0.3)", cursor: "pointer" }}
+                                  >
+                                    Закрыть тикет
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
-            }
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })()}
 
         {data.last_updated && (
           <p style={{ textAlign: "center", fontSize: 11, color: muted, paddingBottom: 16 }}>
