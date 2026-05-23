@@ -927,6 +927,28 @@ async def create_withdrawal_request(
 ):
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+        
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user.id))).scalar_one_or_none()
+    if not fin:
+        raise HTTPException(status_code=400, detail="Нет активных инвестиций")
+        
+    crypto_pool_pct = await _get_pool_pnl_pct(db)
+    from routers.forex import _get_forex_pool_pnl_pct
+    from routers.dashboard import _calc_referral_tree
+    forex_pool_pct = await _get_forex_pool_pnl_pct(db)
+    
+    _, _, _, crypto_ref, _, _ = await _calc_referral_tree(user.id, db, crypto_pool_pct, forex_pool_pct, fin, user.manual_status_override)
+    
+    incr = crypto_pool_pct - fin.entry_pool_pnl_pct
+    gross = fin.investment_usdt * (incr / 100) if incr > 0 else 0.0
+    pnl = round(gross * 0.75 + fin.locked_crypto_pnl, 2)
+    
+    pending_reqs = (await db.execute(select(func.sum(WithdrawalRequest.amount)).where(WithdrawalRequest.user_id == user.id, WithdrawalRequest.status == "pending", WithdrawalRequest.pool_type == "crypto"))).scalar() or 0.0
+    
+    max_available = round(fin.investment_usdt + pnl + crypto_ref - pending_reqs, 2)
+    if amount > max_available + 1: # небольшой запас на округление
+        raise HTTPException(status_code=400, detail=f"Сумма превышает доступный баланс. Доступно (с учетом других заявок): ~{max_available} $")
+        
     req = WithdrawalRequest(user_id=user.id, amount=amount, comment=comment)
     db.add(req)
     await db.commit()
@@ -973,6 +995,31 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="Заявка уже обработана")
+
+    # Считаем PnL пула ДО вывода средств (так как деньги, скорее всего, уже сняты с Binance)
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    
+    current_pnl_pct = 0.0
+    if snap:
+        positions = (await db.execute(
+            select(Position).where(Position.snapshot_id == snap.id)
+        )).scalars().all()
+        # Прибавляем выведенную сумму обратно к пулу, чтобы узнать % до вывода
+        pool_total_before_withdrawal = snap.balance_usdt + actual_amount + sum(
+            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
+        )
+        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+        total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+        ref = start + total_inv - total_wd
+        if ref <= 0:
+            ref = snap.net_invested if snap.net_invested > 0 else start
+        current_pnl_pct = round((pool_total_before_withdrawal - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    # АВТО-МИГРАЦИЯ PNL (чтобы не стереть накопленную прибыль пользователя при уменьшении его депозита)
+    await _migrate_pnl_internal(db, override_crypto_pct=current_pnl_pct)
 
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:

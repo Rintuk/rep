@@ -379,6 +379,28 @@ async def create_forex_withdrawal_request(
 ):
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+        
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user.id))).scalar_one_or_none()
+    if not fin:
+        raise HTTPException(status_code=400, detail="Нет активных инвестиций")
+        
+    forex_pool_pct = await _get_forex_pool_pnl_pct(db)
+    from routers.auth import _get_pool_pnl_pct
+    from routers.dashboard import _calc_referral_tree
+    crypto_pool_pct = await _get_pool_pnl_pct(db)
+    
+    _, _, _, _, forex_ref, _ = await _calc_referral_tree(user.id, db, crypto_pool_pct, forex_pool_pct, fin, user.manual_status_override)
+    
+    fx_incr = forex_pool_pct - fin.forex_entry_pool_pnl_pct
+    fx_gross = fin.forex_investment_usdt * (fx_incr / 100) if fx_incr > 0 else 0.0
+    fx_pnl = round(fx_gross * 0.75 + fin.locked_forex_pnl, 2)
+    
+    pending_reqs = (await db.execute(select(func.sum(WithdrawalRequest.amount)).where(WithdrawalRequest.user_id == user.id, WithdrawalRequest.status == "pending", WithdrawalRequest.pool_type == "forex"))).scalar() or 0.0
+    
+    max_available = round(fin.forex_investment_usdt + fx_pnl + forex_ref - pending_reqs, 2)
+    if amount > max_available + 1: # небольшой запас на округление
+        raise HTTPException(status_code=400, detail=f"Сумма превышает доступный баланс. Доступно (с учетом других заявок): ~{max_available} $")
+
     req = WithdrawalRequest(user_id=user.id, amount=amount, comment=comment, pool_type="forex")
     db.add(req)
     await db.commit()
@@ -430,6 +452,25 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     if req.status != "pending":
         raise HTTPException(status_code=400, detail="Заявка уже обработана")
+
+    # Считаем PnL пула ДО вывода средств
+    forex_snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    
+    current_pnl_pct = 0.0
+    if forex_snap:
+        fx_net_inv = _forex_net_invested_override()
+        if fx_net_inv <= 0:
+            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+        if fx_net_inv > 0:
+            # Прибавляем выведенную сумму обратно к пулу
+            pool_total_before = forex_snap.balance_usdt + actual_amount
+            current_pnl_pct = round((pool_total_before - fx_net_inv) / fx_net_inv * 100, 4)
+
+    # АВТО-МИГРАЦИЯ PNL
+    from routers.auth import _migrate_pnl_internal
+    await _migrate_pnl_internal(db, override_forex_pct=current_pnl_pct)
 
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
