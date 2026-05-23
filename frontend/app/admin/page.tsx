@@ -109,7 +109,7 @@ function CircuitBackground() {
 }
 
 const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", GOLD: "#ffd700", VIP: "#f59e0b" };
-const STATUS_LABELS: Record<string, string> = { PARTNER: "👤 Партнёр", BRONZE: "🥉 Бронза", GOLD: "🥇 Золото", VIP: "💎 VIP" };
+const STATUS_LABELS: Record<string, string> = { PARTNER: "Партнёр", BRONZE: "🥉 Бронза", GOLD: "🥇 Золото", VIP: "💎 VIP" };
 
 export default function AdminPage() {
   const router = useRouter();
@@ -1020,7 +1020,7 @@ export default function AdminPage() {
                             <td style={{ padding: "12px 16px" }}>
                               <div style={{ color: "#fff", fontSize: 13 }}>{u.referrals_count} чел.</div>
                               <div style={{ fontSize: 11, color: u.status ? STATUS_COLORS[u.status] : muted, marginTop: 2 }}>
-                                {u.status ? STATUS_LABELS[u.status] || u.status : "👤 Партнёр"} ({u.total_volume ? u.total_volume.toFixed(0) : "0"} $)
+                                {u.status ? STATUS_LABELS[u.status] || u.status : "Партнёр"} (Оборот: {u.total_volume ? u.total_volume.toFixed(0) : "0"} $)
                               </div>
                             </td>
                             <td style={{ padding: "12px 16px", fontSize: 11, color: muted }}>{new Date(u.created_at).toLocaleDateString("ru")}</td>
