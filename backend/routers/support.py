@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,6 +8,14 @@ from schemas import SupportTicketCreate, SupportTicketOut, SupportTicketAdminOut
 from security import get_current_user, get_admin_user
 
 router = APIRouter(prefix="/auth", tags=["support"])
+
+
+def _has_unread(ticket: SupportTicket) -> bool:
+    if ticket.replied_at is None:
+        return False
+    if ticket.investor_read_at is None:
+        return True
+    return ticket.replied_at > ticket.investor_read_at
 
 
 @router.post("/support/ticket", response_model=SupportTicketOut)
@@ -20,7 +29,8 @@ async def create_ticket(
     await db.commit()
     await db.refresh(ticket)
     return SupportTicketOut(id=ticket.id, subject=ticket.subject, message=ticket.message,
-                            status=ticket.status, created_at=ticket.created_at, replies=[])
+                            status=ticket.status, created_at=ticket.created_at,
+                            has_unread=False, replies=[])
 
 
 @router.get("/support/my-tickets", response_model=list[SupportTicketOut])
@@ -42,9 +52,25 @@ async def my_tickets(
         result.append(SupportTicketOut(
             id=t.id, subject=t.subject, message=t.message,
             status=t.status, created_at=t.created_at,
+            has_unread=_has_unread(t),
             replies=[SupportReplyOut(id=r.id, body=r.body, created_at=r.created_at) for r in replies],
         ))
     return result
+
+
+@router.post("/support/mark-read")
+async def mark_read(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tickets = (await db.execute(
+        select(SupportTicket).where(SupportTicket.user_id == user.id)
+    )).scalars().all()
+    now = datetime.utcnow()
+    for t in tickets:
+        t.investor_read_at = now
+    await db.commit()
+    return {"status": "ok"}
 
 
 @router.get("/admin/support", response_model=list[SupportTicketAdminOut])
@@ -116,6 +142,7 @@ async def admin_reply(
     reply = SupportReply(ticket_id=ticket_id, body=body)
     db.add(reply)
     ticket.status = "answered"
+    ticket.replied_at = datetime.utcnow()
     await db.commit()
 
     user = (await db.execute(select(User).where(User.id == ticket.user_id))).scalar_one_or_none()

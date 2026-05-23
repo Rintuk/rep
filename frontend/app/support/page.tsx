@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSupportTicket, getMyTickets, investorCloseTicket, SupportTicket } from "@/lib/api";
+import { createSupportTicket, getMyTickets, investorCloseTicket, markTicketsRead, SupportTicket } from "@/lib/api";
 import { ArrowLeft, Send } from "lucide-react";
 
 function CircuitBackground() {
@@ -89,6 +89,7 @@ export default function SupportPage() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
+    markTicketsRead().catch(() => {});
     loadTickets();
   }, []);
 

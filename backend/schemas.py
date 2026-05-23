@@ -95,6 +95,7 @@ class SupportTicketOut(BaseModel):
     message: str
     status: str
     created_at: datetime
+    has_unread: bool = False
     replies: list[SupportReplyOut] = []
 
 class SupportTicketAdminOut(SupportTicketOut):

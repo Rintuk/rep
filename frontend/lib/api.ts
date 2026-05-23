@@ -261,6 +261,7 @@ export interface SupportTicket {
   message: string;
   status: string;
   created_at: string;
+  has_unread: boolean;
   replies: SupportReply[];
   user_email?: string;
 }
@@ -291,6 +292,10 @@ export async function adminCloseTicket(ticketId: string) {
 
 export async function investorCloseTicket(ticketId: string) {
   await api.post(`/auth/support/${ticketId}/close`);
+}
+
+export async function markTicketsRead() {
+  await api.post("/auth/support/mark-read");
 }
 
 // ── Новости ──────────────────────────────────────────────────────────────────

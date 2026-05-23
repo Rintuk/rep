@@ -5,7 +5,7 @@ import {
   getDashboard,
   createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals,
   createForexDepositRequest, getMyForexDeposits, createForexWithdrawalRequest, getMyForexWithdrawals,
-  changePassword, getNews, NewsItem as NewsItemType, getMyTickets,
+  changePassword, getNews, NewsItem as NewsItemType, getMyTickets, markTicketsRead,
 } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, LogOut, Copy, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -162,7 +162,7 @@ export default function DashboardPage() {
     getMyForexDeposits().then(setMyForexDeposits).catch(() => {});
     getMyForexWithdrawals().then(setMyForexWithdrawals).catch(() => {});
     getNews().then(setNewsFeed).catch(() => {});
-    const refreshBadge = () => getMyTickets().then(t => setSupportBadge(t.filter(x => x.status === "answered").length)).catch(() => {});
+    const refreshBadge = () => getMyTickets().then(t => setSupportBadge(t.filter(x => x.has_unread).length)).catch(() => {});
     refreshBadge();
     const interval = setInterval(() => { fetchData(false); refreshBadge(); }, 60000);
     return () => clearInterval(interval);
@@ -376,7 +376,7 @@ export default function DashboardPage() {
                   { label: "Пополнить счёт", color: "#22c97a", icon: <PlusCircle size={15}/>, action: openDeposit },
                   { label: "Вывести средства", color: "#ff9944", icon: <Wallet size={15}/>, action: openWithdraw },
                   { label: copied ? "Скопировано!" : "Реф. ссылка", color: "#6b8ab0", icon: <Copy size={15}/>, action: () => { setMenuOpen(false); copyRefLink(); } },
-                  { label: "Поддержка", color: "#38bdf8", icon: <Headphones size={15}/>, badge: supportBadge, action: () => { setMenuOpen(false); setSupportBadge(0); router.push("/support"); } },
+                  { label: "Поддержка", color: "#38bdf8", icon: <Headphones size={15}/>, badge: supportBadge, action: () => { setMenuOpen(false); setSupportBadge(0); markTicketsRead().catch(() => {}); router.push("/support"); } },
                   { label: "Сменить пароль", color: "#a78bfa", icon: <Settings size={15}/>, action: () => { setMenuOpen(false); setShowChangePass(true); setChangePassMsg(null); setOldPass(""); setNewPass(""); setNewPass2(""); } },
                   { label: "Выйти", color: "#ff4d4d", icon: <LogOut size={15}/>, action: () => { setMenuOpen(false); logout(); } },
                 ].map((item, i) => item.special === "toggle" ? (
