@@ -82,6 +82,7 @@ export default function SupportPage() {
   const router = useRouter();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [ticketsLoaded, setTicketsLoaded] = useState(false);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -95,10 +96,14 @@ export default function SupportPage() {
   }, []);
 
   async function loadTickets() {
+    setTicketsError(null);
     try {
       const data = await getMyTickets();
       setTickets(data);
-    } catch { /* ignore */ } finally {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setTicketsError(msg || "Ошибка загрузки тикетов");
+    } finally {
       setTicketsLoaded(true);
     }
   }
@@ -154,6 +159,13 @@ export default function SupportPage() {
 
           {!ticketsLoaded ? (
             <p style={{ color: "#4a6a9a", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Загрузка…</p>
+          ) : ticketsError ? (
+            <div style={{ textAlign: "center", padding: "16px 0" }}>
+              <p style={{ color: "#ff6b6b", fontSize: 12, marginBottom: 10, wordBreak: "break-all" }}>Ошибка: {ticketsError}</p>
+              <button onClick={loadTickets} style={{ background: "rgba(0,180,255,0.12)", color: "#00b4ff", fontSize: 12, fontWeight: 600, padding: "6px 16px", borderRadius: 8, border: "1px solid rgba(0,180,255,0.25)", cursor: "pointer" }}>
+                Повторить
+              </button>
+            </div>
           ) : tickets.length === 0 ? (
             <p style={{ color: "#4a6a9a", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Обращений пока нет</p>
           ) : (
