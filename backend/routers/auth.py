@@ -56,9 +56,43 @@ async def _register(data: RegisterIn, db: AsyncSession):
         ref_user = ref_user.scalar_one_or_none()
         if not ref_user:
             raise HTTPException(status_code=400, detail="Реферальный код не найден")
-        # Проверяем лимит рефералов
+        # Динамический подсчет лимита
+        all_u = (await db.execute(select(User))).scalars().all()
+        all_f = (await db.execute(select(UserFinancials))).scalars().all()
+        f_map = {f.user_id: f for f in all_f}
+        c_map = {}
+        for u in all_u:
+            if u.referred_by:
+                c_map.setdefault(u.referred_by, []).append(u)
+        
+        my_f = f_map.get(ref_user.id)
+        total_vol = (my_f.investment_usdt + my_f.forex_investment_usdt) if my_f else 0.0
+        
+        q = [ref_user.id]
+        while q:
+            curr = q.pop(0)
+            for child in c_map.get(curr, []):
+                if child.is_active:
+                    cf = f_map.get(child.id)
+                    if cf:
+                        total_vol += cf.investment_usdt + cf.forex_investment_usdt
+                    q.append(child.id)
+                    
+        from constants import STATUS_THRESHOLDS, STATUS_INVITE_LIMITS
+        status = "PARTNER"
+        if ref_user.manual_status_override and ref_user.manual_status_override in STATUS_THRESHOLDS:
+            status = ref_user.manual_status_override
+        else:
+            if total_vol >= STATUS_THRESHOLDS["VIP"]: status = "VIP"
+            elif total_vol >= STATUS_THRESHOLDS["GOLD"]: status = "GOLD"
+            elif total_vol >= STATUS_THRESHOLDS["BRONZE"]: status = "BRONZE"
+            
+        dynamic_limit = STATUS_INVITE_LIMITS.get(status, 3)
+        # Если админ вручную дал limit больше чем по статусу, используем его
+        actual_limit = max(ref_user.referral_limit, dynamic_limit)
+        
         count = await db.execute(select(func.count()).where(User.referred_by == ref_user.id))
-        if count.scalar() >= ref_user.referral_limit:
+        if count.scalar() >= actual_limit:
             raise HTTPException(status_code=400, detail="Реферальный лимит исчерпан")
         referred_by_id = ref_user.id
 
@@ -121,6 +155,22 @@ async def set_referral_limit(user_id: str, limit: int, db: AsyncSession = Depend
     user.referral_limit = limit
     await db.commit()
     return {"status": "ok", "referral_limit": limit}
+
+
+@router.patch("/admin/status-override/{user_id}", dependencies=[Depends(get_admin_user)])
+async def set_status_override(user_id: str, status: str | None, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    # "NONE" or empty string clears the override
+    if status == "NONE" or status == "":
+        status = None
+        
+    user.manual_status_override = status
+    await db.commit()
+    return {"status": "ok", "manual_status_override": status}
 
 
 @router.get("/admin/users/{user_id}", dependencies=[Depends(get_admin_user)])
