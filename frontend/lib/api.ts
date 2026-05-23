@@ -285,6 +285,14 @@ export async function replyToTicket(ticketId: string, body: string) {
   return res.data as SupportTicket;
 }
 
+export async function adminCloseTicket(ticketId: string) {
+  await api.post(`/auth/admin/support/${ticketId}/close`);
+}
+
+export async function investorCloseTicket(ticketId: string) {
+  await api.post(`/auth/support/${ticketId}/close`);
+}
+
 // ── Новости ──────────────────────────────────────────────────────────────────
 
 export interface NewsItem {

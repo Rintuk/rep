@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSupportTicket, getMyTickets, SupportTicket } from "@/lib/api";
+import { createSupportTicket, getMyTickets, investorCloseTicket, SupportTicket } from "@/lib/api";
 import { ArrowLeft, Send } from "lucide-react";
 
 function CircuitBackground() {
@@ -75,8 +75,8 @@ const card: React.CSSProperties = {
   backdropFilter: "blur(12px)",
 };
 
-const STATUS_LABEL: Record<string, string> = { open: "Открыт", answered: "Отвечен" };
-const STATUS_COLOR: Record<string, string> = { open: "#f59e0b", answered: "#22c97a" };
+const STATUS_LABEL: Record<string, string> = { open: "Открыт", answered: "Отвечен", closed: "Закрыт" };
+const STATUS_COLOR: Record<string, string> = { open: "#f59e0b", answered: "#22c97a", closed: "#8090b0" };
 
 export default function SupportPage() {
   const router = useRouter();
@@ -96,6 +96,13 @@ export default function SupportPage() {
     try {
       const data = await getMyTickets();
       setTickets(data);
+    } catch { /* ignore */ }
+  }
+
+  async function handleClose(ticketId: string) {
+    try {
+      await investorCloseTicket(ticketId);
+      await loadTickets();
     } catch { /* ignore */ }
   }
 
@@ -197,7 +204,7 @@ export default function SupportPage() {
                   <p style={{ color: "#8aa0c0", fontSize: 13, lineHeight: 1.6, marginBottom: t.replies.length ? 12 : 0 }}>{t.message}</p>
                   {/* Ответы */}
                   {t.replies.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: t.status !== "closed" ? 12 : 0 }}>
                       {t.replies.map(r => (
                         <div key={r.id} style={{ background: "rgba(34,201,122,0.06)", border: "1px solid rgba(34,201,122,0.15)", borderRadius: 8, padding: "10px 14px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
@@ -208,6 +215,15 @@ export default function SupportPage() {
                         </div>
                       ))}
                     </div>
+                  )}
+                  {/* Кнопка закрытия */}
+                  {t.status !== "closed" && (
+                    <button
+                      onClick={() => handleClose(t.id)}
+                      style={{ marginTop: 8, background: "rgba(100,100,120,0.15)", color: "#8090b0", fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(100,100,120,0.25)", cursor: "pointer" }}
+                    >
+                      Закрыть тикет
+                    </button>
                   )}
                 </div>
               ))}

@@ -72,6 +72,36 @@ async def admin_list_tickets(
     return result
 
 
+@router.post("/admin/support/{ticket_id}/close")
+async def admin_close_ticket(
+    ticket_id: str,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = (await db.execute(select(SupportTicket).where(SupportTicket.id == ticket_id))).scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Тикет не найден")
+    ticket.status = "closed"
+    await db.commit()
+    return {"status": "closed"}
+
+
+@router.post("/support/{ticket_id}/close")
+async def investor_close_ticket(
+    ticket_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = (await db.execute(
+        select(SupportTicket).where(SupportTicket.id == ticket_id, SupportTicket.user_id == user.id)
+    )).scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Тикет не найден")
+    ticket.status = "closed"
+    await db.commit()
+    return {"status": "closed"}
+
+
 @router.post("/admin/support/{ticket_id}/reply", response_model=SupportTicketAdminOut)
 async def admin_reply(
     ticket_id: str,

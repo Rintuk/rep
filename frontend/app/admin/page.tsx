@@ -15,7 +15,7 @@ import {
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
   cryptoFullReset,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
-  getAdminTickets, replyToTicket, SupportTicket,
+  getAdminTickets, replyToTicket, adminCloseTicket, SupportTicket,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -222,6 +222,15 @@ export default function AdminPage() {
       await fetchTickets();
     } catch { /* ignore */ }
     finally { setReplyLoading(null); }
+  }
+
+  async function handleAdminClose(ticketId: string) {
+    if (!confirm("Закрыть тикет?")) return;
+    try {
+      await adminCloseTicket(ticketId);
+      setExpandedTicket(null);
+      await fetchTickets();
+    } catch { /* ignore */ }
   }
 
   async function fetchData() {
@@ -1289,16 +1298,16 @@ export default function AdminPage() {
                       style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "14px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, textAlign: "left" }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
                           <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{t.subject}</span>
                           <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 600,
-                            background: t.status === "open" ? "rgba(245,158,11,0.15)" : "rgba(34,201,122,0.12)",
-                            color: t.status === "open" ? "#f59e0b" : "#22c97a" }}>
-                            {t.status === "open" ? "Открыт" : "Отвечен"}
+                            background: t.status === "open" ? "rgba(245,158,11,0.15)" : t.status === "closed" ? "rgba(100,100,120,0.2)" : "rgba(34,201,122,0.12)",
+                            color: t.status === "open" ? "#f59e0b" : t.status === "closed" ? "#8090b0" : "#22c97a" }}>
+                            {t.status === "open" ? "Открыт" : t.status === "closed" ? "Закрыт" : "Отвечен"}
                           </span>
                         </div>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <span style={{ color: muted, fontSize: 12 }}>{t.user_email}</span>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          <span style={{ color: "#e0e8ff", fontSize: 12, fontWeight: 500 }}>👤 {t.user_email}</span>
                           <span style={{ color: muted, fontSize: 11 }}>{new Date(t.created_at).toLocaleString("ru", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                         </div>
                       </div>
@@ -1330,22 +1339,32 @@ export default function AdminPage() {
                         )}
 
                         {/* Форма ответа */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <textarea
-                            value={replyTexts[t.id] || ""}
-                            onChange={e => setReplyTexts(prev => ({ ...prev, [t.id]: e.target.value }))}
-                            placeholder="Ваш ответ..."
-                            rows={3}
-                            style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${border}`, borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 13, outline: "none", resize: "vertical", fontFamily: "inherit" }}
-                          />
-                          <button
-                            onClick={() => handleReply(t.id)}
-                            disabled={replyLoading === t.id || !(replyTexts[t.id] || "").trim()}
-                            style={{ alignSelf: "flex-start", background: "#22c97a", color: "#000", fontWeight: 700, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", opacity: (replyLoading === t.id || !(replyTexts[t.id] || "").trim()) ? 0.5 : 1 }}
-                          >
-                            {replyLoading === t.id ? "Отправка..." : "Ответить"}
-                          </button>
-                        </div>
+                        {t.status !== "closed" && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <textarea
+                              value={replyTexts[t.id] || ""}
+                              onChange={e => setReplyTexts(prev => ({ ...prev, [t.id]: e.target.value }))}
+                              placeholder="Ваш ответ..."
+                              rows={3}
+                              style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${border}`, borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 13, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+                            />
+                            <div style={{ display: "flex", gap: 10 }}>
+                              <button
+                                onClick={() => handleReply(t.id)}
+                                disabled={replyLoading === t.id || !(replyTexts[t.id] || "").trim()}
+                                style={{ background: "#22c97a", color: "#000", fontWeight: 700, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", opacity: (replyLoading === t.id || !(replyTexts[t.id] || "").trim()) ? 0.5 : 1 }}
+                              >
+                                {replyLoading === t.id ? "Отправка..." : "Ответить"}
+                              </button>
+                              <button
+                                onClick={() => handleAdminClose(t.id)}
+                                style={{ background: "rgba(100,100,120,0.2)", color: "#8090b0", fontWeight: 600, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "1px solid rgba(100,100,120,0.3)", cursor: "pointer" }}
+                              >
+                                Закрыть тикет
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
