@@ -34,7 +34,7 @@ interface Overview {
   positions: { symbol: string; amount: number; avg_price: number; current_price: number; value: number }[];
   trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
   ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
-  investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number }[];
+  investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; }[];
   referrals: { id: string; email: string; is_active: boolean; referred_by_email: string; investment: number }[];
   pending_users: { id: string; email: string; created_at: string }[];
 }
