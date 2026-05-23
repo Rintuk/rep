@@ -8,6 +8,16 @@ api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    // When API_URL points to localhost but the page is opened from another device
+    // (e.g. mobile via LAN), rewrite the host so API calls reach the right machine.
+    const isLocalhostFallback = !process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL.includes("localhost") ||
+      process.env.NEXT_PUBLIC_API_URL.includes("127.0.0.1");
+    const pageHost = window.location.hostname;
+    if (isLocalhostFallback && pageHost !== "localhost" && pageHost !== "127.0.0.1") {
+      config.baseURL = `${window.location.protocol}//${pageHost}:8000`;
+    }
   }
   return config;
 });

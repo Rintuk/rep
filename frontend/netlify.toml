@@ -8,3 +8,4 @@ package = "@netlify/plugin-nextjs"
 [build.environment]
   NEXT_PUBLIC_WALLET_ADDRESS = "TWDLBDKEoA8kGdR7bvUkG5f5a2ZLUbvNuw"
   NEXT_PUBLIC_WALLET_NETWORK = "USDT TRC20"
+  NEXT_PUBLIC_API_URL = "https://REPLACE_WITH_YOUR_BACKEND_URL"
