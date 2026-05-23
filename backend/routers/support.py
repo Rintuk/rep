@@ -1,7 +1,7 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from database import get_db
 from models import SupportTicket, SupportReply, User
 from schemas import SupportTicketCreate, SupportTicketOut, SupportTicketAdminOut, SupportReplyOut
@@ -162,3 +162,15 @@ async def admin_reply(
         user_email=user.email if user else "—",
         replies=[SupportReplyOut(id=r.id, body=r.body, created_at=r.created_at) for r in replies],
     )
+
+
+@router.post("/admin/support/clear-all")
+async def clear_all_tickets(
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Удаляет все тикеты и все ответы к ним."""
+    await db.execute(delete(SupportReply))
+    await db.execute(delete(SupportTicket))
+    await db.commit()
+    return {"status": "ok", "message": "Вся история тикетов удалена"}

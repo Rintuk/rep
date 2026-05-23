@@ -15,7 +15,7 @@ import {
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
   cryptoFullReset,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
-  getAdminTickets, replyToTicket, adminCloseTicket, SupportTicket,
+  getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, SupportTicket,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -157,6 +157,8 @@ export default function AdminPage() {
   const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
   const [replyLoading, setReplyLoading] = useState<string | null>(null);
+  const [clearTicketsLoading, setClearTicketsLoading] = useState(false);
+  const [clearTicketsMsg, setClearTicketsMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -232,6 +234,23 @@ export default function AdminPage() {
       setExpandedTicket(null);
       await fetchTickets();
     } catch { /* ignore */ }
+  }
+
+  async function handleClearAllTickets() {
+    if (!confirm("Удалить ВСЮ историю тикетов?\n\nЭто действие необратимо.")) return;
+    setClearTicketsLoading(true);
+    setClearTicketsMsg(null);
+    try {
+      const r = await clearAllTickets();
+      setClearTicketsMsg(r.message);
+      setExpandedTicket(null);
+      await fetchTickets();
+    } catch {
+      setClearTicketsMsg("Ошибка удаления");
+    } finally {
+      setClearTicketsLoading(false);
+      setTimeout(() => setClearTicketsMsg(null), 4000);
+    }
   }
 
   async function fetchData() {
@@ -1296,14 +1315,36 @@ export default function AdminPage() {
         {/* Поддержка */}
         {activeTab === "support" && (
           <div style={{ ...card, padding: 20 }}>
-            <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 15, marginBottom: 16 }}>
-              Обращения в поддержку
-              {tickets.filter(t => t.status === "open").length > 0 && (
-                <span style={{ marginLeft: 8, fontSize: 12, padding: "2px 8px", borderRadius: 10, background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}>
-                  {tickets.filter(t => t.status === "open").length} новых
-                </span>
-              )}
-            </h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+              <h3 style={{ color: "#fff", fontWeight: 700, fontSize: 15, margin: 0 }}>
+                Обращения в поддержку
+                {tickets.filter(t => t.status === "open").length > 0 && (
+                  <span style={{ marginLeft: 8, fontSize: 12, padding: "2px 8px", borderRadius: 10, background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}>
+                    {tickets.filter(t => t.status === "open").length} новых
+                  </span>
+                )}
+              </h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {clearTicketsMsg && (
+                  <span style={{ fontSize: 12, color: clearTicketsMsg.includes("Ошибка") ? "#ff4d4d" : "#22c97a" }}>
+                    {clearTicketsMsg}
+                  </span>
+                )}
+                <button
+                  onClick={handleClearAllTickets}
+                  disabled={clearTicketsLoading || tickets.length === 0}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    background: "rgba(127,29,29,0.7)", color: "#fca5a5",
+                    border: "1px solid rgba(255,77,77,0.3)",
+                    opacity: (clearTicketsLoading || tickets.length === 0) ? 0.5 : 1,
+                  }}
+                >
+                  🗑 {clearTicketsLoading ? "Удаление…" : "Очистить историю"}
+                </button>
+              </div>
+            </div>
             {tickets.length === 0
               ? <p style={{ color: muted, fontSize: 13 }}>Обращений пока нет</p>
               : <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
