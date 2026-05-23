@@ -108,8 +108,8 @@ function CircuitBackground() {
   return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }} />;
 }
 
-const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", GOLD: "#ffd700", VIP: "#f59e0b" };
-const STATUS_LABELS: Record<string, string> = { PARTNER: "Партнёр", BRONZE: "🥉 Бронза", GOLD: "🥇 Золото", VIP: "💎 VIP" };
+const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", SILVER: "#c0c0c0", GOLD: "#ffd700", VIP: "#f59e0b" };
+const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Партнёр", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
 
 export default function AdminPage() {
   const router = useRouter();
@@ -1018,22 +1018,34 @@ export default function AdminPage() {
                               {u.ref_income > 0 ? `+${u.ref_income.toFixed(2)} $` : "—"}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
-                              <div style={{ color: "#fff", fontSize: 13 }}>{u.referrals_count} чел.</div>
-                              <div style={{ fontSize: 11, color: u.status ? STATUS_COLORS[u.status] : muted, marginTop: 2, fontWeight: 500 }}>
-                                {u.status ? STATUS_LABELS[u.status] || u.status : "Партнёр"}
+                              <div style={{ color: "#fff", fontSize: 13, marginBottom: 8 }}>
+                                <span style={{ color: muted, marginRight: 4 }}>Рефералы:</span>
+                                {u.referrals_count}
+                              </div>
+                              <div style={{ 
+                                display: "inline-block",
+                                padding: "4px 8px", 
+                                background: u.status ? `${STATUS_COLORS[u.status]}22` : "rgba(107, 138, 176, 0.15)",
+                                border: `1px solid ${u.status ? STATUS_COLORS[u.status] : "#6b8ab0"}`,
+                                borderRadius: 6,
+                                fontSize: 11, 
+                                color: u.status ? STATUS_COLORS[u.status] : "#6b8ab0", 
+                                fontWeight: 600 
+                              }}>
+                                {u.status ? STATUS_LABELS[u.status] || u.status : "🔰 Партнёр"}
                               </div>
                               {u.next_vol ? (
-                                <div style={{ marginTop: 6, width: 120 }}>
+                                <div style={{ marginTop: 8, width: 120 }}>
                                   <div style={{ fontSize: 9, color: muted, marginBottom: 2, display: "flex", justifyContent: "space-between" }}>
-                                    <span>{u.total_volume ? u.total_volume.toFixed(0) : 0} $</span>
-                                    <span>{u.next_vol} $</span>
+                                    <span>Оборот: {u.total_volume ? u.total_volume.toFixed(0) : 0} $</span>
+                                    <span>Цель: {u.next_vol} $</span>
                                   </div>
                                   <div style={{ height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 2, overflow: "hidden" }}>
                                     <div style={{ width: `${Math.min(((u.total_volume || 0) / u.next_vol) * 100, 100)}%`, height: "100%", background: u.status && STATUS_COLORS[u.status] ? STATUS_COLORS[u.status] : "#6b8ab0" }} />
                                   </div>
                                 </div>
                               ) : (
-                                <div style={{ fontSize: 10, color: muted, marginTop: 2 }}>
+                                <div style={{ fontSize: 10, color: muted, marginTop: 6 }}>
                                   Оборот: {u.total_volume ? u.total_volume.toFixed(0) : "0"} $
                                 </div>
                               )}

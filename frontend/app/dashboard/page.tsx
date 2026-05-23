@@ -33,8 +33,8 @@ type DepositItem = { id: string; amount: number; status: string; created_at: str
 const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888", DEPOSIT: "#f59e0b" };
 const ACTION_LABEL: Record<string, string> = { BUY: "BUY", SELL: "SELL", HOLD: "HOLD", DEPOSIT: "Пополнение" };
 
-const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", GOLD: "#ffd700", VIP: "#f59e0b" };
-const STATUS_LABELS: Record<string, string> = { PARTNER: "Партнёр", BRONZE: "🥉 Бронза", GOLD: "🥇 Золото", VIP: "💎 VIP" };
+const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", SILVER: "#c0c0c0", GOLD: "#ffd700", VIP: "#f59e0b" };
+const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Партнёр", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
 const STATUS_LEVELS: Record<string, number> = { PARTNER: 1, BRONZE: 2, GOLD: 3, VIP: 5 };
 
 // ─── Circuit board background ─────────────────────────────────────────────────
