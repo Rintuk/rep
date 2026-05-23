@@ -87,9 +87,13 @@ export default function SupportPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [debugInfo, setDebugInfo] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const tokenShort = token ? token.slice(-8) : "НЕТ";
+    setDebugInfo(`API: ${apiUrl} | токен: ...${tokenShort}`);
     if (!token) { router.push("/login"); return; }
     markTicketsRead().catch(() => {});
     loadTickets();
@@ -101,8 +105,8 @@ export default function SupportPage() {
       const data = await getMyTickets();
       setTickets(data);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setTicketsError(msg || "Ошибка загрузки тикетов");
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setTicketsError(errMsg || "Ошибка загрузки тикетов");
     } finally {
       setTicketsLoaded(true);
     }
@@ -212,6 +216,7 @@ export default function SupportPage() {
         {/* Форма нового обращения */}
         <div style={{ ...card, padding: 24 }}>
           <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Новое обращение</h2>
+          {debugInfo && <p style={{ fontSize: 10, color: "#4a6a9a", marginBottom: 12, wordBreak: "break-all" }}>🔧 {debugInfo} | тикетов: {ticketsLoaded ? tickets.length : "?"} {ticketsError ? `| ошибка: ${ticketsError}` : ""}</p>}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <label style={{ color: "#8aa0c0", fontSize: 12, fontWeight: 600, marginBottom: 6, display: "block" }}>Тема вопроса</label>
