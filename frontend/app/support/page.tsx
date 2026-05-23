@@ -173,7 +173,7 @@ export default function SupportPage() {
           ) : tickets.length === 0 ? (
             <p style={{ color: "#4a6a9a", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Обращений пока нет</p>
           ) : (
-            <div style={{ maxHeight: 480, overflowY: "auto", display: "flex", flexDirection: "column", gap: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {tickets.map((t, i) => (
                 <div key={t.id} style={{ padding: "16px 0", borderBottom: i < tickets.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
