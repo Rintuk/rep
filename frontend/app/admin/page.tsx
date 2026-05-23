@@ -13,7 +13,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset,
+  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, SupportTicket,
 } from "@/lib/api";
@@ -44,6 +44,7 @@ interface InvestorForm {
   withdrawal_usdt: string;
   note: string;
   referral_limit: string;
+  manual_status_override: string;
   forex_investment_usdt: string;
   forex_withdrawal_usdt: string;
 }
@@ -145,6 +146,11 @@ export default function AdminPage() {
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
+
+  const [statusOverrideMsg, setStatusOverrideMsg] = useState<Record<string, string>>({});
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [migrateLoading, setMigrateLoading] = useState(false);
+  const [migrateMsg, setMigrateMsg] = useState<string | null>(null);
 
   const [newsList, setNewsList] = useState<NewsItemType[]>([]);
   const [newsTitle, setNewsTitle] = useState("");
@@ -332,12 +338,60 @@ export default function AdminPage() {
           withdrawal_usdt: String(detail.withdrawal_usdt ?? 0),
           note: detail.note ?? "",
           referral_limit: String(detail.referral_limit ?? 5),
+          manual_status_override: detail.manual_status_override || "NONE",
           forex_investment_usdt: String(detail.forex_investment_usdt ?? 0),
           forex_withdrawal_usdt: String(detail.forex_withdrawal_usdt ?? 0),
         }}));
       } catch {
-        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", forex_investment_usdt: "0", forex_withdrawal_usdt: "0" } }));
+        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0" } }));
       }
+    }
+  }
+
+  async function handleBackup() {
+    setBackupLoading(true);
+    try {
+      const data = await backupDatabase();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup_${new Date().toISOString().split("T")[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Ошибка при создании бэкапа");
+    } finally {
+      setBackupLoading(false);
+    }
+  }
+
+  async function handleMigrate() {
+    if (!confirm("Фиксировать историческую прибыль по старым ставкам? Это действие сбросит точки входа (entry_pool_pct) на текущие!")) return;
+    setMigrateLoading(true); setMigrateMsg(null);
+    try {
+      const r = await migratePnL();
+      setMigrateMsg(`Успешно. Обновлено инвесторов: ${r.updated_investors}. Залочено профита (Крипто): $${r.total_crypto_locked}`);
+      fetchData();
+    } catch {
+      setMigrateMsg("Ошибка миграции");
+    } finally {
+      setMigrateLoading(false);
+    }
+  }
+
+  async function handleStatusSave(id: string) {
+    const f = forms[id];
+    if (!f) return;
+    setStatusOverrideMsg(prev => ({ ...prev, [id]: "Сохранение..." }));
+    try {
+      await setStatusOverride(id, f.manual_status_override);
+      await setReferralLimit(id, Number(f.referral_limit));
+      setStatusOverrideMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
+      setTimeout(() => setStatusOverrideMsg(prev => ({ ...prev, [id]: "" })), 2000);
+      fetchData();
+    } catch {
+      setStatusOverrideMsg(prev => ({ ...prev, [id]: "Ошибка сохранения" }));
     }
   }
 
@@ -726,6 +780,35 @@ export default function AdminPage() {
             {dangerZoneOpen && (
               <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
 
+                {/* Скачать Бэкап */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(13,58,32,0.8)" }}>
+                  <div>
+                    <p style={{ color: "#22c97a", fontSize: 13, fontWeight: 600 }}>💾 Создать бэкап финансов</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Выгрузить всех пользователей и их финансы в JSON.</p>
+                  </div>
+                  <button onClick={handleBackup} disabled={backupLoading}
+                    style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: "rgba(13,58,32,0.8)", color: "#22c97a", cursor: "pointer", border: "1px solid rgba(34,201,122,0.3)", opacity: backupLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                    {backupLoading ? "..." : "Скачать"}
+                  </button>
+                </div>
+
+                {/* Миграция PnL */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,153,68,0.3)" }}>
+                  <div>
+                    <p style={{ color: "#ff9944", fontSize: 13, fontWeight: 600 }}>🛠 Миграция PnL (Сохранение старой прибыли)</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Зафиксировать текущую прибыль (по 77%) в locked_pnl и сбросить точки входа.</p>
+                    {migrateMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{migrateMsg}</p>}
+                  </div>
+                  <button onClick={handleMigrate} disabled={migrateLoading}
+                    style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: "rgba(68,34,13,0.8)", color: "#ff9944", cursor: "pointer", border: "1px solid rgba(255,153,68,0.3)", opacity: migrateLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                    {migrateLoading ? "..." : "Запустить миграцию"}
+                  </button>
+                </div>
+
                 {/* Очистка демо */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                   padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,77,77,0.15)" }}>
@@ -975,8 +1058,39 @@ export default function AdminPage() {
                                       </div>
                                     )}
 
+                                    {/* Настройки статуса и лимитов (Общие) */}
+                                    <div style={{ borderTop: `1px solid ${border}`, paddingTop: 16, marginTop: 8 }}>
+                                      <p style={{ color: "#fff", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Партнерские настройки (Общие)</p>
+                                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                                        <div>
+                                          <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>Статус (Вручную)</label>
+                                          <select value={f.manual_status_override} onChange={e => updateForm(u.id, "manual_status_override", e.target.value)}
+                                            style={{ ...inputStyle, background: "rgba(0,0,0,0.5)" }}>
+                                            <option value="NONE">Автоматически</option>
+                                            <option value="PARTNER">Партнер</option>
+                                            <option value="BRONZE">Бронза</option>
+                                            <option value="GOLD">Золото</option>
+                                            <option value="VIP">VIP</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>Лимит инвайтов (Минимум)</label>
+                                          <input type="number" value={f.referral_limit}
+                                            onChange={e => updateForm(u.id, "referral_limit", e.target.value)}
+                                            style={inputStyle} />
+                                        </div>
+                                      </div>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+                                        <button onClick={() => handleStatusSave(u.id)}
+                                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 16px", borderRadius: 8, background: "rgba(68,136,221,0.2)", color: "#4488dd", cursor: "pointer", border: "1px solid rgba(68,136,221,0.4)" }}>
+                                          <Save size={13} /> Сохранить настройки
+                                        </button>
+                                        {statusOverrideMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: statusOverrideMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{statusOverrideMsg[u.id]}</span>}
+                                      </div>
+                                    </div>
+
                                     {/* Служебные операции инвестора */}
-                                    <div style={{ borderTop: `1px solid ${border}`, marginTop: 4 }}>
+                                    <div style={{ borderTop: `1px solid ${border}`, marginTop: 16, paddingTop: 8 }}>
                                       <button
                                         onClick={() => setInvestorDangerOpen(prev => ({ ...prev, [u.id]: !prev[u.id] }))}
                                         style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "10px 0",

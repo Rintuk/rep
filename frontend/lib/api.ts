@@ -370,3 +370,22 @@ export async function resetForexDemoAccount() {
   const res = await api.post("/api/demo/forex/reset");
   return res.data;
 }
+
+// ── Admin: Migration & Override ──────────────────────────────────────────────
+
+export async function backupDatabase() {
+  const res = await api.get("/auth/admin/backup-db");
+  return res.data;
+}
+
+export async function migratePnL() {
+  const res = await api.post("/auth/admin/migrate-pnl");
+  return res.data;
+}
+
+export async function setStatusOverride(userId: string, status: string | null) {
+  const res = await api.patch(`/auth/admin/status-override/${userId}`, null, {
+    params: { status: status || "NONE" }
+  });
+  return res.data;
+}

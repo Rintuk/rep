@@ -193,6 +193,7 @@ async def get_user_detail(user_id: str, db: AsyncSession = Depends(get_db)):
         "is_admin": user.is_admin,
         "referral_code": user.referral_code,
         "referral_limit": user.referral_limit,
+        "manual_status_override": user.manual_status_override,
         "referred_by": user.referred_by,
         "created_at": str(user.created_at),
         "investment_usdt": fin.investment_usdt if fin else 0.0,

@@ -13,12 +13,13 @@ import { QRCodeSVG } from "qrcode.react";
 interface Position { symbol: string; amount: number; avg_price: number; current_price?: number; }
 interface Trade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }
 interface AIFeed { timestamp: string; action: string; symbol: string; reason: string; }
-interface ReferralInfo { email: string; investment_usdt: number; bonus_usdt: number; }
+interface ReferralInfo { email: string; investment_usdt: number; bonus_usdt: number; level: number; }
 interface Dashboard {
   balance_usdt: number; pool_total_usdt: number; pool_positions_usdt: number;
   mode: string; hwm: number; drawdown_pct: number; server_online: boolean;
   last_updated: string | null;
   user_investment: number; user_pnl: number; user_pnl_pct: number;
+  status: string; total_volume_usdt: number; next_status_volume: number | null;
   ref_bonus: number; referral_code: string; referrals: ReferralInfo[];
   positions: Position[]; recent_trades: Trade[]; ai_feed: AIFeed[];
   forex_pool_total: number; forex_pool_positions: number; forex_balance: number;
@@ -31,6 +32,10 @@ type DepositItem = { id: string; amount: number; status: string; created_at: str
 
 const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888", DEPOSIT: "#f59e0b" };
 const ACTION_LABEL: Record<string, string> = { BUY: "BUY", SELL: "SELL", HOLD: "HOLD", DEPOSIT: "Пополнение" };
+
+const STATUS_COLORS: Record<string, string> = { PARTNER: "#4a6a9a", BRONZE: "#cd7f32", GOLD: "#ffd700", VIP: "#a855f7" };
+const STATUS_LABELS: Record<string, string> = { PARTNER: "Партнер", BRONZE: "Бронза", GOLD: "Золото", VIP: "VIP" };
+const STATUS_LEVELS: Record<string, number> = { PARTNER: 1, BRONZE: 2, GOLD: 3, VIP: 5 };
 
 // ─── Circuit board background ─────────────────────────────────────────────────
 function CircuitBackground() {
@@ -458,84 +463,102 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* ── Рефералы ──────────────────────────────────────────────────────── */}
-        {isCrypto && (
-          <div style={{ ...card, padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: data.referrals.length > 0 ? 16 : 0 }}>
-              <div>
-                <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Мои рефералы</h2>
-                <p style={{ color: "#4a6a9a", fontSize: 12 }}>Вы получаете 3% от прибыли каждого приглашённого</p>
-              </div>
-              <button onClick={copyRefLink} style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-                background: copied ? "rgba(34,201,122,0.15)" : "rgba(68,136,221,0.12)",
-                border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(68,136,221,0.3)"}`,
-                color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
-              }}>
-                <Copy size={14} />
-                {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
-              </button>
+        {/* ── Партнерская программа (Общая) ──────────────────────────────────────── */}
+        <div style={{ ...card, padding: 20 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
+            <div>
+              <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Партнерская программа</h2>
+              <p style={{ color: "#4a6a9a", fontSize: 12 }}>Приглашайте друзей и получайте процент от их прибыли</p>
             </div>
-            {data.referrals.length === 0 ? (
-              <p style={{ color: "#4a6a9a", fontSize: 13 }}>Пока никто не зарегистрировался по вашей ссылке</p>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ color: "#4a6a9a" }}>
-                      <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 400 }}>Email</th>
-                      <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Инвестиция</th>
-                      <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Ваш бонус</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.referrals.map((r, i) => (
-                      <tr key={i} style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
-                        <td style={{ padding: "8px 0", color: "#fff" }}>{r.email}</td>
-                        <td style={{ padding: "8px 0", textAlign: "right", color: "#fff" }}>{r.investment_usdt > 0 ? `${r.investment_usdt.toFixed(2)} $` : "—"}</td>
-                        <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600, color: r.bonus_usdt > 0 ? "#f59e0b" : "#4a6a9a" }}>{r.bonus_usdt > 0 ? `+${r.bonus_usdt.toFixed(2)} $` : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  {data.ref_bonus > 0 && (
-                    <tfoot>
-                      <tr style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
-                        <td colSpan={2} style={{ paddingTop: 8, color: "#4a6a9a", fontSize: 12 }}>Итого бонус</td>
-                        <td style={{ paddingTop: 8, textAlign: "right", fontWeight: 700, color: "#f59e0b" }}>+{data.ref_bonus.toFixed(2)} $</td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-            )}
+            <button onClick={copyRefLink} style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              background: copied ? "rgba(34,201,122,0.15)" : "rgba(68,136,221,0.12)",
+              border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(68,136,221,0.3)"}`,
+              color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
+            }}>
+              <Copy size={14} />
+              {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
+            </button>
           </div>
-        )}
 
-        {!isCrypto && (data.forex_ref_bonus ?? 0) > 0 && (
-          <div style={{ ...card, padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
-              <div>
-                <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Реф. доход (Форекс)</h2>
-                <p style={{ color: "#4a6a9a", fontSize: 12 }}>Вы получаете 3% от прибыли приглашённых в форекс-пул</p>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 24 }}>
+            <div style={{ flex: "1 1 200px", padding: 16, background: "rgba(0,0,0,0.2)", borderRadius: 12, border: "1px solid rgba(0,180,255,0.1)" }}>
+              <div style={{ color: "#4a6a9a", fontSize: 12, marginBottom: 8 }}>Ваш статус</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ 
+                  color: STATUS_COLORS[data.status] || "#fff", 
+                  fontWeight: 700, fontSize: 20,
+                  textShadow: `0 0 10px ${STATUS_COLORS[data.status] || "#fff"}40`
+                }}>
+                  {STATUS_LABELS[data.status] || data.status}
+                </span>
+                <span style={{ fontSize: 11, padding: "2px 8px", background: "rgba(255,255,255,0.05)", borderRadius: 10, color: "#aaa" }}>
+                  {STATUS_LEVELS[data.status]} {STATUS_LEVELS[data.status] === 1 ? "уровень" : STATUS_LEVELS[data.status] === 5 ? "уровней" : "уровня"} в глубину
+                </span>
               </div>
-              <button onClick={copyRefLink} style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-                background: copied ? "rgba(34,201,122,0.15)" : "rgba(245,158,11,0.12)",
-                border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(245,158,11,0.3)"}`,
-                color: copied ? "#22c97a" : "#f59e0b", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
-              }}>
-                <Copy size={14} />
-                {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
-              </button>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 12, borderTop: "1px solid rgba(0,180,255,0.08)" }}>
-              <span style={{ color: "#4a6a9a", fontSize: 13 }}>Итого бонус</span>
-              <span style={{ fontWeight: 700, color: "#f59e0b", fontSize: 16 }}>+{data.forex_ref_bonus.toFixed(2)} $</span>
+            
+            <div style={{ flex: "2 1 300px", padding: 16, background: "rgba(0,0,0,0.2)", borderRadius: 12, border: "1px solid rgba(0,180,255,0.1)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ color: "#4a6a9a", fontSize: 12 }}>Общий объем структуры</span>
+                <span style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{data.total_volume_usdt.toFixed(2)} $</span>
+              </div>
+              
+              {data.next_status_volume ? (
+                <>
+                  <div style={{ width: "100%", height: 6, background: "rgba(255,255,255,0.05)", borderRadius: 3, overflow: "hidden", marginBottom: 8 }}>
+                    <div style={{ 
+                      width: `${Math.min(100, (data.total_volume_usdt / data.next_status_volume) * 100)}%`, 
+                      height: "100%", background: "linear-gradient(90deg, #4488dd, #22c97a)", borderRadius: 3
+                    }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#4a6a9a" }}>
+                    <span>До следующего статуса</span>
+                    <span>{data.next_status_volume} $</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ color: "#22c97a", fontSize: 12, marginTop: 12 }}>Вы достигли максимального статуса! 🎉</div>
+              )}
             </div>
           </div>
-        )}
+
+          {data.referrals.length === 0 ? (
+            <p style={{ color: "#4a6a9a", fontSize: 13 }}>Пока никто не зарегистрировался по вашей ссылке</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ color: "#4a6a9a" }}>
+                    <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 400 }}>Email</th>
+                    <th style={{ textAlign: "center", paddingBottom: 8, fontWeight: 400 }}>Уровень</th>
+                    <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Оборот</th>
+                    <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Ваш бонус (Крипто+Форекс)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.referrals.map((r, i) => (
+                    <tr key={i} style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
+                      <td style={{ padding: "8px 0", color: "#fff" }}>{r.email}</td>
+                      <td style={{ padding: "8px 0", textAlign: "center", color: "#4a6a9a" }}>L{r.level}</td>
+                      <td style={{ padding: "8px 0", textAlign: "right", color: "#fff" }}>{r.investment_usdt > 0 ? `${r.investment_usdt.toFixed(2)} $` : "—"}</td>
+                      <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600, color: r.bonus_usdt > 0 ? "#f59e0b" : "#4a6a9a" }}>{r.bonus_usdt > 0 ? `+${r.bonus_usdt.toFixed(2)} $` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {(data.ref_bonus > 0 || data.forex_ref_bonus > 0) && (
+                  <tfoot>
+                    <tr style={{ borderTop: "1px solid rgba(0,180,255,0.08)" }}>
+                      <td colSpan={3} style={{ paddingTop: 8, color: "#4a6a9a", fontSize: 12 }}>Итого бонус</td>
+                      <td style={{ paddingTop: 8, textAlign: "right", fontWeight: 700, color: "#f59e0b" }}>+{(data.ref_bonus + data.forex_ref_bonus).toFixed(2)} $</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          )}
+        </div>
 
         {/* ── Новости и события ────────────────────────────────────────────── */}
         {newsFeed.length > 0 && (
