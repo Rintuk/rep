@@ -162,7 +162,8 @@ export default function AdminPage() {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    fetchTickets();
+    const interval = setInterval(() => { fetchData(); fetchTickets(); }, 60000);
     return () => clearInterval(interval);
   }, [activePool]);
 
@@ -509,6 +510,22 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
+
+        {/* Открытые тикеты поддержки */}
+        {tickets.filter(t => t.status === "open").length > 0 && (
+          <button
+            onClick={() => setActiveTab("support")}
+            style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: 0 }}
+          >
+            <div style={{ ...card, padding: "14px 18px", border: "1px solid rgba(255,60,60,0.4)", background: "rgba(40,5,5,0.75)", display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff3c3c", display: "inline-block", flexShrink: 0, boxShadow: "0 0 8px #ff3c3c" }} />
+              <span style={{ color: "#ff3c3c", fontWeight: 700, fontSize: 14 }}>
+                Открытые тикеты! — {tickets.filter(t => t.status === "open").length} {tickets.filter(t => t.status === "open").length === 1 ? "обращение ожидает ответа" : "обращений ожидают ответа"}
+              </span>
+              <span style={{ marginLeft: "auto", color: "#ff3c3c", fontSize: 12, opacity: 0.7 }}>Перейти →</span>
+            </div>
+          </button>
+        )}
 
         {/* Ожидают одобрения */}
         {data.pending_users.length > 0 && (
