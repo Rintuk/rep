@@ -159,7 +159,9 @@ export default function SupportPage() {
 
         {/* История обращений — всегда видна */}
         <div style={{ ...card, padding: 24 }}>
-          <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>Мои обращения</h2>
+          <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>
+            Мои обращения{ticketsLoaded && !ticketsError && <span style={{ color: "#4a6a9a", fontWeight: 400, fontSize: 13, marginLeft: 8 }}>({tickets.length})</span>}
+          </h2>
 
           {!ticketsLoaded ? (
             <p style={{ color: "#4a6a9a", fontSize: 13, textAlign: "center", padding: "16px 0" }}>Загрузка…</p>
