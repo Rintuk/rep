@@ -326,6 +326,10 @@ async def approve_forex_deposit(request_id: str, actual_amount: float, db: Async
 
     current_pnl_pct = await _get_forex_pool_pnl_pct(db)
 
+    # АВТО-МИГРАЦИЯ PNL (защита от размытия процентов)
+    from routers.auth import _migrate_pnl_internal
+    await _migrate_pnl_internal(db, override_forex_pct=current_pnl_pct)
+
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
         old_inv = fin.forex_investment_usdt

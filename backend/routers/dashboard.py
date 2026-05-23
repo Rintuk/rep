@@ -64,7 +64,7 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 f = fins_map.get(child.id)
                 if f:
                     total_volume += f.investment_usdt + f.forex_investment_usdt
-                q.append(child.id)
+            q.append(child.id)
                 
     status, next_vol, levels_allowed = _get_status_and_limits(total_volume, manual_override)
     
@@ -76,6 +76,9 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             continue
             
         for child in children_map.get(curr, []):
+            # Always traverse children (dynamic compression)
+            queue.append((child.id, depth + 1))
+            
             if not child.is_active:
                 continue
             
@@ -115,12 +118,6 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 parts = child.email.split("@")
                 masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else child.email
                 refs_info.append(ReferralInfo(email=masked, investment_usdt=inv + fx, bonus_usdt=cb + fb, level=depth))
-            
-            queue.append((child.id, depth + 1))
-            
-    if my_fin:
-        crypto_bonus += my_fin.locked_crypto_ref_bonus
-        forex_bonus += my_fin.locked_forex_ref_bonus
             
     return status, total_volume, next_vol, crypto_bonus, forex_bonus, refs_info
 

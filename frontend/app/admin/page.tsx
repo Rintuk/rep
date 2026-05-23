@@ -113,6 +113,7 @@ const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Инвестор"
 
 const getNextStatusName = (vol: number) => {
   if (vol === 3000) return "Бронзы";
+  if (vol === 3500) return "Серебра";
   if (vol === 4000) return "Золота";
   if (vol === 5000) return "VIP";
   return "след. статуса";

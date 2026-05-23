@@ -14,6 +14,7 @@ REF_FEES = {
 STATUS_THRESHOLDS = {
     "PARTNER": 0,
     "BRONZE": 3000,
+    "SILVER": 3500,
     "GOLD": 4000,
     "VIP": 5000
 }
@@ -22,6 +23,7 @@ STATUS_THRESHOLDS = {
 STATUS_INVITE_LIMITS = {
     "PARTNER": 3,
     "BRONZE": 5,
+    "SILVER": 7,
     "GOLD": 10,
     "VIP": 9999
 }

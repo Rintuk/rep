@@ -35,10 +35,11 @@ const ACTION_LABEL: Record<string, string> = { BUY: "BUY", SELL: "SELL", HOLD: "
 
 const STATUS_COLORS: Record<string, string> = { PARTNER: "#6b8ab0", BRONZE: "#cd7f32", SILVER: "#c0c0c0", GOLD: "#ffd700", VIP: "#f59e0b" };
 const STATUS_LABELS: Record<string, string> = { PARTNER: "🔰 Инвестор", BRONZE: "🥉 Бронза", SILVER: "🥈 Серебро", GOLD: "🥇 Золото", VIP: "💎 VIP" };
-const STATUS_LEVELS: Record<string, number> = { PARTNER: 1, BRONZE: 2, GOLD: 3, VIP: 5 };
+const STATUS_LEVELS: Record<string, number> = { PARTNER: 1, BRONZE: 2, SILVER: 2, GOLD: 3, VIP: 5 };
 
 const getNextStatusName = (vol: number) => {
   if (vol === 3000) return "Бронзы";
+  if (vol === 3500) return "Серебра";
   if (vol === 4000) return "Золота";
   if (vol === 5000) return "VIP";
   return "следующего статуса";

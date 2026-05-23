@@ -117,6 +117,24 @@ export default function ReferralProgramPage() {
               </div>
             </div>
 
+            {/* Серебро */}
+            <div style={{ display: "flex", alignItems: "center", background: "rgba(192,192,192,0.05)", border: "1px solid rgba(192,192,192,0.2)", borderRadius: 12, padding: "20px" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                  <span style={{ fontSize: 20 }}>🥈</span>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: "#c0c0c0", margin: 0 }}>Серебро</h3>
+                </div>
+                <div style={{ display: "flex", gap: 24, color: "#8b9cba", fontSize: 14 }}>
+                  <div><strong>Требуемый оборот:</strong> 3 500 $</div>
+                  <div><strong>Доступно приглашений:</strong> 7</div>
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#c0c0c0" }}>2</div>
+                <div style={{ fontSize: 12, color: "#8b9cba" }}>уровня в глубину</div>
+              </div>
+            </div>
+
             {/* Золото */}
             <div style={{ display: "flex", alignItems: "center", background: "rgba(255,215,0,0.05)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: 12, padding: "20px" }}>
               <div style={{ flex: 1 }}>

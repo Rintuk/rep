@@ -421,7 +421,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             pnl = round(gross_pnl * INVESTOR_SHARE + locked_crypto_pnl, 2)
             
             # Reconstruct historical gross profit that was locked during migration
-            locked_gross = locked_crypto_pnl / 0.77
+            locked_gross = locked_crypto_pnl / 0.75
             
             total_gross_pnl += (gross_pnl + locked_gross)
             
@@ -631,18 +631,20 @@ async def backup_db(db: AsyncSession = Depends(get_db)):
 @router.post("/admin/migrate-pnl", dependencies=[Depends(get_admin_user)])
 async def migrate_pnl(db: AsyncSession = Depends(get_db)):
     """
-    Фиксирует историческую прибыль всех инвесторов по старой ставке 77% (0.77).
+    Фиксирует прибыль всех инвесторов перед изменением параметров пула (или перед пополнением).
     Сбрасывает точки входа (entry_pool_pnl_pct) на текущие проценты пулов.
-    Защищает прибыль от ретроспективного урезания при переходе на 75%.
+    Защищает прибыль от ретроспективного урезания или размытия.
     """
+    return await _migrate_pnl_internal(db)
+async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | None = None, override_forex_pct: float | None = None):
     # 1. Получаем текущие PnL пулов
-    crypto_pool_pct = await _get_pool_pnl_pct(db)
+    crypto_pool_pct = override_crypto_pct if override_crypto_pct is not None else await _get_pool_pnl_pct(db)
     
     # 2. Получаем форекс PnL пула
     from models import ForexBotSnapshot
     forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
-    forex_pool_pct = 0.0
-    if forex_snap:
+    forex_pool_pct = override_forex_pct if override_forex_pct is not None else 0.0
+    if forex_snap and override_forex_pct is None:
         from routers.forex import _forex_net_invested_override
         fx_net_inv = _forex_net_invested_override()
         if fx_net_inv <= 0:
@@ -651,7 +653,7 @@ async def migrate_pnl(db: AsyncSession = Depends(get_db)):
             forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
 
     # 3. Фиксируем прибыль
-    OLD_SHARE = 0.77
+    OLD_SHARE = 0.75
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     updated = 0
     total_crypto_locked = 0.0
@@ -874,6 +876,9 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
         current_pnl_pct = round((pool_total_without_deposit - ref) / ref * 100, 4) if ref > 0 else 0.0
     else:
         current_pnl_pct = 0.0
+
+    # АВТО-МИГРАЦИЯ PNL (защита от размытия процентов)
+    await _migrate_pnl_internal(db, override_crypto_pct=current_pnl_pct)
 
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
