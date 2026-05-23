@@ -647,7 +647,7 @@ async def migrate_pnl(db: AsyncSession = Depends(get_db)):
             incr = crypto_pool_pct - f.entry_pool_pnl_pct
             gross = f.investment_usdt * (incr / 100)
             user_profit = round(gross * OLD_SHARE, 2)
-            if user_profit > 0:
+            if user_profit != 0:
                 f.locked_crypto_pnl += user_profit
                 total_crypto_locked += user_profit
         f.entry_pool_pnl_pct = crypto_pool_pct
@@ -657,7 +657,7 @@ async def migrate_pnl(db: AsyncSession = Depends(get_db)):
             fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
             fx_gross = f.forex_investment_usdt * (fx_incr / 100)
             fx_user_profit = round(fx_gross * OLD_SHARE, 2)
-            if fx_user_profit > 0:
+            if fx_user_profit != 0:
                 f.locked_forex_pnl += fx_user_profit
         f.forex_entry_pool_pnl_pct = forex_pool_pct
         
