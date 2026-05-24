@@ -97,7 +97,8 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 incr = crypto_pool_pct - ref_entry
                 
                 new_gross = inv * (incr / 100) if incr > 0 else 0.0
-                locked_gross = f.locked_crypto_pnl / 0.75 if f and getattr(f, "locked_crypto_pnl", 0.0) > 0 else 0.0
+                # Баг 4 fix: используем константу вместо жёсткого 0.75
+                locked_gross = f.locked_crypto_pnl / INVESTOR_SHARE if f and getattr(f, "locked_crypto_pnl", 0.0) > 0 else 0.0
                 total_gross = new_gross + locked_gross
                 
                 if total_gross > 0:
@@ -111,7 +112,8 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 fx_incr = forex_pool_pct - fx_entry
                 
                 new_fx_gross = fx * (fx_incr / 100) if fx_incr > 0 else 0.0
-                locked_fx_gross = f.locked_forex_pnl / 0.75 if f and getattr(f, "locked_forex_pnl", 0.0) > 0 else 0.0
+                # Баг 4 fix: используем константу вместо жёсткого 0.75
+                locked_fx_gross = f.locked_forex_pnl / INVESTOR_SHARE if f and getattr(f, "locked_forex_pnl", 0.0) > 0 else 0.0
                 total_fx_gross = new_fx_gross + locked_fx_gross
                 
                 if total_fx_gross > 0:
@@ -209,6 +211,9 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
 
+    # Баг 6 fix: инициализируем forex_pool_pnl_pct до блока if forex_snap:
+    # иначе если форекс-снапшота нет — NameError на строке 269
+    forex_pool_pnl_pct = 0.0
     forex_pool_total = forex_pool_positions = forex_balance = 0.0
     forex_server_online = False
     forex_last_updated = None

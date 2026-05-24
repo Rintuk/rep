@@ -476,6 +476,9 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
     if fin:
         fin.forex_investment_usdt = max(fin.forex_investment_usdt - actual_amount, 0.0)
         fin.forex_withdrawal_usdt = round(fin.forex_withdrawal_usdt + actual_amount, 2)
+        # Баг 3 fix: при полном выводе обнуляем locked_forex_pnl, иначе при новом депозите будет двойной счёт
+        if fin.forex_investment_usdt <= 0:
+            fin.locked_forex_pnl = 0.0
         fin.updated_at = datetime.utcnow()
 
     req.status = "approved"

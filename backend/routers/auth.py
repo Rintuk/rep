@@ -138,6 +138,12 @@ async def reject_user(user_id: str, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    # Баг 7 fix: проверяем наличие рефералов перед удалением
+    refs = (await db.execute(select(User).where(User.referred_by == user_id))).scalars().all()
+    if refs:
+        raise HTTPException(status_code=400, detail="Нельзя удалить пользователя, у которого уже есть рефералы")
+        
     await db.delete(user)
     await db.commit()
     return {"status": "rejected"}
@@ -664,7 +670,8 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | N
             incr = crypto_pool_pct - f.entry_pool_pnl_pct
             gross = f.investment_usdt * (incr / 100)
             user_profit = round(gross * OLD_SHARE, 2)
-            if user_profit != 0:
+            # Баг 1 fix: фиксируем только прибыль, убытки не трогаем
+            if user_profit > 0:
                 f.locked_crypto_pnl += user_profit
                 total_crypto_locked += user_profit
         f.entry_pool_pnl_pct = crypto_pool_pct
@@ -674,7 +681,8 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | N
             fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
             fx_gross = f.forex_investment_usdt * (fx_incr / 100)
             fx_user_profit = round(fx_gross * OLD_SHARE, 2)
-            if fx_user_profit != 0:
+            # Баг 1 fix: фиксируем только прибыль, убытки не трогаем
+            if fx_user_profit > 0:
                 f.locked_forex_pnl += fx_user_profit
         f.forex_entry_pool_pnl_pct = forex_pool_pct
         
@@ -750,6 +758,10 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
             if depth > 5: continue
             
             for child in children_map.get(curr, []):
+                # Баг 8 fix: компрессия дерева — всегда обходим потомков неактивных,
+                # но бонус считаем только для активных (согласно _calc_referral_tree)
+                queue.append((child.id, depth + 1))
+                
                 if not child.is_active: continue
                 child_f = backup_fins.get(child.id, {})
                 
@@ -766,8 +778,9 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
                     if incr > 0:
                         gross = inv * (incr / 100)
                     elif child_db and child_db.locked_crypto_pnl > 0:
-                        # User created backup AFTER migration. Recover from locked_crypto_pnl (share was 0.75)
-                        gross = child_db.locked_crypto_pnl / 0.75
+                        # User created backup AFTER migration. Recover from locked_crypto_pnl
+                        from constants import INVESTOR_SHARE as _IS
+                        gross = child_db.locked_crypto_pnl / _IS
                         
                     if gross > 0:
                         crypto_bonus += gross * REF_FEES[depth]
@@ -779,13 +792,11 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
                     if fx_incr > 0:
                         fx_gross = fx * (fx_incr / 100)
                     elif child_db and child_db.locked_forex_pnl > 0:
-                        # Forex share is also 0.75 typically, or we just divide
-                        fx_gross = child_db.locked_forex_pnl / 0.75
+                        from constants import INVESTOR_SHARE as _IS
+                        fx_gross = child_db.locked_forex_pnl / _IS
                         
                     if fx_gross > 0:
                         forex_bonus += fx_gross * REF_FEES[depth]
-                        
-                queue.append((child.id, depth + 1))
                 
         if crypto_bonus > 0 or forex_bonus > 0:
             fin_db.locked_crypto_ref_bonus = round(crypto_bonus, 2)
@@ -823,8 +834,9 @@ async def my_deposit_requests(
         select(DepositRequest).where(DepositRequest.user_id == user.id)
         .order_by(DepositRequest.created_at.desc()).limit(20)
     )).scalars().all()
+    # Баг 10 fix: добавляем pool_type для различия крипто и форекс заявок
     return [{"id": r.id, "amount": r.amount, "comment": r.comment,
-             "status": r.status, "created_at": str(r.created_at)} for r in rows]
+             "status": r.status, "pool_type": r.pool_type, "created_at": str(r.created_at)} for r in rows]
 
 
 @router.get("/admin/deposits", dependencies=[Depends(get_admin_user)])
@@ -1025,6 +1037,9 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
     if fin:
         fin.investment_usdt = max(fin.investment_usdt - actual_amount, 0.0)
         fin.withdrawal_usdt = round(fin.withdrawal_usdt + actual_amount, 2)
+        # Баг 2 fix: при полном выводе обнуляем locked_crypto_pnl, иначе при новом депозите будет двойной счёт
+        if fin.investment_usdt <= 0:
+            fin.locked_crypto_pnl = 0.0
         fin.updated_at = datetime.utcnow()
 
     req.status = "approved"

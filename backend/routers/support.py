@@ -155,9 +155,11 @@ async def admin_reply(
         select(SupportReply).where(SupportReply.ticket_id == ticket_id)
         .order_by(SupportReply.created_at.asc())
     )).scalars().all()
+    # \u0411\u0430\u0433 9 fix: \u044f\u0432\u043d\u043e \u0443\u0441\u0442\u0430\u043d\u0430\u0432\u043b\u0438\u0432\u0430\u0435\u043c has_unread (\u043f\u043e\u0441\u043b\u0435 \u043e\u0442\u0432\u0435\u0442\u0430 \u0430\u0434\u043c\u0438\u043d\u0430 \u0438\u043d\u0432\u0435\u0441\u0442\u043e\u0440 \u0435\u0449\u0451 \u043d\u0435 \u0447\u0438\u0442\u0430\u043b, \u0437\u043d\u0430\u0447\u0438\u0442 has_unread=True)
     return SupportTicketAdminOut(
         id=ticket.id, subject=ticket.subject, message=ticket.message,
         status=ticket.status, created_at=ticket.created_at,
+        has_unread=True,
         user_email=user.email if user else "—",
         replies=[SupportReplyOut(id=r.id, body=r.body, created_at=r.created_at) for r in replies],
     )
