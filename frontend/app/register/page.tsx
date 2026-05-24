@@ -173,7 +173,7 @@ function RegisterForm() {
     setError("");
     if (password !== passwordConfirm) { setError("Пароли не совпадают"); return; }
     if (password.length < 6) { setError("Пароль должен быть не менее 6 символов"); return; }
-    if (!referralCode.trim()) { setError("Необходим реферальный код для регистрации"); return; }
+
     setLoading(true);
     try {
       await register(email, password, referralCode || undefined);
@@ -349,7 +349,7 @@ function RegisterForm() {
                 <div className="relative">
                   <Link size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: refFromUrl ? "#22c97a" : "#3b5a8a", pointerEvents: "none" }} />
                   <input type="text" value={referralCode} onChange={e => setReferralCode(e.target.value)}
-                    readOnly={refFromUrl} required placeholder="Вставьте код из приглашения"
+                    readOnly={refFromUrl} placeholder="Вставьте код из приглашения (необязательно)"
                     style={inputStyle(refFromUrl ? "rgba(34,201,122,0.4)" : undefined)}
                     onFocus={e => { if (!refFromUrl) e.target.style.borderColor = "rgba(0,180,255,0.6)"; }}
                     onBlur={e => { if (!refFromUrl) e.target.style.borderColor = "rgba(0,140,255,0.2)"; }}
