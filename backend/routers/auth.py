@@ -423,7 +423,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             pnl = round(gross_pnl * INVESTOR_SHARE + locked_crypto_pnl, 2)
             
             # Reconstruct historical gross profit that was locked during migration
-            locked_gross = locked_crypto_pnl / 0.75
+            locked_gross = locked_crypto_pnl / INVESTOR_SHARE
             
             total_gross_pnl += (gross_pnl + locked_gross)
             
@@ -492,6 +492,10 @@ async def adjust_net_invested(add_amount: float, db: AsyncSession = Depends(get_
     """
     if add_amount == 0:
         raise HTTPException(status_code=400, detail="add_amount не может быть 0")
+        
+    # Баг 16 fix: обязательно фиксируем прибыль ДО изменения net_invested
+    await _migrate_pnl_internal(db)
+    
     snaps = (await db.execute(select(BotSnapshot))).scalars().all()
     updated = 0
     for s in snaps:
@@ -603,6 +607,17 @@ async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     if user.is_admin:
         raise HTTPException(status_code=403, detail="Нельзя удалить администратора")
+        
+    refs = (await db.execute(select(User).where(User.referred_by == user_id))).scalars().all()
+    if refs:
+        raise HTTPException(status_code=400, detail="Нельзя удалить пользователя, у которого уже есть рефералы")
+        
+    from sqlalchemy import delete
+    from models import DepositRequest, WithdrawalRequest, SupportTicket
+    await db.execute(delete(DepositRequest).where(DepositRequest.user_id == user_id))
+    await db.execute(delete(WithdrawalRequest).where(WithdrawalRequest.user_id == user_id))
+    await db.execute(delete(SupportTicket).where(SupportTicket.user_id == user_id))
+    
     await db.delete(user)
     await db.commit()
     return {"status": "deleted"}
@@ -659,7 +674,7 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | N
             forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
 
     # 3. Фиксируем прибыль
-    OLD_SHARE = 0.75
+    from constants import INVESTOR_SHARE
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     updated = 0
     total_crypto_locked = 0.0
@@ -669,22 +684,29 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | N
         if f.investment_usdt > 0:
             incr = crypto_pool_pct - f.entry_pool_pnl_pct
             gross = f.investment_usdt * (incr / 100)
-            user_profit = round(gross * OLD_SHARE, 2)
-            # Баг 1 fix: фиксируем только прибыль, убытки не трогаем
+            user_profit = round(gross * INVESTOR_SHARE, 2)
             if user_profit > 0:
                 f.locked_crypto_pnl += user_profit
                 total_crypto_locked += user_profit
-        f.entry_pool_pnl_pct = crypto_pool_pct
+                f.entry_pool_pnl_pct = crypto_pool_pct
+            elif override_crypto_pct is not None:
+                # Если это принудительная миграция перед депозитом/выводом
+                f.entry_pool_pnl_pct = crypto_pool_pct
+        else:
+            f.entry_pool_pnl_pct = crypto_pool_pct
         
         # Forex
         if f.forex_investment_usdt > 0:
             fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
             fx_gross = f.forex_investment_usdt * (fx_incr / 100)
-            fx_user_profit = round(fx_gross * OLD_SHARE, 2)
-            # Баг 1 fix: фиксируем только прибыль, убытки не трогаем
+            fx_user_profit = round(fx_gross * INVESTOR_SHARE, 2)
             if fx_user_profit > 0:
                 f.locked_forex_pnl += fx_user_profit
-        f.forex_entry_pool_pnl_pct = forex_pool_pct
+                f.forex_entry_pool_pnl_pct = forex_pool_pct
+            elif override_forex_pct is not None:
+                f.forex_entry_pool_pnl_pct = forex_pool_pct
+        else:
+            f.forex_entry_pool_pnl_pct = forex_pool_pct
         
         updated += 1
         
@@ -953,7 +975,7 @@ async def create_withdrawal_request(
     
     incr = crypto_pool_pct - fin.entry_pool_pnl_pct
     gross = fin.investment_usdt * (incr / 100) if incr > 0 else 0.0
-    pnl = round(gross * 0.75 + fin.locked_crypto_pnl, 2)
+    pnl = round(gross * INVESTOR_SHARE + fin.locked_crypto_pnl, 2)
     
     pending_reqs = (await db.execute(select(func.sum(WithdrawalRequest.amount)).where(WithdrawalRequest.user_id == user.id, WithdrawalRequest.status == "pending", WithdrawalRequest.pool_type == "crypto"))).scalar() or 0.0
     

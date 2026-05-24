@@ -23,10 +23,10 @@ class User(Base):
     manual_status_override: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
     created_at:     Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    referrals:             Mapped[list["User"]]                  = relationship("User", foreign_keys=[referred_by])
-    financials:            Mapped["UserFinancials | None"]        = relationship("UserFinancials", back_populates="user", uselist=False)
-    virtual_account:       Mapped["VirtualAccount | None"]        = relationship("VirtualAccount", back_populates="user", uselist=False)
-    forex_virtual_account: Mapped["ForexVirtualAccount | None"]   = relationship("ForexVirtualAccount", back_populates="user", uselist=False)
+    referrals:             Mapped[list["User"]]                   = relationship("User", foreign_keys=[referred_by])
+    financials:            Mapped["UserFinancials | None"]        = relationship("UserFinancials", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    virtual_account:       Mapped["VirtualAccount | None"]        = relationship("VirtualAccount", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    forex_virtual_account: Mapped["ForexVirtualAccount | None"]   = relationship("ForexVirtualAccount", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class UserFinancials(Base):

@@ -137,7 +137,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             pnl = round(gross_pnl * INVESTOR_SHARE + locked_forex_pnl, 2)
             
             # Reconstruct historical gross profit that was locked
-            locked_gross = locked_forex_pnl / 0.75
+            locked_gross = locked_forex_pnl / INVESTOR_SHARE
             
             total_gross_pnl += (gross_pnl + locked_gross)
             admin_fee = POOL_FEE
@@ -393,7 +393,7 @@ async def create_forex_withdrawal_request(
     
     fx_incr = forex_pool_pct - fin.forex_entry_pool_pnl_pct
     fx_gross = fin.forex_investment_usdt * (fx_incr / 100) if fx_incr > 0 else 0.0
-    fx_pnl = round(fx_gross * 0.75 + fin.locked_forex_pnl, 2)
+    fx_pnl = round(fx_gross * INVESTOR_SHARE + fin.locked_forex_pnl, 2)
     
     pending_reqs = (await db.execute(select(func.sum(WithdrawalRequest.amount)).where(WithdrawalRequest.user_id == user.id, WithdrawalRequest.status == "pending", WithdrawalRequest.pool_type == "forex"))).scalar() or 0.0
     
@@ -542,6 +542,11 @@ async def cleanup_forex_demo_snapshots(db: AsyncSession = Depends(get_db)):
 async def adjust_forex_net_invested(add_amount: float, db: AsyncSession = Depends(get_db)):
     if add_amount == 0:
         raise HTTPException(status_code=400, detail="add_amount не может быть 0")
+        
+    # Баг 16 fix: обязательно фиксируем прибыль ДО изменения net_invested
+    from routers.auth import _migrate_pnl_internal
+    await _migrate_pnl_internal(db)
+    
     snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
     for s in snaps:
         s.net_invested = round(s.net_invested + add_amount, 4)
