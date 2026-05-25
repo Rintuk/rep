@@ -715,6 +715,65 @@ async def emergency_restore_old_investors(db: AsyncSession = Depends(get_db)):
         await db.commit()
     return {"status": "success", "updated": updated}
 
+from pydantic import BaseModel
+class RecalibratePayload(BaseModel):
+    target_profit_usdt: float
+    new_investor_emails: list[str]
+
+@router.post("/admin/emergency-recalibrate-pool", dependencies=[Depends(get_admin_user)])
+async def emergency_recalibrate_pool(payload: RecalibratePayload, db: AsyncSession = Depends(get_db)):
+    from models import ForexBotSnapshot, User, UserFinancials
+    from constants import INVESTOR_SHARE
+    
+    # 1. Update net_invested
+    snaps = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalars().all()
+    if not snaps:
+        return {"status": "error", "detail": "No snapshots"}
+    current_balance = snaps[0].balance_usdt
+    new_net_invested = current_balance - payload.target_profit_usdt
+    
+    all_snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
+    for s in all_snaps:
+        s.net_invested = new_net_invested
+        
+    pool_pnl_pct = (payload.target_profit_usdt / new_net_invested * 100) if new_net_invested > 0 else 0.0
+    
+    # 2. Reset everyone
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    for f in all_fins:
+        if f.forex_investment_usdt > 0:
+            f.forex_entry_pool_pnl_pct = 0.0
+            f.locked_forex_pnl = 0.0
+            
+    # 3. Handle new investors
+    new_users = (await db.execute(select(User).where(User.email.in_(payload.new_investor_emails)))).scalars().all()
+    new_user_ids = {u.id for u in new_users}
+    
+    for f in all_fins:
+        if f.user_id in new_user_ids and f.forex_investment_usdt > 0:
+            f.forex_entry_pool_pnl_pct = pool_pnl_pct
+            
+    # 4. Handle old investors
+    total_old = sum(f.forex_investment_usdt for f in all_fins if f.user_id not in new_user_ids and f.forex_investment_usdt > 0)
+    if total_old > 0:
+        for f in all_fins:
+            if f.user_id in new_user_ids or f.forex_investment_usdt <= 0:
+                continue
+            ideal_net_profit = (f.forex_investment_usdt / total_old) * payload.target_profit_usdt * INVESTOR_SHARE
+            current_net_profit = f.forex_investment_usdt * (pool_pnl_pct / 100) * INVESTOR_SHARE
+            missing_profit = ideal_net_profit - current_net_profit
+            if missing_profit > 0:
+                f.locked_forex_pnl = round(missing_profit, 2)
+                
+    await db.commit()
+    return {
+        "status": "success", 
+        "new_net_invested": new_net_invested,
+        "pool_pnl_pct": pool_pnl_pct,
+        "total_old_investment": total_old,
+        "target_profit": payload.target_profit_usdt
+    }
+
 @router.post("/admin/emergency-fix-user", dependencies=[Depends(get_admin_user)])
 async def emergency_fix_user(email: str, db: AsyncSession = Depends(get_db)):
     user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
