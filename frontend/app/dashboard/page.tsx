@@ -513,33 +513,9 @@ export default function DashboardPage() {
 
         {/* ── Партнерская программа (Общая) ──────────────────────────────────────── */}
         <div style={{ ...card, padding: 20 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
-            <div>
-              <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Партнерская программа</h2>
-              <p style={{ color: "#4a6a9a", fontSize: 12 }}>Приглашайте друзей и получайте процент от их прибыли</p>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={() => router.push("/referral")} style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-                background: "rgba(139,92,246,0.15)",
-                border: "1px solid rgba(139,92,246,0.3)",
-                color: "#a78bfa", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
-              }}>
-                <Info size={16} />
-                Как это работает?
-              </button>
-              <button onClick={copyRefLink} style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
-                background: copied ? "rgba(34,201,122,0.15)" : "rgba(68,136,221,0.12)",
-                border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(68,136,221,0.3)"}`,
-                color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
-              }}>
-                <Copy size={14} />
-                {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
-              </button>
-            </div>
+          <div style={{ marginBottom: 20 }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 4 }}>👥 Партнерская программа</h2>
+            <p style={{ color: "#4a6a9a", fontSize: 12 }}>Приглашайте друзей и получайте процент от их прибыли</p>
           </div>
 
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginBottom: 24 }}>
@@ -614,6 +590,32 @@ export default function DashboardPage() {
               </table>
             </div>
           )}
+
+          {/* Кнопки внизу блока */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 24 }}>
+            <button onClick={() => router.push("/referral")} style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              background: "rgba(139,92,246,0.15)",
+              border: "1px solid rgba(139,92,246,0.3)",
+              color: "#a78bfa", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
+              width: "100%"
+            }}>
+              <Info size={16} />
+              Как это работает?
+            </button>
+            <button onClick={copyRefLink} style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+              background: copied ? "rgba(34,201,122,0.15)" : "rgba(68,136,221,0.12)",
+              border: `1px solid ${copied ? "rgba(34,201,122,0.4)" : "rgba(68,136,221,0.3)"}`,
+              color: copied ? "#22c97a" : "#4488dd", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
+              width: "100%"
+            }}>
+              <Copy size={14} />
+              {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
+            </button>
+          </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }} className="two-col">
