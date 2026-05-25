@@ -588,6 +588,49 @@ async def crypto_full_reset(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/admin/rollback-hwm", dependencies=[Depends(get_admin_user)])
+async def rollback_hwm(target_crypto_pct: float | None = None, target_forex_pct: float | None = None, db: AsyncSession = Depends(get_db)):
+    """
+    Откат фальшивой прибыли. Если процент инвестора превышает целевой (т.е. он получил прибыль из-за скачка баланса),
+    система вычитает эту разницу из locked_pnl и возвращает точку входа (entry_pool_pnl_pct) на целевой уровень.
+    """
+    from constants import INVESTOR_SHARE
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    rolled_back_crypto = 0.0
+    rolled_back_forex = 0.0
+    users_affected = 0
+    
+    for f in all_fins:
+        affected = False
+        if target_crypto_pct is not None and f.entry_pool_pnl_pct > target_crypto_pct:
+            diff = f.entry_pool_pnl_pct - target_crypto_pct
+            gross = f.investment_usdt * (diff / 100)
+            fake_profit = round(gross * INVESTOR_SHARE, 2)
+            f.locked_crypto_pnl = max(0.0, f.locked_crypto_pnl - fake_profit)
+            f.entry_pool_pnl_pct = target_crypto_pct
+            rolled_back_crypto += fake_profit
+            affected = True
+            
+        if target_forex_pct is not None and f.forex_entry_pool_pnl_pct > target_forex_pct:
+            diff = f.forex_entry_pool_pnl_pct - target_forex_pct
+            gross = f.forex_investment_usdt * (diff / 100)
+            fake_profit = round(gross * INVESTOR_SHARE, 2)
+            f.locked_forex_pnl = max(0.0, f.locked_forex_pnl - fake_profit)
+            f.forex_entry_pool_pnl_pct = target_forex_pct
+            rolled_back_forex += fake_profit
+            affected = True
+            
+        if affected:
+            users_affected += 1
+            
+    await db.commit()
+    return {
+        "status": "success",
+        "users_affected": users_affected,
+        "rolled_back_crypto_usdt": round(rolled_back_crypto, 2),
+        "rolled_back_forex_usdt": round(rolled_back_forex, 2)
+    }
+
 @router.post("/admin/users/{user_id}/reset-password", dependencies=[Depends(get_admin_user)])
 async def reset_user_password(user_id: str, new_password: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
@@ -898,7 +941,8 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
         positions = (await db.execute(
             select(Position).where(Position.snapshot_id == snap.id)
         )).scalars().all()
-        pool_total_without_deposit = snap.balance_usdt - actual_amount + sum(
+        # Вычет депозита убран: деньги подразумеваются ЕЩЕ НЕ заведенными на биржу
+        pool_total_without_deposit = snap.balance_usdt + sum(
             p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
         )
         start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
