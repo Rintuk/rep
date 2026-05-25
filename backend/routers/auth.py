@@ -796,7 +796,7 @@ async def emergency_restore_hardcoded(db: AsyncSession = Depends(get_db)):
                 fin.forex_entry_pool_pnl_pct = current_pct
                 updated += 1
     await db.commit()
-@router.get("/admin/emergency-fix-exact-193")
+@router.get("/admin/emergency-fix-exact-193", dependencies=[Depends(get_admin_user)])
 async def emergency_fix_exact_193(db: AsyncSession = Depends(get_db)):
     # Exact distribution of $193 pool profit, accounting for entry points
     correct_profits = {
