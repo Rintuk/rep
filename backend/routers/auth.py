@@ -671,6 +671,19 @@ async def emergency_set_net_invested(new_net_invested: float, pool_type: str = "
     await db.commit()
     return {"status": "success", "new_net_invested": new_net_invested, "updated_snapshots": len(snaps)}
 
+@router.post("/admin/emergency-restore-forex-stats", dependencies=[Depends(get_admin_user)])
+async def emergency_restore_forex_stats(db: AsyncSession = Depends(get_db)):
+    """Полностью восстанавливает статистику инвесторов: сбрасывает точку входа до 0 и обнуляет locked_pnl."""
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    updated = 0
+    for f in all_fins:
+        if f.forex_investment_usdt > 0:
+            f.forex_entry_pool_pnl_pct = 0.0
+            f.locked_forex_pnl = 0.0
+            updated += 1
+    await db.commit()
+    return {"status": "success", "investors_restored": updated}
+
 @router.post("/admin/users/{user_id}/reset-password", dependencies=[Depends(get_admin_user)])
 async def reset_user_password(user_id: str, new_password: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
