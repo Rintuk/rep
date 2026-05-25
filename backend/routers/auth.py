@@ -774,6 +774,28 @@ async def emergency_recalibrate_pool(payload: RecalibratePayload, db: AsyncSessi
         "target_profit": payload.target_profit_usdt
     }
 
+@router.get("/admin/emergency-restore-hardcoded")
+async def emergency_restore_hardcoded(db: AsyncSession = Depends(get_db)):
+    from models import User, UserFinancials
+    from routers.forex import _get_forex_pool_pnl_pct
+    profits = [
+        {"email": "maksimsegolev6@gmail.com", "exact_profit": 37.42},
+        {"email": "aleko_k@inbox.ru", "exact_profit": 54.43},
+        {"email": "juniorvasilva@gmail.com", "exact_profit": 13.95}
+    ]
+    current_pct = await _get_forex_pool_pnl_pct(db)
+    updated = 0
+    for p in profits:
+        user = (await db.execute(select(User).where(User.email == p["email"]))).scalar_one_or_none()
+        if user:
+            fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user.id))).scalar_one_or_none()
+            if fin:
+                fin.locked_forex_pnl = p["exact_profit"]
+                fin.forex_entry_pool_pnl_pct = current_pct
+                updated += 1
+    await db.commit()
+    return {"status": "success", "updated": updated}
+
 class SetProfitPayload(BaseModel):
     email: str
     exact_profit: float
