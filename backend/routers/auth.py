@@ -659,6 +659,21 @@ async def rollback_hwm(
         "rolled_back_forex_usdt": round(rolled_back_forex, 2)
     }
 
+@router.post("/admin/emergency-set-net-invested", dependencies=[Depends(get_admin_user)])
+async def emergency_set_net_invested(new_net_invested: float, pool_type: str = "forex", db: AsyncSession = Depends(get_db)):
+    """Жесткая установка net_invested во всех снимках БЕЗ вызова миграции прибыли."""
+    if pool_type == "forex":
+        from models import ForexBotSnapshot
+        snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
+        for s in snaps:
+            s.net_invested = new_net_invested
+    else:
+        snaps = (await db.execute(select(BotSnapshot))).scalars().all()
+        for s in snaps:
+            s.net_invested = new_net_invested
+    await db.commit()
+    return {"status": "success", "new_net_invested": new_net_invested, "updated_snapshots": len(snaps)}
+
 @router.post("/admin/users/{user_id}/reset-password", dependencies=[Depends(get_admin_user)])
 async def reset_user_password(user_id: str, new_password: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
