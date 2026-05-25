@@ -270,7 +270,7 @@ function RegisterForm() {
             {[
               { icon: "⚡", text: "AI торгует 24/7 без остановок" },
               { icon: "📊", text: "Прозрачная статистика в реальном времени" },
-              { icon: "🔒", text: "Доступ только по приглашению" },
+              { icon: "🌐", text: "Открытая регистрация для инвесторов" },
             ].map(({ icon, text }) => (
               <div key={text} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                 <span style={{ fontSize: 16 }}>{icon}</span>

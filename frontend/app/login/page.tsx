@@ -573,10 +573,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div style={{ background: "rgba(0,180,255,0.05)", borderLeft: "4px solid #00b4ff", padding: "16px 20px", borderRadius: "0 8px 8px 0", marginTop: 10 }}>
-                <strong style={{ color: "#00b4ff" }}>Условия участия:</strong> Платформа работает в формате закрытого клуба. Регистрация доступна только по персональным реферальным приглашениям от действующих резидентов пула.
-              </div>
-
             </div>
           </div>
         </div>
