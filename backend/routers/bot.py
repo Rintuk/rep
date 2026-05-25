@@ -50,11 +50,18 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         for p in payload.positions
     )
 
+    last_snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    
+    actual_net_invested = last_snap.net_invested if last_snap and last_snap.net_invested > 0 else payload.net_invested
+    actual_real_start = last_snap.real_start_balance if last_snap and last_snap.real_start_balance > 0 else payload.real_start_balance
+
     snapshot = BotSnapshot(
         bot_id=payload.bot_id, timestamp=ts,
         balance_usdt=payload.balance_usdt, mode=payload.mode,
         hwm=payload.hwm, drawdown_pct=payload.drawdown_pct,
-        real_start_balance=payload.real_start_balance, net_invested=payload.net_invested,
+        real_start_balance=actual_real_start, net_invested=actual_net_invested,
     )
     db.add(snapshot)
     await db.flush()
@@ -153,11 +160,18 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         for p in payload.positions
     )
 
+    last_forex_snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    
+    actual_fx_net = last_forex_snap.net_invested if last_forex_snap and last_forex_snap.net_invested > 0 else net_invested_usd
+    actual_fx_start = last_forex_snap.real_start_balance if last_forex_snap and last_forex_snap.real_start_balance > 0 else real_start_usd
+
     snapshot = ForexBotSnapshot(
         bot_id=payload.bot_id, timestamp=ts,
         balance_usdt=balance_usd, mode=payload.mode,
         hwm=hwm_usd, drawdown_pct=payload.drawdown_pct,
-        real_start_balance=real_start_usd, net_invested=net_invested_usd,
+        real_start_balance=actual_fx_start, net_invested=actual_fx_net,
     )
     db.add(snapshot)
     await db.flush()
