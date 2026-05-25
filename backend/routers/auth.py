@@ -781,7 +781,9 @@ async def emergency_restore_hardcoded(db: AsyncSession = Depends(get_db)):
     profits = [
         {"email": "maksimsegolev6@gmail.com", "exact_profit": 37.42},
         {"email": "aleko_k@inbox.ru", "exact_profit": 54.43},
-        {"email": "juniorvasilva@gmail.com", "exact_profit": 13.95}
+        {"email": "juniorvasilva@gmail.com", "exact_profit": 13.95},
+        {"email": "sanekkushnarenko777@gmail.com", "exact_profit": 0.0},
+        {"email": "kushnar080868@mail.ru", "exact_profit": 0.0}
     ]
     current_pct = await _get_forex_pool_pnl_pct(db)
     updated = 0
@@ -794,7 +796,7 @@ async def emergency_restore_hardcoded(db: AsyncSession = Depends(get_db)):
                 fin.forex_entry_pool_pnl_pct = current_pct
                 updated += 1
     await db.commit()
-    return {"status": "success", "updated": updated}
+    return {"status": "success", "updated": updated, "new_pct": current_pct}
 
 class SetProfitPayload(BaseModel):
     email: str
