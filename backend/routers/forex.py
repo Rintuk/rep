@@ -540,6 +540,26 @@ async def adjust_forex_net_invested(add_amount: float, db: AsyncSession = Depend
     }
 
 
+@router.post("/admin/forex-adjust-pool-capital", dependencies=[Depends(get_admin_user)])
+async def forex_adjust_pool_capital(amount_usdt: float, db: AsyncSession = Depends(get_db)):
+    if amount_usdt == 0:
+        raise HTTPException(status_code=400, detail="Amount cannot be zero")
+        
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    
+    if not snap:
+        raise HTTPException(status_code=404, detail="No snapshots found")
+        
+    snap.net_invested += amount_usdt
+    # Optionally update hwm if it's a deposit so it doesn't immediately show as drawdown
+    if amount_usdt > 0:
+        snap.hwm += amount_usdt
+        
+    await db.commit()
+    return {"status": "success", "new_net_invested": snap.net_invested}
+
 
 @router.post("/admin/forex-full-reset", dependencies=[Depends(get_admin_user)])
 async def forex_full_reset(db: AsyncSession = Depends(get_db)):
