@@ -193,11 +193,8 @@ async def admin_forex_pool_history(db: AsyncSession = Depends(get_db)):
     if not clean_snaps:
         return []
 
-    override = _forex_net_invested_override()
-
-    result = []
     for s in clean_snaps:
-        ref = override if override > 0 else s.net_invested
+        ref = s.net_invested
         pnl = round(s.balance_usdt - ref, 2)
         pnl_pct = round((pnl / ref) * 100, 2)
         result.append({"ts": s.timestamp.strftime("%d.%m %H:%M"), "pool_total": round(s.balance_usdt, 2),
@@ -447,9 +444,7 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
     
     current_pnl_pct = 0.0
     if forex_snap:
-        fx_net_inv = _forex_net_invested_override()
-        if fx_net_inv <= 0:
-            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
         if fx_net_inv > 0:
             # Прибавляем выведенную сумму обратно к пулу
             pool_total_before = forex_snap.balance_usdt + actual_amount

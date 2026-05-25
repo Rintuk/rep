@@ -612,13 +612,10 @@ async def rollback_hwm(
                 target_crypto_pct = round((target_crypto_profit_usdt / ref) * 100, 4)
 
     if target_forex_profit_usdt is not None:
-        from routers.forex import _forex_net_invested_override
         from models import ForexBotSnapshot
         forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
         if forex_snap:
-            fx_net_inv = _forex_net_invested_override()
-            if fx_net_inv <= 0:
-                fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
             if fx_net_inv > 0:
                 target_forex_pct = round((target_forex_profit_usdt / fx_net_inv) * 100, 4)
 
@@ -752,10 +749,7 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | N
     forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
     forex_pool_pct = override_forex_pct if override_forex_pct is not None else 0.0
     if forex_snap and override_forex_pct is None:
-        from routers.forex import _forex_net_invested_override
-        fx_net_inv = _forex_net_invested_override()
-        if fx_net_inv <= 0:
-            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
         if fx_net_inv > 0:
             forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
 

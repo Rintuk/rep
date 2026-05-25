@@ -8,7 +8,6 @@ from models import (BotSnapshot, Position, Trade, AIFeedEntry, UserFinancials, U
 from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo, NewsItemOut
 from security import get_current_user
 from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS
-from routers.forex import _forex_net_invested_override
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -234,11 +233,8 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         forex_balance = forex_snap.balance_usdt
         forex_pool_total = forex_balance
 
-        _override = _forex_net_invested_override()
-        fx_net_inv = _override if _override > 0 else (
-            forex_snap.net_invested if forex_snap.net_invested > 0 else (
-                forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
-            )
+        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+            forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
         )
         forex_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4) if fx_net_inv > 0 else 0.0
 
