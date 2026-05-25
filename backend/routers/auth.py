@@ -684,6 +684,37 @@ async def emergency_restore_forex_stats(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": "success", "investors_restored": updated}
 
+@router.post("/admin/emergency-restore-old-investors", dependencies=[Depends(get_admin_user)])
+async def emergency_restore_old_investors(db: AsyncSession = Depends(get_db)):
+    from routers.forex import _get_forex_pool_pnl_pct
+    from constants import INVESTOR_SHARE
+    current_pool_pct = await _get_forex_pool_pnl_pct(db)
+    
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    new_emails = ['kushnar080868@mail.ru', 'sanekkushnarenko777@gmail.com']
+    new_users = (await db.execute(select(User).where(User.email.in_(new_emails)))).scalars().all()
+    new_user_ids = {u.id for u in new_users}
+    
+    total_old = sum(f.forex_investment_usdt for f in all_fins if f.user_id not in new_user_ids and f.forex_investment_usdt > 0)
+    TOTAL_PROFIT = 290.0
+    updated = 0
+    
+    if total_old > 0:
+        for f in all_fins:
+            if f.user_id in new_user_ids or f.forex_investment_usdt <= 0:
+                continue
+                
+            ideal_net_profit = (f.forex_investment_usdt / total_old) * TOTAL_PROFIT * INVESTOR_SHARE
+            current_net_profit = f.forex_investment_usdt * (current_pool_pct / 100) * INVESTOR_SHARE
+            missing_profit = ideal_net_profit - current_net_profit
+            
+            if missing_profit > 0:
+                f.locked_forex_pnl = round(f.locked_forex_pnl + missing_profit, 2)
+                updated += 1
+                
+        await db.commit()
+    return {"status": "success", "updated": updated}
+
 @router.post("/admin/emergency-fix-user", dependencies=[Depends(get_admin_user)])
 async def emergency_fix_user(email: str, db: AsyncSession = Depends(get_db)):
     user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
