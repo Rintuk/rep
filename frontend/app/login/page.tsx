@@ -333,7 +333,7 @@ export default function LoginPage() {
         }}>
 
           {/* Left panel */}
-          <div className="hidden md:flex flex-col justify-center px-10 py-12"
+          <div className="hidden md:flex flex-col justify-center items-center text-center px-10 py-12"
             style={{ flex: 1, borderRight: "1px solid rgba(0,180,255,0.1)" }}>
             <h1 style={{
               fontSize: 46,
