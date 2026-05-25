@@ -335,6 +335,15 @@ async def approve_forex_deposit(request_id: str, actual_amount: float, db: Async
 
     req.status = "approved"
     req.updated_at = datetime.utcnow()
+    
+    # ВАЖНО: Увеличиваем капитал пула, чтобы депозит не считался прибылью
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if snap:
+        snap.net_invested += actual_amount
+        snap.hwm += actual_amount
+
     await db.commit()
     return {"status": "approved", "amount": actual_amount}
 
@@ -465,6 +474,16 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
 
     req.status = "approved"
     req.updated_at = datetime.utcnow()
+    
+    # ВАЖНО: Уменьшаем капитал пула
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if snap:
+        snap.net_invested -= actual_amount
+        if snap.net_invested < 0:
+            snap.net_invested = 0
+
     await db.commit()
     return {"status": "approved", "amount": actual_amount}
 
