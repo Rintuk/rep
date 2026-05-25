@@ -774,6 +774,19 @@ async def emergency_recalibrate_pool(payload: RecalibratePayload, db: AsyncSessi
         "target_profit": payload.target_profit_usdt
     }
 
+@router.get("/admin/emergency-diag", dependencies=[Depends(get_admin_user)])
+async def emergency_diag(db: AsyncSession = Depends(get_db)):
+    from models import ForexBotSnapshot, UserFinancials, User
+    snaps = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(10))).scalars().all()
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    users = (await db.execute(select(User))).scalars().all()
+    
+    snap_data = [{"id": s.id, "ts": str(s.timestamp), "bal": s.balance_usdt, "net": s.net_invested, "hwm": s.hwm} for s in snaps]
+    user_map = {u.id: u.email for u in users}
+    fin_data = [{"email": user_map.get(f.user_id), "inv": f.forex_investment_usdt, "pct": f.forex_entry_pool_pnl_pct, "locked": f.locked_forex_pnl} for f in fins if f.forex_investment_usdt > 0]
+    
+    return {"snaps": snap_data, "fins": fin_data}
+
 @router.post("/admin/emergency-fix-user", dependencies=[Depends(get_admin_user)])
 async def emergency_fix_user(email: str, db: AsyncSession = Depends(get_db)):
     user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
