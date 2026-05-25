@@ -800,11 +800,11 @@ async def emergency_restore_hardcoded(db: AsyncSession = Depends(get_db)):
 async def emergency_fix_exact_193(db: AsyncSession = Depends(get_db)):
     # Exact distribution of $193 pool profit, accounting for entry points
     correct_profits = {
-        "maksimsegolev6@gmail.com": 49.17,
-        "aleko_k@inbox.ru": 71.53,
-        "juniorvasilva@gmail.com": 18.33,
-        "sanekkushnarenko777@gmail.com": 40.58,
-        "kushnar080868@mail.ru": 13.39
+        "maksimsegolev6@gmail.com": 42.67,
+        "aleko_k@inbox.ru": 62.07,
+        "juniorvasilva@gmail.com": 15.91,
+        "sanekkushnarenko777@gmail.com": 18.12,
+        "kushnar080868@mail.ru": 5.98
     }
     
     # Get current pool pct
