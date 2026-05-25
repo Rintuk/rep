@@ -207,6 +207,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [waking, setWaking] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   async function tryLogin(emailVal: string, passwordVal: string, rememberVal: boolean): Promise<boolean> {
     try {
@@ -363,6 +364,26 @@ export default function LoginPage() {
                   fill="rgba(0,200,255,0.5)" stroke="rgba(0,200,255,0.8)" strokeWidth="1"/>;
               })}
             </svg>
+            <button type="button" onClick={() => setShowAbout(true)}
+              style={{
+                marginTop: 32, background: "linear-gradient(135deg, rgba(43,107,255,0.15) 0%, rgba(16,64,204,0.3) 100%)",
+                border: "1px solid rgba(0,180,255,0.3)", borderRadius: 12, padding: "10px 28px", color: "#6b8ab0",
+                fontWeight: 600, fontSize: 13, letterSpacing: 1, cursor: "pointer", boxShadow: "0 4px 15px rgba(0,100,255,0.1)",
+                transition: "all 0.2s", textTransform: "uppercase"
+              }}
+              onMouseEnter={e => {
+                const t = e.currentTarget as HTMLButtonElement;
+                t.style.background = "linear-gradient(135deg, rgba(43,107,255,0.3) 0%, rgba(16,64,204,0.5) 100%)";
+                t.style.color = "#fff"; t.style.borderColor = "rgba(0,180,255,0.6)";
+                t.style.boxShadow = "0 6px 20px rgba(0,180,255,0.3)"; t.style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={e => {
+                const t = e.currentTarget as HTMLButtonElement;
+                t.style.background = "linear-gradient(135deg, rgba(43,107,255,0.15) 0%, rgba(16,64,204,0.3) 100%)";
+                t.style.color = "#6b8ab0"; t.style.borderColor = "rgba(0,180,255,0.3)";
+                t.style.boxShadow = "0 4px 15px rgba(0,100,255,0.1)"; t.style.transform = "translateY(0)";
+              }}
+            >О проекте</button>
           </div>
 
           {/* Right panel — form */}
@@ -373,7 +394,7 @@ export default function LoginPage() {
             </h2>
             {/* Mobile: стильный заголовок */}
             <h1 className="form-title-mobile" style={{
-              marginBottom: 24,
+              marginBottom: 8,
               fontSize: 32,
               fontWeight: 900,
               letterSpacing: 4,
@@ -385,6 +406,17 @@ export default function LoginPage() {
             }}>
               AI MAKLER
             </h1>
+            
+            <div className="form-title-mobile" style={{ textAlign: "center", marginBottom: 24 }}>
+              <button type="button" onClick={() => setShowAbout(true)}
+                style={{
+                  background: "linear-gradient(135deg, rgba(43,107,255,0.15) 0%, rgba(16,64,204,0.3) 100%)",
+                  border: "1px solid rgba(0,180,255,0.3)", borderRadius: 10, padding: "6px 20px", color: "#8ab4f8",
+                  fontWeight: 600, fontSize: 12, letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase"
+                }}
+              >О проекте</button>
+            </div>
 
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Email */}
@@ -506,6 +538,49 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* Модальное окно "О проекте" */}
+      {showAbout && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", padding: 20 }}>
+          <div style={{ background: "linear-gradient(180deg, #0a132e 0%, #050a1a 100%)", border: "1px solid rgba(0,180,255,0.4)", borderRadius: 20, width: "100%", maxWidth: 680, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 15px 50px rgba(0,100,255,0.2), inset 0 0 40px rgba(0,180,255,0.05)" }}>
+            <div style={{ padding: "24px 30px", borderBottom: "1px solid rgba(0,180,255,0.15)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,100,255,0.05)" }}>
+              <h3 style={{ color: "#fff", fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: 1, textTransform: "uppercase", textShadow: "0 0 10px rgba(0,180,255,0.5)" }}>О проекте AI MAKLER</h3>
+              <button onClick={() => setShowAbout(false)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "50%", width: 36, height: 36, color: "#8ab4f8", fontSize: 20, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }} onMouseEnter={e => { e.currentTarget.style.background="rgba(255,255,255,0.1)"; e.currentTarget.style.color="#fff"; }} onMouseLeave={e => { e.currentTarget.style.background="rgba(255,255,255,0.05)"; e.currentTarget.style.color="#8ab4f8"; }}>&times;</button>
+            </div>
+            <div style={{ padding: "30px", overflowY: "auto", color: "#a0b0d0", fontSize: 15, lineHeight: 1.7, display: "flex", flexDirection: "column", gap: 20 }}>
+              
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <div style={{ fontSize: 32, background: "rgba(0,180,255,0.1)", padding: 12, borderRadius: 16, border: "1px solid rgba(0,180,255,0.2)" }}>🚀</div>
+                <div>
+                  <h4 style={{ color: "#e0e8ff", fontSize: 17, fontWeight: 700, margin: "0 0 8px 0" }}>Инновационная платформа для алгоритмической торговли</h4>
+                  <p style={{ margin: 0 }}>AI MAKLER — это закрытый инвестиционный пул, использующий передовые алгоритмы машинного обучения для торговли на криптовалютных и классических финансовых рынках. Наша система анализирует тысячи переменных в секунду, находя оптимальные точки входа и выхода.</p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <div style={{ fontSize: 32, background: "rgba(34,201,122,0.1)", padding: 12, borderRadius: 16, border: "1px solid rgba(34,201,122,0.2)" }}>🛡️</div>
+                <div>
+                  <h4 style={{ color: "#e0e8ff", fontSize: 17, fontWeight: 700, margin: "0 0 8px 0" }}>Адаптивный риск-менеджмент</h4>
+                  <p style={{ margin: 0 }}>Встроенная система защиты капитала автоматически реагирует на аномальную волатильность, снижая риски в периоды неопределенности. Интеллектуальный алгоритм балансирует между агрессивной и консервативной стратегиями.</p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <div style={{ fontSize: 32, background: "rgba(245,166,35,0.1)", padding: 12, borderRadius: 16, border: "1px solid rgba(245,166,35,0.2)" }}>📊</div>
+                <div>
+                  <h4 style={{ color: "#e0e8ff", fontSize: 17, fontWeight: 700, margin: "0 0 8px 0" }}>Абсолютная прозрачность для инвесторов</h4>
+                  <p style={{ margin: 0 }}>Каждый участник пула получает доступ к личному кабинету с детальной статистикой в реальном времени. Отслеживайте свой портфель, анализируйте PnL, историю сделок и выводите средства в несколько кликов.</p>
+                </div>
+              </div>
+
+              <div style={{ background: "rgba(0,180,255,0.05)", borderLeft: "4px solid #00b4ff", padding: "16px 20px", borderRadius: "0 8px 8px 0", marginTop: 10 }}>
+                <strong style={{ color: "#00b4ff" }}>Условия участия:</strong> Платформа работает в формате закрытого клуба. Регистрация доступна только по персональным реферальным приглашениям от действующих резидентов пула.
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
