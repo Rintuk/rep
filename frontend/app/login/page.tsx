@@ -336,14 +336,16 @@ export default function LoginPage() {
           <div className="hidden md:flex flex-col justify-center px-10 py-12"
             style={{ flex: 1, borderRight: "1px solid rgba(0,180,255,0.1)" }}>
             <h1 style={{
-              fontSize: 42,
-              fontWeight: 800,
+              fontSize: 46,
+              fontWeight: 900,
               color: "#fff",
               lineHeight: 1.15,
-              letterSpacing: -1,
+              letterSpacing: 1,
               marginBottom: 12,
+              textTransform: "uppercase",
+              textShadow: "0 0 15px rgba(0,180,255,0.8), 0 0 30px rgba(0,100,255,0.5)"
             }}>
-              AI Маклер
+              AI MAKLER
             </h1>
             <p style={{ color: "#6b8ab0", fontSize: 16, marginBottom: 32 }}>
               Инвестиционная платформа
