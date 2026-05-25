@@ -684,6 +684,20 @@ async def emergency_restore_forex_stats(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": "success", "investors_restored": updated}
 
+@router.post("/admin/emergency-fix-user", dependencies=[Depends(get_admin_user)])
+async def emergency_fix_user(email: str, db: AsyncSession = Depends(get_db)):
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if user:
+        fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user.id))).scalar_one_or_none()
+        if fin:
+            from routers.forex import _get_forex_pool_pnl_pct
+            current_pct = await _get_forex_pool_pnl_pct(db)
+            fin.forex_entry_pool_pnl_pct = current_pct
+            fin.locked_forex_pnl = 0.0
+            await db.commit()
+            return {"status": "success", "user": email, "new_entry": current_pct}
+    return {"status": "error"}
+
 @router.post("/admin/users/{user_id}/reset-password", dependencies=[Depends(get_admin_user)])
 async def reset_user_password(user_id: str, new_password: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
