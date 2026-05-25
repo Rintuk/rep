@@ -119,6 +119,17 @@ const getNextStatusName = (vol: number) => {
   return "след. статуса";
 };
 
+const INVESTOR_HEADERS = [
+  { label: "Email", key: "email" },
+  { label: "Инвестировано", key: "investment" },
+  { label: "Выведено", key: "withdrawal" },
+  { label: "PnL", key: "pnl" },
+  { label: "Реф. доход", key: "ref_income" },
+  { label: "Рефералы / Статус", key: "referrals_count" },
+  { label: "Дата", key: "created_at" },
+  { label: "", key: null }
+];
+
 export default function AdminPage() {
   const router = useRouter();
   const [activePool, setActivePool] = useState<"crypto" | "forex">("forex");
@@ -129,6 +140,38 @@ export default function AdminPage() {
   const [deposits, setDeposits] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [withdrawals, setWithdrawals] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
+
+  const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: "asc" | "desc" }>({ key: "created_at", direction: "desc" });
+
+  const sortedInvestors = React.useMemo(() => {
+    if (!data?.investors) return [];
+    let sortableItems = [...data.investors];
+    if (sortConfig.key !== null) {
+      sortableItems.sort((a: any, b: any) => {
+        let aValue = a[sortConfig.key!];
+        let bValue = b[sortConfig.key!];
+        
+        if (sortConfig.key === "created_at") {
+          aValue = new Date(aValue as string).getTime();
+          bValue = new Date(bValue as string).getTime();
+        } else if (typeof aValue === 'string' && typeof bValue === 'string') {
+          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+        }
+        
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [data?.investors, sortConfig]);
+
+  const requestSort = (key: string | null) => {
+    if (!key) return;
+    let direction: "asc" | "desc" = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    setSortConfig({ key, direction });
+  };
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [forms, setForms] = useState<Record<string, InvestorForm>>({});
@@ -1002,15 +1045,22 @@ export default function AdminPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640, fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${border}` }}>
-                    {["Email", "Инвестировано", "Выведено", "PnL", "Реф. доход", "Рефералы / Статус", "Дата", ""].map((h, i) => (
-                      <th key={i} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 500, color: muted }}>{h}</th>
+                    {INVESTOR_HEADERS.map((h, i) => (
+                      <th key={i} onClick={() => requestSort(h.key)} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 500, color: muted, cursor: h.key ? "pointer" : "default", userSelect: "none" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          {h.label}
+                          {h.key && sortConfig.key === h.key && (
+                            <span style={{ fontSize: 10 }}>{sortConfig.direction === "asc" ? "▲" : "▼"}</span>
+                          )}
+                        </div>
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {data.investors.length === 0
+                  {sortedInvestors.length === 0
                     ? <tr><td colSpan={8} style={{ padding: "24px 16px", textAlign: "center", color: muted }}>Инвесторов нет</td></tr>
-                    : data.investors.map((u) => {
+                    : sortedInvestors.map((u) => {
                       const isOpen = expandedId === u.id;
                       const f = forms[u.id];
                       return (
