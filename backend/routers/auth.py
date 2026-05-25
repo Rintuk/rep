@@ -778,7 +778,7 @@ class SetProfitPayload(BaseModel):
     email: str
     exact_profit: float
 
-@router.post("/admin/emergency-set-profit")
+@router.post("/admin/emergency-set-profit", dependencies=[Depends(get_admin_user)])
 async def emergency_set_profit(payload: SetProfitPayload, db: AsyncSession = Depends(get_db)):
     from models import User, UserFinancials
     user = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
