@@ -589,11 +589,39 @@ async def crypto_full_reset(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/admin/rollback-hwm", dependencies=[Depends(get_admin_user)])
-async def rollback_hwm(target_crypto_pct: float | None = None, target_forex_pct: float | None = None, db: AsyncSession = Depends(get_db)):
+async def rollback_hwm(
+    target_crypto_pct: float | None = None, 
+    target_forex_pct: float | None = None, 
+    target_crypto_profit_usdt: float | None = None,
+    target_forex_profit_usdt: float | None = None,
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Откат фальшивой прибыли. Если процент инвестора превышает целевой (т.е. он получил прибыль из-за скачка баланса),
-    система вычитает эту разницу из locked_pnl и возвращает точку входа (entry_pool_pnl_pct) на целевой уровень.
+    Откат фальшивой прибыли. Можно указать целевой процент (pct) ИЛИ целевую сумму прибыли в пуле (usdt).
     """
+    if target_crypto_profit_usdt is not None:
+        snap = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+        if snap:
+            start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+            total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+            total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+            ref = start + total_inv - total_wd
+            if ref <= 0:
+                ref = snap.net_invested if snap.net_invested > 0 else start
+            if ref > 0:
+                target_crypto_pct = round((target_crypto_profit_usdt / ref) * 100, 4)
+
+    if target_forex_profit_usdt is not None:
+        from routers.forex import _forex_net_invested_override
+        from models import ForexBotSnapshot
+        forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+        if forex_snap:
+            fx_net_inv = _forex_net_invested_override()
+            if fx_net_inv <= 0:
+                fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+            if fx_net_inv > 0:
+                target_forex_pct = round((target_forex_profit_usdt / fx_net_inv) * 100, 4)
+
     from constants import INVESTOR_SHARE
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     rolled_back_crypto = 0.0
