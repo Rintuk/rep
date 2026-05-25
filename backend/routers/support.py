@@ -175,3 +175,18 @@ async def clear_all_tickets(
     await db.execute(delete(SupportTicket))
     await db.commit()
     return {"status": "ok", "message": "Вся история тикетов удалена"}
+
+
+@router.post("/admin/support/clear-closed")
+async def clear_closed_tickets(
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Удаляет закрытые тикеты и ответы к ним."""
+    closed_tickets = (await db.execute(select(SupportTicket.id).where(SupportTicket.status == "closed"))).scalars().all()
+    if closed_tickets:
+        await db.execute(delete(SupportReply).where(SupportReply.ticket_id.in_(closed_tickets)))
+        await db.execute(delete(SupportTicket).where(SupportTicket.id.in_(closed_tickets)))
+        await db.commit()
+        return {"status": "ok", "message": "Закрытые тикеты удалены"}
+    return {"status": "ok", "message": "Нет закрытых тикетов для удаления"}

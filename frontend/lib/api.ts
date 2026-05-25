@@ -302,6 +302,11 @@ export async function clearAllTickets() {
   return res.data as { status: string; message: string };
 }
 
+export async function clearClosedTickets() {
+  const res = await api.post("/auth/admin/support/clear-closed");
+  return res.data as { status: string; message: string };
+}
+
 export async function investorCloseTicket(ticketId: string) {
   await api.post(`/auth/support/${ticketId}/close`);
 }

@@ -15,7 +15,7 @@ import {
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
   cryptoFullReset, backupDatabase, migratePnL, setStatusOverride,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
-  getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, SupportTicket,
+  getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -218,6 +218,7 @@ export default function AdminPage() {
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
   const [replyLoading, setReplyLoading] = useState<string | null>(null);
   const [clearTicketsLoading, setClearTicketsLoading] = useState(false);
+  const [clearClosedLoading, setClearClosedLoading] = useState(false);
   const [clearTicketsMsg, setClearTicketsMsg] = useState<string | null>(null);
   const [selectedSupportUser, setSelectedSupportUser] = useState<string | null>(null);
 
@@ -310,6 +311,23 @@ export default function AdminPage() {
       setClearTicketsMsg("Ошибка удаления");
     } finally {
       setClearTicketsLoading(false);
+      setTimeout(() => setClearTicketsMsg(null), 4000);
+    }
+  }
+
+  async function handleClearClosedTickets() {
+    if (!confirm("Удалить все закрытые тикеты?\n\nЭто действие необратимо.")) return;
+    setClearClosedLoading(true);
+    setClearTicketsMsg(null);
+    try {
+      const r = await clearClosedTickets();
+      setClearTicketsMsg(r.message);
+      setExpandedTicket(null);
+      await fetchTickets();
+    } catch {
+      setClearTicketsMsg("Ошибка удаления");
+    } finally {
+      setClearClosedLoading(false);
       setTimeout(() => setClearTicketsMsg(null), 4000);
     }
   }
@@ -1603,19 +1621,34 @@ export default function AdminPage() {
                     </span>
                   )}
                   {!selectedSupportUser && (
-                    <button
-                      onClick={handleClearAllTickets}
-                      disabled={clearTicketsLoading || tickets.length === 0}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
-                        background: "rgba(127,29,29,0.7)", color: "#fca5a5",
-                        border: "1px solid rgba(255,77,77,0.3)",
-                        opacity: (clearTicketsLoading || tickets.length === 0) ? 0.5 : 1,
-                      }}
-                    >
-                      🗑 {clearTicketsLoading ? "Удаление…" : "Очистить историю"}
-                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={handleClearClosedTickets}
+                        disabled={clearClosedLoading || tickets.filter(t => t.status === "closed").length === 0}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                          background: "rgba(245,158,11,0.15)", color: "#f59e0b",
+                          border: "1px solid rgba(245,158,11,0.3)",
+                          opacity: (clearClosedLoading || tickets.filter(t => t.status === "closed").length === 0) ? 0.5 : 1,
+                        }}
+                      >
+                        🗑 {clearClosedLoading ? "Удаление…" : "Удалить закрытые"}
+                      </button>
+                      <button
+                        onClick={handleClearAllTickets}
+                        disabled={clearTicketsLoading || tickets.length === 0}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                          background: "rgba(127,29,29,0.7)", color: "#fca5a5",
+                          border: "1px solid rgba(255,77,77,0.3)",
+                          opacity: (clearTicketsLoading || tickets.length === 0) ? 0.5 : 1,
+                        }}
+                      >
+                        🗑 {clearTicketsLoading ? "Удаление…" : "Очистить историю"}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
