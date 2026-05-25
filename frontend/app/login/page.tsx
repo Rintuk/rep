@@ -374,16 +374,13 @@ export default function LoginPage() {
             {/* Mobile: стильный заголовок */}
             <h1 className="form-title-mobile" style={{
               marginBottom: 24,
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: 900,
-              letterSpacing: 6,
+              letterSpacing: 4,
               textTransform: "uppercase",
               textAlign: "center",
-              background: "linear-gradient(135deg, #00cfff 0%, #4488ff 50%, #00cfff 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              filter: "drop-shadow(0 0 12px rgba(0,180,255,0.5))",
+              color: "#fff",
+              textShadow: "0 0 15px rgba(0,180,255,0.8), 0 0 30px rgba(0,100,255,0.5)",
               lineHeight: 1.2,
             }}>
               AI MAKLER
