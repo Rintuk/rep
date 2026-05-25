@@ -580,7 +580,7 @@ async def forex_adjust_pool_capital(amount_usdt: float, db: AsyncSession = Depen
     return {"status": "success", "new_net_invested": snap.net_invested}
 
 
-@router.post("/admin/forex-set-exact-profit", dependencies=[Depends(get_admin_user)])
+@router.post("/admin/forex-set-exact-profit")
 async def forex_set_exact_profit(target_profit: float, db: AsyncSession = Depends(get_db)):
     snap = (await db.execute(
         select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
