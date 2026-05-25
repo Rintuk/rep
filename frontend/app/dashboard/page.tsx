@@ -613,7 +613,7 @@ export default function DashboardPage() {
               width: "100%"
             }}>
               <Copy size={14} />
-              {copied ? "Скопировано!" : "Скопировать реф. ссылку"}
+              {copied ? "Скопировано!" : "Реф. ссылка"}
             </button>
           </div>
         </div>
