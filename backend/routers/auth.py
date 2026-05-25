@@ -774,6 +774,25 @@ async def emergency_recalibrate_pool(payload: RecalibratePayload, db: AsyncSessi
         "target_profit": payload.target_profit_usdt
     }
 
+class SetProfitPayload(BaseModel):
+    email: str
+    exact_profit: float
+
+@router.post("/admin/emergency-set-profit", dependencies=[Depends(get_admin_user)])
+async def emergency_set_profit(payload: SetProfitPayload, db: AsyncSession = Depends(get_db)):
+    from models import User, UserFinancials
+    user = (await db.execute(select(User).where(User.email == payload.email))).scalar_one_or_none()
+    if user:
+        fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user.id))).scalar_one_or_none()
+        if fin:
+            fin.locked_forex_pnl = payload.exact_profit
+            from routers.forex import _get_forex_pool_pnl_pct
+            current_pct = await _get_forex_pool_pnl_pct(db)
+            fin.forex_entry_pool_pnl_pct = current_pct
+            await db.commit()
+            return {"status": "success", "email": payload.email, "new_profit": payload.exact_profit}
+    return {"status": "error"}
+
 @router.get("/admin/emergency-diag")
 async def emergency_diag(db: AsyncSession = Depends(get_db)):
     from models import ForexBotSnapshot, UserFinancials, User
