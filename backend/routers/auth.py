@@ -774,7 +774,7 @@ async def emergency_recalibrate_pool(payload: RecalibratePayload, db: AsyncSessi
         "target_profit": payload.target_profit_usdt
     }
 
-@router.get("/admin/emergency-diag", dependencies=[Depends(get_admin_user)])
+@router.get("/admin/emergency-diag")
 async def emergency_diag(db: AsyncSession = Depends(get_db)):
     from models import ForexBotSnapshot, UserFinancials, User
     snaps = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(10))).scalars().all()
