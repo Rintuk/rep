@@ -796,7 +796,39 @@ async def emergency_restore_hardcoded(db: AsyncSession = Depends(get_db)):
                 fin.forex_entry_pool_pnl_pct = current_pct
                 updated += 1
     await db.commit()
-    return {"status": "success", "updated": updated, "new_pct": current_pct}
+@router.get("/admin/emergency-fix-exact-193")
+async def emergency_fix_exact_193(db: AsyncSession = Depends(get_db)):
+    # Exact distribution of $193 pool profit, accounting for entry points
+    correct_profits = {
+        "maksimsegolev6@gmail.com": 49.17,
+        "aleko_k@inbox.ru": 71.53,
+        "juniorvasilva@gmail.com": 18.33,
+        "sanekkushnarenko777@gmail.com": 40.58,
+        "kushnar080868@mail.ru": 13.39
+    }
+    
+    # Get current pool pct
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    current_pct = 0.0
+    if snap and snap.net_invested > 0:
+        current_pct = (snap.balance_usdt - snap.net_invested) / snap.net_invested * 100.0
+
+    updated = 0
+    for email, target_pnl in correct_profits.items():
+        res = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if res:
+            fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == res.id))).scalar_one_or_none()
+            if fin:
+                # Lock the exact calculated profit
+                fin.locked_forex_pnl = target_pnl
+                # Reset their entry point to current pool pct so floating profit starts at 0
+                fin.forex_entry_pool_pnl_pct = current_pct
+                updated += 1
+                
+    await db.commit()
+    return {"status": "success", "updated": updated, "new_pct": current_pct, "applied_profits": correct_profits}
 
 class SetProfitPayload(BaseModel):
     email: str
