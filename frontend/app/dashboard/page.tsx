@@ -484,6 +484,33 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* ── Новости и события ────────────────────────────────────────────── */}
+        {newsFeed.length > 0 && (
+          <div style={{ ...card, padding: 20 }}>
+            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>📰 Новости и события</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: 360, overflowY: "auto", paddingRight: 4 }}>
+              {newsFeed.map((n, i) => (
+                <div key={n.id} style={{ padding: "14px 0", borderBottom: i < newsFeed.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none", flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                    <span style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{n.title}</span>
+                    {n.pool_type !== "all" && (
+                      <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 600,
+                        background: n.pool_type === "forex" ? "rgba(245,158,11,0.15)" : "rgba(68,136,221,0.15)",
+                        color: n.pool_type === "forex" ? "#f59e0b" : "#4488dd" }}>
+                        {n.pool_type === "forex" ? "Форекс" : "Крипто"}
+                      </span>
+                    )}
+                    <span style={{ color: "#4a6a9a", fontSize: 11 }}>
+                      {new Date(n.created_at).toLocaleString("ru", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p style={{ color: "#8aa0c0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{n.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Партнерская программа (Общая) ──────────────────────────────────────── */}
         <div style={{ ...card, padding: 20 }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
@@ -588,33 +615,6 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-
-        {/* ── Новости и события ────────────────────────────────────────────── */}
-        {newsFeed.length > 0 && (
-          <div style={{ ...card, padding: 20 }}>
-            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>📰 Новости и события</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: 360, overflowY: "auto", paddingRight: 4 }}>
-              {newsFeed.map((n, i) => (
-                <div key={n.id} style={{ padding: "14px 0", borderBottom: i < newsFeed.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none", flexShrink: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                    <span style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{n.title}</span>
-                    {n.pool_type !== "all" && (
-                      <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 600,
-                        background: n.pool_type === "forex" ? "rgba(245,158,11,0.15)" : "rgba(68,136,221,0.15)",
-                        color: n.pool_type === "forex" ? "#f59e0b" : "#4488dd" }}>
-                        {n.pool_type === "forex" ? "Форекс" : "Крипто"}
-                      </span>
-                    )}
-                    <span style={{ color: "#4a6a9a", fontSize: 11 }}>
-                      {new Date(n.created_at).toLocaleString("ru", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                  <p style={{ color: "#8aa0c0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{n.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }} className="two-col">
           <style>{`.two-col { @media (max-width:640px) { grid-template-columns: 1fr !important; } }`}</style>
