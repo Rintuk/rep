@@ -368,7 +368,7 @@ export default function LoginPage() {
           {/* Right panel — form */}
           <div className="login-form-panel flex flex-col justify-center" style={{ flex: 1 }}>
             {/* Desktop: обычный заголовок */}
-            <h2 className="form-title-desktop" style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 24 }}>
+            <h2 className="form-title-desktop" style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 24, textAlign: "center" }}>
               Вход в аккаунт
             </h2>
             {/* Mobile: стильный заголовок */}
