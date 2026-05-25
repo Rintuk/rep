@@ -162,6 +162,8 @@ function RegisterForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [agree, setAgree] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get("ref");
@@ -173,6 +175,7 @@ function RegisterForm() {
     setError("");
     if (password !== passwordConfirm) { setError("Пароли не совпадают"); return; }
     if (password.length < 6) { setError("Пароль должен быть не менее 6 символов"); return; }
+    if (!agree) { setError("Необходимо принять условия соглашения"); return; }
 
     setLoading(true);
     try {
@@ -278,7 +281,7 @@ function RegisterForm() {
 
           {/* Правая панель — форма */}
           <div className="reg-form-panel flex flex-col justify-center" style={{ flex: 1 }}>
-            <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 12 }}>Регистрация</h2>
+            <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 700, marginBottom: 12, textAlign: "center" }}>Регистрация</h2>
 
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
@@ -357,23 +360,35 @@ function RegisterForm() {
                 </div>
               </div>
 
+              {/* Согласие с условиями */}
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", userSelect: "none", marginTop: 4 }}>
+                <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} style={{ width: 16, height: 16, accentColor: "#2b6bff", cursor: "pointer", marginTop: 2 }} />
+                <span style={{ color: "#8899bb", fontSize: 13, lineHeight: 1.4 }}>
+                  Я принимаю условия{" "}
+                  <button type="button" onClick={(e) => { e.preventDefault(); setShowTerms(true); }} style={{ color: "#4488dd", background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer", textDecoration: "underline" }}>
+                    Пользовательского соглашения (Оферты)
+                  </button>
+                  {" "}и осознаю риски.
+                </span>
+              </label>
+
               {error && <p style={{ color: "#ff5555", fontSize: 13, textAlign: "center" }}>{error}</p>}
 
               {/* Кнопка */}
-              <button type="submit" disabled={loading || !passwordsMatch}
+              <button type="submit" disabled={loading || !passwordsMatch || !agree}
                 style={{
                   marginTop: 2,
-                  background: loading || !passwordsMatch ? "#1a3060" : "linear-gradient(180deg, #2b6bff 0%, #1040cc 100%)",
+                  background: loading || !passwordsMatch || !agree ? "#1a3060" : "linear-gradient(180deg, #2b6bff 0%, #1040cc 100%)",
                   border: "none", borderRadius: 10, padding: "13px",
                   color: "#fff", fontWeight: 700, fontSize: 15,
-                  cursor: loading || !passwordsMatch ? "not-allowed" : "pointer",
-                  boxShadow: loading || !passwordsMatch ? "none" : "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)",
+                  cursor: loading || !passwordsMatch || !agree ? "not-allowed" : "pointer",
+                  boxShadow: loading || !passwordsMatch || !agree ? "none" : "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)",
                   transition: "transform 0.1s, box-shadow 0.1s, background 0.2s",
-                  letterSpacing: 0.5, opacity: !passwordsMatch ? 0.5 : 1,
+                  letterSpacing: 0.5, opacity: (!passwordsMatch || !agree) ? 0.5 : 1,
                 }}
-                onMouseDown={e => { if (!loading && passwordsMatch) { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(4px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 1px 0 #0d2a80, 0 2px 8px rgba(30,80,255,0.2)"; } }}
-                onMouseUp={e => { if (!loading && passwordsMatch) { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)"; } }}
-                onMouseLeave={e => { if (!loading && passwordsMatch) { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)"; } }}
+                onMouseDown={e => { if (!loading && passwordsMatch && agree) { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(4px)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 1px 0 #0d2a80, 0 2px 8px rgba(30,80,255,0.2)"; } }}
+                onMouseUp={e => { if (!loading && passwordsMatch && agree) { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)"; } }}
+                onMouseLeave={e => { if (!loading && passwordsMatch && agree) { (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 0 #0d2a80, 0 6px 20px rgba(30,80,255,0.35)"; } }}
               >
                 {loading ? "Отправка..." : "Подать заявку"}
               </button>
@@ -390,6 +405,28 @@ function RegisterForm() {
           </div>
         </div>
       </div>
+
+      {/* Модальное окно с Офертой */}
+      {showTerms && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(5px)", padding: 20 }}>
+          <div style={{ background: "#0a132e", border: "1px solid rgba(0,140,255,0.3)", borderRadius: 16, width: "100%", maxWidth: 600, maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 10px 40px rgba(0,0,0,0.5)" }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ color: "#fff", fontSize: 18, fontWeight: 700, margin: 0 }}>Пользовательское соглашение и уведомление о рисках</h3>
+              <button onClick={() => setShowTerms(false)} style={{ background: "none", border: "none", color: "#8899bb", fontSize: 24, cursor: "pointer", padding: 0, lineHeight: 1 }}>&times;</button>
+            </div>
+            <div style={{ padding: "24px", overflowY: "auto", color: "#a0b0d0", fontSize: 14, lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 16 }}>
+              <p><strong>1. Общие положения</strong><br/>Настоящее Пользовательское соглашение (Оферта) регулирует отношения между Администрацией инвестиционного пула «AI MAKLER» (далее — «Платформа») и Пользователем. Регистрация на Платформе означает безоговорочное согласие со всеми условиями данного соглашения.</p>
+              <p><strong>2. Уведомление о рисках</strong><br/>Деятельность на финансовых, криптовалютных и валютных рынках сопряжена с <strong>высоким уровнем риска</strong>. Использование алгоритмических систем (в том числе искусственного интеллекта) и иных инвестиционных инструментов может привести к частичной или полной потере вложенного капитала. Пользователь подтверждает, что осознает все риски и осуществляет инвестиции исключительно за счет свободных средств, потеря которых не приведет к ухудшению его финансового положения.</p>
+              <p><strong>3. Ограничение ответственности</strong><br/>Платформа предоставляет технологические решения для алгоритмической торговли и аналитики. Администрация Платформы, разработчики, а также владельцы пулов <strong>не несут юридической и финансовой ответственности</strong> за любые убытки, упущенную выгоду или потерю капитала Пользователя, возникшие в результате использования сервисов Платформы. Прошлые результаты доходности не гарантируют аналогичных результатов в будущем.</p>
+              <p><strong>4. Использование Искусственного Интеллекта</strong><br/>Инвестиционные решения, принимаемые AI-системами, носят вероятностный характер. Платформа не гарантирует абсолютной точности прогнозов или защиты от непредвиденных рыночных колебаний (форс-мажорных обстоятельств, резких скачков волатильности, технических сбоев).</p>
+            </div>
+            <div style={{ padding: "16px 24px", borderTop: "1px solid rgba(255,255,255,0.05)", textAlign: "right" }}>
+              <button onClick={() => setShowTerms(false)} style={{ background: "#2b6bff", border: "none", color: "#fff", padding: "8px 24px", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>Ясно</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
