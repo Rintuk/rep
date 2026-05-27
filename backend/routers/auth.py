@@ -1488,3 +1488,30 @@ async def admin_silent_withdraw(payload: SilentWithdrawPayload, db: AsyncSession
         return {"status": "success", "pool": "forex", "decreased_base_by": delta_n, "new_net_inv": new_net_inv}
 
     raise HTTPException(status_code=400, detail="Неверный pool_type")
+
+class RevertSilentPayload(BaseModel):
+    pool: str
+    decreased_base_by: float
+
+@router.post("/admin/revert-silent-withdraw", dependencies=[Depends(get_admin_user)])
+async def admin_revert_silent_withdraw(payload: RevertSilentPayload, db: AsyncSession = Depends(get_db)):
+    """Откат тихого вывода. Восстанавливает базу во всех свежих снапшотах."""
+    if payload.pool == "crypto":
+        from models import BotSnapshot
+        snaps = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(20))).scalars().all()
+        for s in snaps:
+            s.real_start_balance += payload.decreased_base_by
+            if s.net_invested > 0:
+                s.net_invested += payload.decreased_base_by
+        await db.commit()
+        return {"status": "success"}
+
+    elif payload.pool == "forex":
+        from models import ForexBotSnapshot
+        snaps = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(20))).scalars().all()
+        for s in snaps:
+            s.net_invested += payload.decreased_base_by
+            s.real_start_balance += payload.decreased_base_by
+        await db.commit()
+        return {"status": "success"}
+
