@@ -16,6 +16,7 @@ import {
   cryptoFullReset, backupDatabase, migratePnL, setStatusOverride,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
+  silentWithdraw, revertSilentWithdraw,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -205,6 +206,13 @@ export default function AdminPage() {
   const [backupLoading, setBackupLoading] = useState(false);
   const [migrateLoading, setMigrateLoading] = useState(false);
   const [migrateMsg, setMigrateMsg] = useState<string | null>(null);
+
+  const [silentWAmount, setSilentWAmount] = useState("");
+  const [silentWLoading, setSilentWLoading] = useState(false);
+  const [silentWMsg, setSilentWMsg] = useState<string | null>(null);
+  const [revertSWAmount, setRevertSWAmount] = useState("");
+  const [revertSWLoading, setRevertSWLoading] = useState(false);
+  const [revertSWMsg, setRevertSWMsg] = useState<string | null>(null);
 
   const [newsList, setNewsList] = useState<NewsItemType[]>([]);
   const [newsTitle, setNewsTitle] = useState("");
@@ -450,6 +458,36 @@ export default function AdminPage() {
     } finally {
       setMigrateLoading(false);
     }
+  }
+
+  async function handleSilentWithdraw() {
+    const amt = parseFloat(silentWAmount);
+    if (isNaN(amt) || amt <= 0) return;
+    if (!confirm(`Точно применить тихий вывод $${amt} из ${poolLabel}?`)) return;
+    setSilentWLoading(true); setSilentWMsg(null);
+    try {
+      const r = await silentWithdraw(activePool, amt);
+      setSilentWMsg(`Успешно! База сжата на $${r.decreased_base_by.toFixed(2)}`);
+      setSilentWAmount("");
+      fetchData();
+    } catch (err: any) {
+      setSilentWMsg(err?.response?.data?.detail || "Ошибка");
+    } finally { setSilentWLoading(false); }
+  }
+
+  async function handleRevertSilentWithdraw() {
+    const amt = parseFloat(revertSWAmount);
+    if (isNaN(amt) || amt <= 0) return;
+    if (!confirm(`Точно откатить тихий вывод сжатия $${amt} для ${poolLabel}?`)) return;
+    setRevertSWLoading(true); setRevertSWMsg(null);
+    try {
+      await revertSilentWithdraw(activePool, amt);
+      setRevertSWMsg("Успешный откат");
+      setRevertSWAmount("");
+      fetchData();
+    } catch (err: any) {
+      setRevertSWMsg(err?.response?.data?.detail || "Ошибка");
+    } finally { setRevertSWLoading(false); }
   }
 
   async function handleStatusSave(id: string) {

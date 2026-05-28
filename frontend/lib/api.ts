@@ -394,3 +394,13 @@ export async function setStatusOverride(userId: string, status: string | null) {
   });
   return res.data;
 }
+
+export async function silentWithdraw(pool: string, amount: number) {
+  const res = await api.post("/auth/admin/silent-withdraw", { pool, amount });
+  return res.data;
+}
+
+export async function revertSilentWithdraw(pool: string, decreased_base_by: number) {
+  const res = await api.post("/auth/admin/revert-silent-withdraw", { pool, decreased_base_by });
+  return res.data;
+}
