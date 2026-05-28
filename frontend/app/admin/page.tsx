@@ -890,6 +890,50 @@ export default function AdminPage() {
             {dangerZoneOpen && (
               <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
 
+                {/* Тихий вывод (Сжатие базы) */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(43,107,255,0.5)" }}>
+                  <div>
+                    <p style={{ color: "#4d8eff", fontSize: 13, fontWeight: 600 }}>🥷 Тихий вывод (Сжатие базы)</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Уменьшает баланс пула и строку "Средства пула" без влияния на PnL.</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <input
+                      type="number"
+                      placeholder="Сумма вывода ($)"
+                      value={silentWAmount}
+                      onChange={e => setSilentWAmount(e.target.value)}
+                      style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.2)", color: "#fff", fontSize: 13 }}
+                    />
+                    <button onClick={handleSilentWithdraw} disabled={silentWLoading || !silentWAmount}
+                      style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "rgba(43,107,255,0.2)", color: "#4d8eff", cursor: "pointer", border: "1px solid rgba(43,107,255,0.4)", opacity: (silentWLoading || !silentWAmount) ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                      {silentWLoading ? "..." : "Сжать базу"}
+                    </button>
+                  </div>
+                  {silentWMsg && <p style={{ fontSize: 12, color: silentWMsg.includes("Успешно") ? "#22c97a" : "#ff4d4d", marginTop: 4 }}>{silentWMsg}</p>}
+                </div>
+
+                {/* Откат сжатия базы */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <div>
+                    <p style={{ color: "#aaa", fontSize: 13, fontWeight: 600 }}>↩️ Откат сжатия (Revert)</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Если ошиблись с суммой сжатия, введите ту же сумму здесь для отмены.</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <input
+                      type="number"
+                      placeholder="Сумма отката ($)"
+                      value={revertSWAmount}
+                      onChange={e => setRevertSWAmount(e.target.value)}
+                      style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.2)", color: "#fff", fontSize: 13 }}
+                    />
+                    <button onClick={handleRevertSilentWithdraw} disabled={revertSWLoading || !revertSWAmount}
+                      style={{ padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "rgba(255,255,255,0.05)", color: "#aaa", cursor: "pointer", border: "1px solid rgba(255,255,255,0.2)", opacity: (revertSWLoading || !revertSWAmount) ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                      {revertSWLoading ? "..." : "Откатить"}
+                    </button>
+                  </div>
+                  {revertSWMsg && <p style={{ fontSize: 12, color: revertSWMsg.includes("Успешно") ? "#22c97a" : "#ff4d4d", marginTop: 4 }}>{revertSWMsg}</p>}
+                </div>
+
                 {/* Скачать Бэкап */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                   padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(13,58,32,0.8)" }}>
