@@ -422,10 +422,10 @@ export default function AdminPage() {
           manual_status_override: detail.manual_status_override || "NONE",
           forex_investment_usdt: String(detail.forex_investment_usdt ?? 0),
           forex_withdrawal_usdt: String(detail.forex_withdrawal_usdt ?? 0),
-          custom_investor_share: detail.custom_investor_share !== null ? String(detail.custom_investor_share * 100) : "",
+          custom_investor_share: detail.custom_investor_share !== null ? String(detail.custom_investor_share * 100) : "75",
         }}));
       } catch {
-        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0", custom_investor_share: "" } }));
+        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0", custom_investor_share: "75" } }));
       }
     }
   }
