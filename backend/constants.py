@@ -1,5 +1,10 @@
-INVESTOR_SHARE     = 0.75   # 75% — доля инвестора от прибыли
-POOL_FEE           = 0.20   # 20% — управляющий
+INVESTOR_SHARE     = 0.75   # 75% для инвестора
+POOL_FEE           = 0.20   # 20% для платформы
+
+def get_investor_share(fin) -> float:
+    if fin and getattr(fin, "custom_investor_share", None) is not None:
+        return float(fin.custom_investor_share)
+    return INVESTOR_SHARE
 
 # Многоуровневые реферальные бонусы (Уровень: Процент)
 REF_FEES = {

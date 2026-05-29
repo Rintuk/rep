@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_forex_pnl FLOAT DEFAULT 0",
             "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_crypto_ref_bonus FLOAT DEFAULT 0",
             "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_forex_ref_bonus FLOAT DEFAULT 0",
+            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS custom_investor_share FLOAT DEFAULT NULL",
             "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS replied_at TIMESTAMP DEFAULT NULL",
             "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS investor_read_at TIMESTAMP DEFAULT NULL",
             "ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS pool_type VARCHAR DEFAULT 'crypto'",

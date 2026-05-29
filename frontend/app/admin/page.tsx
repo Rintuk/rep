@@ -13,7 +13,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride,
+  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw,
@@ -48,6 +48,7 @@ interface InvestorForm {
   manual_status_override: string;
   forex_investment_usdt: string;
   forex_withdrawal_usdt: string;
+  custom_investor_share: string;
 }
 
 function CircuitBackground() {
@@ -421,9 +422,10 @@ export default function AdminPage() {
           manual_status_override: detail.manual_status_override || "NONE",
           forex_investment_usdt: String(detail.forex_investment_usdt ?? 0),
           forex_withdrawal_usdt: String(detail.forex_withdrawal_usdt ?? 0),
+          custom_investor_share: detail.custom_investor_share !== null ? String(detail.custom_investor_share * 100) : "",
         }}));
       } catch {
-        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0" } }));
+        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0", custom_investor_share: "" } }));
       }
     }
   }
@@ -495,13 +497,14 @@ export default function AdminPage() {
     if (!f) return;
     setStatusOverrideMsg(prev => ({ ...prev, [id]: "Сохранение..." }));
     try {
-      await setStatusOverride(id, f.manual_status_override);
-      await setReferralLimit(id, Number(f.referral_limit));
-      setStatusOverrideMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
-      setTimeout(() => setStatusOverrideMsg(prev => ({ ...prev, [id]: "" })), 2000);
-      fetchData();
+        await setStatusOverride(id, f.manual_status_override);
+        await setReferralLimit(id, Number(f.referral_limit));
+        await setCustomInvestorShare(id, f.custom_investor_share ? Number(f.custom_investor_share) / 100 : null);
+        setStatusOverrideMsg(prev => ({ ...prev, [id]: "✓ Сохранено!" }));
+        setTimeout(() => setStatusOverrideMsg(prev => ({ ...prev, [id]: "" })), 2000);
+        fetchData();
     } catch {
-      setStatusOverrideMsg(prev => ({ ...prev, [id]: "Ошибка сохранения" }));
+        setStatusOverrideMsg(prev => ({ ...prev, [id]: "Ошибка сохранения" }));
     }
   }
 
@@ -1262,8 +1265,8 @@ export default function AdminPage() {
                                           {[
                                             { label: "Инвестировано (USDT)", field: "forex_investment_usdt" as keyof InvestorForm, type: "number" },
                                             { label: "Выведено (USDT)", field: "forex_withdrawal_usdt" as keyof InvestorForm, type: "number" },
-                                            { label: "Лимит рефералов", field: "referral_limit" as keyof InvestorForm, type: "number" },
-                                            { label: "Заметка", field: "note" as keyof InvestorForm, type: "text" },
+                                            { label: "Лимит рефералов (глубина)", field: "referral_limit" as keyof InvestorForm, type: "number" },
+                                            { label: "Индивид. % (напр. 80)", field: "custom_investor_share" as keyof InvestorForm, type: "number" },
                                           ].map(({ label, field, type }) => (
                                             <div key={field}>
                                               <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
@@ -1272,6 +1275,12 @@ export default function AdminPage() {
                                                 style={{ ...inputStyle, border: "1px solid rgba(245,158,11,0.3)" }} />
                                             </div>
                                           ))}
+                                          <div style={{ gridColumn: "span 2" }}>
+                                            <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>Заметка</label>
+                                            <input type="text" value={f.note}
+                                              onChange={e => updateForm(u.id, "note", e.target.value)}
+                                              style={{ ...inputStyle, border: "1px solid rgba(245,158,11,0.3)" }} />
+                                          </div>
                                         </div>
                                         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
                                           <button onClick={() => handleForexSave(u.id)} disabled={forexSavingId === u.id}

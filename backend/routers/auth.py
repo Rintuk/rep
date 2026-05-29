@@ -6,7 +6,7 @@ from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEnt
 from schemas import RegisterIn, LoginIn, TokenOut, NewsItemCreate, NewsItemOut
 from security import hash_password, verify_password, create_access_token, get_admin_user, get_current_user
 from datetime import datetime, timedelta
-from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS
+from constants import INVESTOR_SHARE, get_investor_share, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get_investor_share
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -158,6 +158,55 @@ async def set_referral_limit(user_id: str, limit: int, db: AsyncSession = Depend
     await db.commit()
     return {"status": "ok", "referral_limit": limit}
 
+from pydantic import BaseModel
+class InvestorShareRequest(BaseModel):
+    share: float | None
+
+@router.post("/admin/investor-share/{user_id}", dependencies=[Depends(get_admin_user)])
+async def set_investor_share(user_id: str, data: InvestorShareRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))
+    fin = result.scalar_one_or_none()
+    
+    if fin:
+        # Calculate current dynamic PnL
+        crypto_pool_pct = await _get_pool_pnl_pct(db)
+        from models import ForexBotSnapshot
+        forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+        forex_pool_pct = 0.0
+        if forex_snap:
+            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+            if fx_net_inv > 0:
+                forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
+                
+        # Lock crypto pnl
+        if fin.investment_usdt > 0:
+            incr = crypto_pool_pct - fin.entry_pool_pnl_pct
+            gross = fin.investment_usdt * (incr / 100)
+            user_profit = round(gross * get_investor_share(fin), 2)
+            if user_profit > 0:
+                fin.locked_crypto_pnl += user_profit
+            fin.entry_pool_pnl_pct = crypto_pool_pct
+            
+        # Lock forex pnl
+        if fin.forex_investment_usdt > 0:
+            fx_incr = forex_pool_pct - fin.forex_entry_pool_pnl_pct
+            fx_gross = fin.forex_investment_usdt * (fx_incr / 100)
+            fx_user_profit = round(fx_gross * get_investor_share(fin), 2)
+            if fx_user_profit > 0:
+                fin.locked_forex_pnl += fx_user_profit
+            fin.forex_entry_pool_pnl_pct = forex_pool_pct
+            
+        # Update custom share
+        fin.custom_investor_share = data.share
+    else:
+        # User has no financials yet, just create with the new share
+        db.add(UserFinancials(
+            user_id=user_id,
+            custom_investor_share=data.share
+        ))
+
+    await db.commit()
+    return {"status": "ok"}
 
 @router.patch("/admin/status-override/{user_id}", dependencies=[Depends(get_admin_user)])
 async def set_status_override(user_id: str, status: str | None, db: AsyncSession = Depends(get_db)):
@@ -203,6 +252,7 @@ async def get_user_detail(user_id: str, db: AsyncSession = Depends(get_db)):
         "forex_investment_usdt": fin.forex_investment_usdt if fin else 0.0,
         "forex_withdrawal_usdt": fin.forex_withdrawal_usdt if fin else 0.0,
         "note": fin.note if fin else "",
+        "custom_investor_share": fin.custom_investor_share if fin else None,
         "referrals": [
             {"id": r.id, "email": r.email, "is_active": r.is_active, "created_at": str(r.created_at)}
             for r in refs
@@ -420,10 +470,10 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             gross_pnl = inv * (incremental / 100)
             
             locked_crypto_pnl = fin.locked_crypto_pnl if fin else 0.0
-            pnl = round(gross_pnl * INVESTOR_SHARE + locked_crypto_pnl, 2)
+            pnl = round(gross_pnl * get_investor_share(fin) + locked_crypto_pnl, 2)
             
             # Reconstruct historical gross profit that was locked during migration
-            locked_gross = locked_crypto_pnl / INVESTOR_SHARE
+            locked_gross = locked_crypto_pnl / get_investor_share(fin)
             
             total_gross_pnl += (gross_pnl + locked_gross)
             
@@ -445,6 +495,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             "status": status,
             "total_volume": round(total_volume, 2),
             "next_vol": next_vol,
+            "custom_investor_share": fin.custom_investor_share if fin else None,
         })
 
     pool_profit = round(total_gross_pnl, 2)
@@ -619,7 +670,7 @@ async def rollback_hwm(
             if fx_net_inv > 0:
                 target_forex_pct = round((target_forex_profit_usdt / fx_net_inv) * 100, 4)
 
-    from constants import INVESTOR_SHARE
+    from constants import INVESTOR_SHARE, get_investor_share
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     rolled_back_crypto = 0.0
     rolled_back_forex = 0.0
@@ -630,7 +681,7 @@ async def rollback_hwm(
         if target_crypto_pct is not None and f.entry_pool_pnl_pct > target_crypto_pct:
             diff = f.entry_pool_pnl_pct - target_crypto_pct
             gross = f.investment_usdt * (diff / 100)
-            fake_profit = round(gross * INVESTOR_SHARE, 2)
+            fake_profit = round(gross * get_investor_share(f), 2)
             f.locked_crypto_pnl = max(0.0, f.locked_crypto_pnl - fake_profit)
             f.entry_pool_pnl_pct = target_crypto_pct
             rolled_back_crypto += fake_profit
@@ -639,7 +690,7 @@ async def rollback_hwm(
         if target_forex_pct is not None and f.forex_entry_pool_pnl_pct > target_forex_pct:
             diff = f.forex_entry_pool_pnl_pct - target_forex_pct
             gross = f.forex_investment_usdt * (diff / 100)
-            fake_profit = round(gross * INVESTOR_SHARE, 2)
+            fake_profit = round(gross * get_investor_share(f), 2)
             f.locked_forex_pnl = max(0.0, f.locked_forex_pnl - fake_profit)
             f.forex_entry_pool_pnl_pct = target_forex_pct
             rolled_back_forex += fake_profit
@@ -687,7 +738,7 @@ async def emergency_restore_forex_stats(db: AsyncSession = Depends(get_db)):
 @router.post("/admin/emergency-restore-old-investors", dependencies=[Depends(get_admin_user)])
 async def emergency_restore_old_investors(db: AsyncSession = Depends(get_db)):
     from routers.forex import _get_forex_pool_pnl_pct
-    from constants import INVESTOR_SHARE
+    from constants import INVESTOR_SHARE, get_investor_share
     current_pool_pct = await _get_forex_pool_pnl_pct(db)
     
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
@@ -704,8 +755,8 @@ async def emergency_restore_old_investors(db: AsyncSession = Depends(get_db)):
             if f.user_id in new_user_ids or f.forex_investment_usdt <= 0:
                 continue
                 
-            ideal_net_profit = (f.forex_investment_usdt / total_old) * TOTAL_PROFIT * INVESTOR_SHARE
-            current_net_profit = f.forex_investment_usdt * (current_pool_pct / 100) * INVESTOR_SHARE
+            ideal_net_profit = (f.forex_investment_usdt / total_old) * TOTAL_PROFIT * get_investor_share(f)
+            current_net_profit = f.forex_investment_usdt * (current_pool_pct / 100) * get_investor_share(f)
             missing_profit = ideal_net_profit - current_net_profit
             
             if missing_profit > 0:
@@ -723,7 +774,7 @@ class RecalibratePayload(BaseModel):
 @router.post("/admin/emergency-recalibrate-pool", dependencies=[Depends(get_admin_user)])
 async def emergency_recalibrate_pool(payload: RecalibratePayload, db: AsyncSession = Depends(get_db)):
     from models import ForexBotSnapshot, User, UserFinancials
-    from constants import INVESTOR_SHARE
+    from constants import INVESTOR_SHARE, get_investor_share
     
     # 1. Update net_invested
     snaps = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalars().all()
@@ -759,8 +810,8 @@ async def emergency_recalibrate_pool(payload: RecalibratePayload, db: AsyncSessi
         for f in all_fins:
             if f.user_id in new_user_ids or f.forex_investment_usdt <= 0:
                 continue
-            ideal_net_profit = (f.forex_investment_usdt / total_old) * payload.target_profit_usdt * INVESTOR_SHARE
-            current_net_profit = f.forex_investment_usdt * (pool_pnl_pct / 100) * INVESTOR_SHARE
+            ideal_net_profit = (f.forex_investment_usdt / total_old) * payload.target_profit_usdt * get_investor_share(f)
+            current_net_profit = f.forex_investment_usdt * (pool_pnl_pct / 100) * get_investor_share(f)
             missing_profit = ideal_net_profit - current_net_profit
             if missing_profit > 0:
                 f.locked_forex_pnl = round(missing_profit, 2)
@@ -959,7 +1010,7 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | N
             forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
 
     # 3. Фиксируем прибыль
-    from constants import INVESTOR_SHARE
+    from constants import INVESTOR_SHARE, get_investor_share
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     updated = 0
     total_crypto_locked = 0.0
@@ -969,7 +1020,7 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | N
         if f.investment_usdt > 0:
             incr = crypto_pool_pct - f.entry_pool_pnl_pct
             gross = f.investment_usdt * (incr / 100)
-            user_profit = round(gross * INVESTOR_SHARE, 2)
+            user_profit = round(gross * get_investor_share(f), 2)
             if user_profit > 0:
                 f.locked_crypto_pnl += user_profit
                 total_crypto_locked += user_profit
@@ -984,7 +1035,7 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | N
         if f.forex_investment_usdt > 0:
             fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
             fx_gross = f.forex_investment_usdt * (fx_incr / 100)
-            fx_user_profit = round(fx_gross * INVESTOR_SHARE, 2)
+            fx_user_profit = round(fx_gross * get_investor_share(f), 2)
             if fx_user_profit > 0:
                 f.locked_forex_pnl += fx_user_profit
                 f.forex_entry_pool_pnl_pct = forex_pool_pct
@@ -1086,8 +1137,7 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
                         gross = inv * (incr / 100)
                     elif child_db and child_db.locked_crypto_pnl > 0:
                         # User created backup AFTER migration. Recover from locked_crypto_pnl
-                        from constants import INVESTOR_SHARE as _IS
-                        gross = child_db.locked_crypto_pnl / _IS
+                        gross = child_db.locked_crypto_pnl / get_investor_share(child_db)
                         
                     if gross > 0:
                         crypto_bonus += gross * REF_FEES[depth]
@@ -1099,8 +1149,7 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
                     if fx_incr > 0:
                         fx_gross = fx * (fx_incr / 100)
                     elif child_db and child_db.locked_forex_pnl > 0:
-                        from constants import INVESTOR_SHARE as _IS
-                        fx_gross = child_db.locked_forex_pnl / _IS
+                        fx_gross = child_db.locked_forex_pnl / get_investor_share(child_db)
                         
                     if fx_gross > 0:
                         forex_bonus += fx_gross * REF_FEES[depth]
@@ -1261,7 +1310,7 @@ async def create_withdrawal_request(
     
     incr = crypto_pool_pct - fin.entry_pool_pnl_pct
     gross = fin.investment_usdt * (incr / 100) if incr > 0 else 0.0
-    pnl = round(gross * INVESTOR_SHARE + fin.locked_crypto_pnl, 2)
+    pnl = round(gross * get_investor_share(fin) + fin.locked_crypto_pnl, 2)
     
     pending_reqs = (await db.execute(select(func.sum(WithdrawalRequest.amount)).where(WithdrawalRequest.user_id == user.id, WithdrawalRequest.status == "pending", WithdrawalRequest.pool_type == "crypto"))).scalar() or 0.0
     

@@ -47,6 +47,7 @@ class UserFinancials(Base):
     # Зафиксированный исторический реферальный доход
     locked_crypto_ref_bonus: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     locked_forex_ref_bonus:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    custom_investor_share:   Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
 
     note:       Mapped[str]      = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

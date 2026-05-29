@@ -7,7 +7,7 @@ from models import (BotSnapshot, Position, Trade, AIFeedEntry, UserFinancials, U
                     ForexBotSnapshot, ForexPosition, ForexTrade, NewsItem)
 from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo, NewsItemOut
 from security import get_current_user
-from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS
+from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get_investor_share
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -97,7 +97,7 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 
                 new_gross = inv * (incr / 100) if incr > 0 else 0.0
                 # Баг 4 fix: используем константу вместо жёсткого 0.75
-                locked_gross = f.locked_crypto_pnl / INVESTOR_SHARE if f and getattr(f, "locked_crypto_pnl", 0.0) > 0 else 0.0
+                locked_gross = f.locked_crypto_pnl / get_investor_share(f) if f and getattr(f, "locked_crypto_pnl", 0.0) > 0 else 0.0
                 total_gross = new_gross + locked_gross
                 
                 if total_gross > 0:
@@ -112,7 +112,7 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 
                 new_fx_gross = fx * (fx_incr / 100) if fx_incr > 0 else 0.0
                 # Баг 4 fix: используем константу вместо жёсткого 0.75
-                locked_fx_gross = f.locked_forex_pnl / INVESTOR_SHARE if f and getattr(f, "locked_forex_pnl", 0.0) > 0 else 0.0
+                locked_fx_gross = f.locked_forex_pnl / get_investor_share(f) if f and getattr(f, "locked_forex_pnl", 0.0) > 0 else 0.0
                 total_fx_gross = new_fx_gross + locked_fx_gross
                 
                 if total_fx_gross > 0:
@@ -198,8 +198,8 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         incremental_pnl_pct = pool_pnl_pct - entry_pnl_pct
         gross_pnl = user_investment * (incremental_pnl_pct / 100) if user_investment > 0 else 0.0
         locked_crypto_pnl = fin.locked_crypto_pnl if fin else 0.0
-        user_pnl = round(gross_pnl * INVESTOR_SHARE + locked_crypto_pnl, 2)
-        user_pnl_pct = round(incremental_pnl_pct * INVESTOR_SHARE, 2)
+        user_pnl = round(gross_pnl * get_investor_share(fin) + locked_crypto_pnl, 2)
+        user_pnl_pct = round(incremental_pnl_pct * get_investor_share(fin), 2)
 
         # Бонусы посчитаем позже вместе с форексом
 
@@ -242,8 +242,8 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         forex_incremental = forex_pool_pnl_pct - forex_entry_pct
         forex_gross = forex_investment * (forex_incremental / 100) if forex_investment > 0 else 0.0
         locked_forex_pnl = fin.locked_forex_pnl if fin else 0.0
-        forex_pnl = round(forex_gross * INVESTOR_SHARE + locked_forex_pnl, 2)
-        forex_pnl_pct = round(forex_incremental * INVESTOR_SHARE, 2)
+        forex_pnl = round(forex_gross * get_investor_share(fin) + locked_forex_pnl, 2)
+        forex_pnl_pct = round(forex_incremental * get_investor_share(fin), 2)
 
         forex_positions_out = [
             PositionOut(symbol=p.symbol, amount=p.amount, avg_price=p.avg_price,

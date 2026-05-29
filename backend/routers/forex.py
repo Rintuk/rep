@@ -7,7 +7,7 @@ from models import (User, UserFinancials, ForexBotSnapshot, ForexPosition, Forex
                     DepositRequest, WithdrawalRequest)
 from security import get_admin_user, get_current_user
 from datetime import datetime, timedelta
-from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS
+from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get_investor_share
 
 router = APIRouter(prefix="/auth", tags=["forex"])
 
@@ -121,10 +121,10 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             incremental = pool_pnl_pct - entry_pct
             gross_pnl = inv * (incremental / 100)
             locked_forex_pnl = fin.locked_forex_pnl if fin else 0.0
-            pnl = round(gross_pnl * INVESTOR_SHARE + locked_forex_pnl, 2)
+            pnl = round(gross_pnl * get_investor_share(fin) + locked_forex_pnl, 2)
             
-            # Reconstruct historical gross profit that was locked
-            locked_gross = locked_forex_pnl / INVESTOR_SHARE
+            # Gross
+            locked_gross = locked_forex_pnl / get_investor_share(fin)
             
             total_gross_pnl += (gross_pnl + locked_gross)
             admin_fee = POOL_FEE
@@ -386,7 +386,7 @@ async def create_forex_withdrawal_request(
     
     fx_incr = forex_pool_pct - fin.forex_entry_pool_pnl_pct
     fx_gross = fin.forex_investment_usdt * (fx_incr / 100) if fx_incr > 0 else 0.0
-    fx_pnl = round(fx_gross * INVESTOR_SHARE + fin.locked_forex_pnl, 2)
+    fx_pnl = round(fx_gross * get_investor_share(fin) + fin.locked_forex_pnl, 2)
     
     pending_reqs = (await db.execute(select(func.sum(WithdrawalRequest.amount)).where(WithdrawalRequest.user_id == user.id, WithdrawalRequest.status == "pending", WithdrawalRequest.pool_type == "forex"))).scalar() or 0.0
     

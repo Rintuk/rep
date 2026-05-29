@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+    @page {
+        size: A4;
+        margin: 20mm;
+    }
+    body {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        color: #1e293b;
+        line-height: 1.6;
+        background-color: #ffffff;
+    }
+    h1 {
+        color: #1d4ed8;
+        text-align: center;
+        margin-bottom: 20px;
+        font-size: 28px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    h2 {
+        color: #2563eb;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 8px;
+        margin-top: 35px;
+        font-size: 22px;
+    }
+    .status-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .status-card {
+        background-color: #f8fafc;
+        border-left: 6px solid #3b82f6;
+        padding: 15px 20px;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .status-title {
+        font-weight: 800;
+        color: #1e40af;
+        font-size: 18px;
+        display: inline-block;
+        width: 120px;
+    }
+    table.bonus-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 25px 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .bonus-table th, .bonus-table td {
+        border: 1px solid #cbd5e1;
+        padding: 14px;
+        text-align: center;
+    }
+    .bonus-table th {
+        background-color: #f1f5f9;
+        color: #0f172a;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 14px;
+    }
+    .bonus-table tr:nth-child(even) {
+        background-color: #f8fafc;
+    }
+    .example-box {
+        background-color: #f0fdf4;
+        border: 2px solid #22c55e;
+        padding: 25px;
+        border-radius: 12px;
+        margin-top: 25px;
+    }
+    .level {
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .l1 { background-color: #dbeafe; border-left: 6px solid #3b82f6; }
+    .l2 { background-color: #e0e7ff; border-left: 6px solid #6366f1; margin-left: 30px; }
+    .l3 { background-color: #fae8ff; border-left: 6px solid #d946ef; margin-left: 60px; }
+    .highlight {
+        color: #ea580c;
+        font-weight: 900;
+        font-size: 1.1em;
+    }
+    .footer {
+        margin-top: 40px;
+        text-align: center;
+        font-size: 13px;
+        color: #64748b;
+        font-style: italic;
+    }
+</style>
+</head>
+<body>
+    <h1>🌟 Партнерская Программа Makler 🌟</h1>
+    
+    <p style="text-align:center; font-size: 16px;">Вся система строится на двух главных понятиях: <b>Статус (Ранг)</b> и <b>Глубина бонусов</b>.</p>
+    
+    <h2>1. Как формируется ваш Статус?</h2>
+    <p>Ваш статус зависит от <b>Общего объема (Total Volume)</b>. Это сумма вашего личного депозита и депозитов <b>ВСЕХ</b> партнеров под вами на любой глубине (до бесконечности).</p>
+    
+    <div class="status-container">
+        <div class="status-card" style="border-left-color: #94a3b8;">
+            <span class="status-title" style="color: #475569;">PARTNER</span> <b>до $3,000</b> — Доход с <b>1 уровня</b>. Максимум 3 приглашенных.
+        </div>
+        <div class="status-card" style="border-left-color: #d97706; background-color: #fffbeb;">
+            <span class="status-title" style="color: #b45309;">BRONZE</span> <b>от $3,000</b> — Доход с <b>2 уровней</b>. Максимум 5 приглашенных.
+        </div>
+        <div class="status-card" style="border-left-color: #64748b; background-color: #f1f5f9;">
+            <span class="status-title" style="color: #334155;">SILVER</span> <b>от $3,500</b> — Доход с <b>2 уровней</b>. Максимум 7 приглашенных.
+        </div>
+        <div class="status-card" style="border-left-color: #eab308; background-color: #fefce8;">
+            <span class="status-title" style="color: #ca8a04;">GOLD</span> <b>от $4,000</b> — Доход с <b>3 уровней</b>. Максимум 10 приглашенных.
+        </div>
+        <div class="status-card" style="border-left-color: #8b5cf6; background-color: #faf5ff;">
+            <span class="status-title" style="color: #6d28d9;">VIP</span> <b>от $5,000</b> — Доход со всех <b>5 уровней</b>. <span style="color:#16a34a; font-weight:bold;">Безлимит приглашений!</span>
+        </div>
+    </div>
+
+    <h2>2. За что платятся деньги?</h2>
+    <p>Вы получаете процент <b>НЕ от суммы депозита</b> приглашенного, а <b>от его ПРИБЫЛИ</b>. То есть, когда ваши партнеры зарабатывают пассивный доход, вы получаете процент от их "грязной" прибыли.</p>
+    
+    <table class="bonus-table">
+        <tr>
+            <th>Глубина</th>
+            <th>Процент от прибыли</th>
+            <th>Кто это такие?</th>
+        </tr>
+        <tr>
+            <td>1 уровень</td>
+            <td><b style="color:#2563eb; font-size:16px;">3.0%</b></td>
+            <td>Ваши лично приглашенные инвесторы</td>
+        </tr>
+        <tr>
+            <td>2 уровень</td>
+            <td><b style="color:#2563eb; font-size:16px;">1.0%</b></td>
+            <td>Приглашенные ваших людей</td>
+        </tr>
+        <tr>
+            <td>3 уровень</td>
+            <td><b style="color:#2563eb; font-size:16px;">0.5%</b></td>
+            <td>Третья линия структуры</td>
+        </tr>
+        <tr>
+            <td>4 уровень</td>
+            <td><b style="color:#2563eb; font-size:16px;">0.3%</b></td>
+            <td>Четвертая линия структуры</td>
+        </tr>
+        <tr>
+            <td>5 уровень</td>
+            <td><b style="color:#2563eb; font-size:16px;">0.2%</b></td>
+            <td>Пятая линия структуры</td>
+        </tr>
+    </table>
+
+    <div style="page-break-before: always;"></div>
+
+    <h2>3. Пример расчета «На пальцах»</h2>
+    
+    <p>Представьте, что вы — <b style="color:#6d28d9;">VIP</b> (оборот структуры больше $5,000), и вы получаете бонусы со всех уровней в глубину.</p>
+    
+    <div class="example-box">
+        <div class="level l1">
+            <b>👤 1. Вы пригласили Алексея (1-й уровень)</b><br/>
+            Он вложил $10,000. Прошел месяц, Пул заработал +10% ($1,000 прибыли).<br/>
+            👉 Вы получаете <b>3%</b> от $1,000 = <span class="highlight">$30</span>
+        </div>
+        <div class="level l2">
+            <b>👥 2. Алексей пригласил Бориса (2-й уровень)</b><br/>
+            Борис вложил $5,000. Пул заработал +10% ($500 прибыли).<br/>
+            👉 Вы получаете <b>1%</b> от $500 = <span class="highlight">$5</span>
+        </div>
+        <div class="level l3">
+            <b>🚀 3. Борис пригласил Виктора (3-й уровень)</b><br/>
+            Виктор вложил $2,000. Пул заработал +10% ($200 прибыли).<br/>
+            👉 Вы получаете <b>0.5%</b> от $200 = <span class="highlight">$1</span>
+        </div>
+        
+        <div style="text-align: right; margin-top: 25px; padding-top: 15px; border-top: 2px dashed #86efac;">
+            <h3 style="color: #15803d; margin: 0; font-size: 22px;">Итого ваш пассивный доход: $36 / мес</h3>
+            <p style="margin:5px 0 0 0; color: #166534; font-size: 14px;">(И это только с одной ветки, без учета вашей личной прибыли инвестора!)</p>
+        </div>
+    </div>
+    
+    <h2>4. Мотивация расти дальше</h2>
+    <p>Представим, что у вас был бы статус <b>PARTNER</b> (структура меньше $3,000). Система автоматически «отрезала» бы вам всю глубину ниже 1-го уровня. </p>
+    <p>В этом случае вы бы получили $30 от Алексея, но доходы от Бориса и Виктора прошли бы мимо вас! Именно поэтому партнерам так выгодно строить <b>глубокую и широкую команду</b> — чтобы пробивать новые статусы и собирать абсолютно все бонусы с максимальной глубины.</p>
+
+    <div class="footer">
+        Документ сгенерирован автоматически системой Makler. Все цифры приведены для примера.
+    </div>
+</body>
+</html>
