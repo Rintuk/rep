@@ -25,35 +25,36 @@ interface ReferralInfo {
   level: number;
 }
 
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
-
 const nodeWidth = 200;
 const nodeHeight = 80;
 
+// Create a fresh dagre graph each call to avoid stale nodes
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = "TB") => {
+  const graph = new dagre.graphlib.Graph();
+  graph.setDefaultEdgeLabel(() => ({}));
+  graph.setGraph({ rankdir: direction });
+
   const isHorizontal = direction === "LR";
-  dagreGraph.setGraph({ rankdir: direction });
 
   nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+    graph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
   });
 
   edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
+    graph.setEdge(edge.source, edge.target);
   });
 
-  dagre.layout(dagreGraph);
+  dagre.layout(graph);
 
   const newNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
+    const pos = graph.node(node.id);
     return {
       ...node,
       targetPosition: isHorizontal ? Position.Left : Position.Top,
       sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
       position: {
-        x: nodeWithPosition.x - nodeWidth / 2,
-        y: nodeWithPosition.y - nodeHeight / 2,
+        x: pos.x - nodeWidth / 2,
+        y: pos.y - nodeHeight / 2,
       },
     };
   });
@@ -62,10 +63,19 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = "TB") => 
 };
 
 const CustomNode = ({ data }: any) => {
+  const isActive = data.investment > 0;
   return (
     <div style={{
-      background: data.isRoot ? "rgba(34,201,122,0.15)" : "rgba(0,180,255,0.1)",
-      border: `1px solid ${data.isRoot ? "rgba(34,201,122,0.4)" : "rgba(0,180,255,0.3)"}`,
+      background: data.isRoot
+        ? "rgba(34,201,122,0.15)"
+        : isActive
+          ? "rgba(0,180,255,0.1)"
+          : "rgba(80,80,80,0.15)",
+      border: `1px solid ${data.isRoot
+        ? "rgba(34,201,122,0.4)"
+        : isActive
+          ? "rgba(0,180,255,0.3)"
+          : "rgba(120,120,120,0.3)"}`,
       borderRadius: 12,
       padding: "10px 14px",
       minWidth: 180,
@@ -74,13 +84,15 @@ const CustomNode = ({ data }: any) => {
       boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
     }}>
       <Handle type="target" position={Position.Top} style={{ background: "#4a6a9a" }} />
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, wordBreak: "break-all" }}>
         {data.email}
       </div>
       {!data.isRoot && (
-        <div style={{ fontSize: 11, color: "#4a6a9a", display: "flex", justifyContent: "space-between" }}>
-          <span>L{data.level}</span>
-          <span style={{ color: data.investment > 0 ? "#fff" : "#4a6a9a" }}>${data.investment?.toFixed(2)}</span>
+        <div style={{ fontSize: 11, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ color: "#4a6a9a" }}>L{data.level}</span>
+          <span style={{ color: isActive ? "#fff" : "#666" }}>
+            {isActive ? `$${data.investment?.toFixed(2)}` : "не активен"}
+          </span>
         </div>
       )}
       {data.bonus > 0 && (
@@ -95,21 +107,24 @@ const CustomNode = ({ data }: any) => {
 
 const nodeTypes = { custom: CustomNode };
 
-export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInfo[], rootEmail: string }) {
-  const [open, setOpen] = useState(false);
+// Build nodes and edges from referral data
+function buildGraph(data: ReferralInfo[], rootEmail: string) {
+  // Collect all IDs that are in data (to detect L1 referrals whose parent is the root)
+  const dataIds = new Set(data.map(r => r.id));
 
-  const initialNodes: Node[] = [];
-  const initialEdges: Edge[] = [];
+  const nodes: Node[] = [
+    {
+      id: "root",
+      type: "custom",
+      position: { x: 0, y: 0 },
+      data: { email: rootEmail, isRoot: true },
+    },
+  ];
 
-  initialNodes.push({
-    id: "root",
-    type: "custom",
-    position: { x: 0, y: 0 },
-    data: { email: rootEmail, isRoot: true, label: "Вы" },
-  });
+  const edges: Edge[] = [];
 
   data.forEach((ref) => {
-    initialNodes.push({
+    nodes.push({
       id: ref.id,
       type: "custom",
       position: { x: 0, y: 0 },
@@ -121,37 +136,51 @@ export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInf
       },
     });
 
-    const isLevel1 = !data.some(d => d.id === ref.parent_id);
-    initialEdges.push({
-      id: `e-${isLevel1 ? "root" : ref.parent_id}-${ref.id}`,
-      source: isLevel1 ? "root" : (ref.parent_id || "root"),
+    // If parent_id is null OR parent is not in the data array → connect to root
+    const parentInData = ref.parent_id && dataIds.has(ref.parent_id);
+    const sourceId = parentInData ? ref.parent_id! : "root";
+    const isActive = ref.investment_usdt > 0;
+
+    edges.push({
+      id: `e-${sourceId}-${ref.id}`,
+      source: sourceId,
       target: ref.id,
       type: "smoothstep",
-      animated: ref.investment_usdt > 0,
-      style: { stroke: ref.investment_usdt > 0 ? "#00cfff" : "#4a6a9a", strokeWidth: 2 },
+      animated: isActive,
+      style: { stroke: isActive ? "#00cfff" : "#444", strokeWidth: isActive ? 2 : 1 },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: ref.investment_usdt > 0 ? "#00cfff" : "#4a6a9a",
+        color: isActive ? "#00cfff" : "#444",
       },
     });
   });
 
-  const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
+  return { nodes, edges };
+}
+
+export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInfo[], rootEmail: string }) {
+  const [open, setOpen] = useState(false);
+
+  const { nodes: initNodes, edges: initEdges } = buildGraph(data, rootEmail);
+  const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initNodes, initEdges);
+
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
 
   useEffect(() => {
-    const { nodes: newNodes, edges: newEdges } = getLayoutedElements(initialNodes, initialEdges);
-    setNodes(newNodes);
-    setEdges(newEdges);
-  }, [data]);
+    const { nodes: n, edges: e } = buildGraph(data, rootEmail);
+    const { nodes: ln, edges: le } = getLayoutedElements(n, e);
+    setNodes(ln);
+    setEdges(le);
+  }, [data, rootEmail]);
 
   const totalRefs = data.length;
   const activeRefs = data.filter(r => r.investment_usdt > 0).length;
+  const totalBonus = data.reduce((s, r) => s + r.bonus_usdt, 0);
 
   return (
     <div style={{ width: "100%" }}>
-      {/* Collapsed header — always visible */}
+      {/* Header button */}
       <button
         onClick={() => setOpen(prev => !prev)}
         style={{
@@ -169,21 +198,20 @@ export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInf
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 16 }}>{open ? "▲" : "▼"}</span>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>
-            Структура сети
+          <span style={{ fontSize: 14 }}>{open ? "▲" : "▼"}</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Структура сети</span>
+          <span style={{ fontSize: 11, color: "#4a6a9a" }}>
+            {totalRefs} чел · {activeRefs} активных
+            {totalBonus > 0 && ` · +${totalBonus.toFixed(2)}$`}
           </span>
         </div>
-        <span style={{ fontSize: 11, color: "#4a6a9a" }}>
-          {open ? "Свернуть" : "Развернуть"}
-        </span>
+        <span style={{ fontSize: 11, color: "#4a6a9a" }}>{open ? "Свернуть" : "Развернуть"}</span>
       </button>
 
-      {/* Tree — shown only when open */}
       {open && (
         <div style={{
           width: "100%",
-          height: 500,
+          height: 480,
           borderRadius: "0 0 12px 12px",
           overflow: "hidden",
           border: "1px solid rgba(0,180,255,0.15)",
@@ -197,7 +225,8 @@ export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInf
             onEdgesChange={onEdgesChange}
             nodeTypes={nodeTypes}
             fitView
-            minZoom={0.2}
+            fitViewOptions={{ padding: 0.2 }}
+            minZoom={0.15}
             maxZoom={2}
           >
             <Background color="#00cfff0d" gap={16} size={1} />
