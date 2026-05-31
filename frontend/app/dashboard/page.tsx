@@ -174,6 +174,7 @@ export default function DashboardPage() {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [newsFeed, setNewsFeed] = useState<NewsItemType[]>([]);
+  const [selectedNewsImage, setSelectedNewsImage] = useState<string | null>(null);
   const [supportBadge, setSupportBadge] = useState(0);
   const [showChangePass, setShowChangePass] = useState(false);
   const [oldPass, setOldPass] = useState("");
@@ -510,7 +511,12 @@ export default function DashboardPage() {
                   {n.image_url && (
                     <div style={{ marginBottom: 12, borderRadius: 8, overflow: "hidden" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={n.image_url} alt={n.title} style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }} />
+                      <img 
+                        src={n.image_url} 
+                        alt={n.title} 
+                        onClick={() => setSelectedNewsImage(n.image_url!)}
+                        style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block", cursor: "pointer" }} 
+                      />
                     </div>
                   )}
                   <p style={{ color: "#8aa0c0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{n.body}</p>
@@ -909,6 +915,32 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {selectedNewsImage && (
+        <div 
+          onClick={() => setSelectedNewsImage(null)}
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.85)",
+            zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center",
+            padding: 20
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={selectedNewsImage} 
+            alt="Увеличенное фото" 
+            style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 8, objectFit: "contain" }} 
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button 
+            onClick={() => setSelectedNewsImage(null)}
+            style={{ position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", fontSize: 24, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            &times;
+          </button>
         </div>
       )}
     </div>
