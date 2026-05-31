@@ -411,7 +411,7 @@ export default function DashboardPage() {
                   { label: "Вывести средства", color: "#ff9944", icon: <Wallet size={15}/>, action: openWithdraw },
                   { label: copied ? "Скопировано!" : "Реф. ссылка", color: "#6b8ab0", icon: <Copy size={15}/>, action: () => { setMenuOpen(false); copyRefLink(); } },
                   { label: "Поддержка", color: "#38bdf8", icon: <Headphones size={15}/>, badge: supportBadge, action: () => { setMenuOpen(false); setSupportBadge(0); markTicketsRead().catch(() => {}); router.push("/support"); } },
-                  { label: "Сменить пароль", color: "#a78bfa", icon: <Settings size={15}/>, action: () => { setMenuOpen(false); setShowChangePass(true); setChangePassMsg(null); setOldPass(""); setNewPass(""); setNewPass2(""); } },
+                  { label: "Профиль", color: "#a78bfa", icon: <Settings size={15}/>, action: () => { setMenuOpen(false); setShowChangePass(true); setChangePassMsg(null); setOldPass(""); setNewPass(""); setNewPass2(""); } },
                   { label: "Выйти", color: "#ff4d4d", icon: <LogOut size={15}/>, action: () => { setMenuOpen(false); logout(); } },
                 ].map((item, i) => item.special === "toggle" ? (
                   <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
@@ -759,7 +759,7 @@ export default function DashboardPage() {
           onClick={e => { if (e.target === e.currentTarget) setShowChangePass(false); }}>
           <div style={{ background: "#0a0f2a", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: 28, width: "100%", maxWidth: 380, boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>🔒 Смена пароля</h3>
+              <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>🔒 Профиль</h3>
               <button onClick={() => setShowChangePass(false)} style={{ background: "none", border: "none", color: "#4a6a9a", cursor: "pointer" }}><X size={18} /></button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
