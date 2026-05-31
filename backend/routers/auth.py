@@ -1635,7 +1635,7 @@ async def admin_revert_silent_withdraw(payload: RevertSilentPayload, db: AsyncSe
 
 @router.get("/admin/users/{user_id}/tree", dependencies=[Depends(get_admin_user)])
 async def get_user_referral_tree(user_id: str, db: AsyncSession = Depends(get_db)):
-    from routers.dashboard import _calc_referral_tree, _get_pool_pnl_pct
+    from routers.dashboard import _calc_referral_tree
     from routers.forex import _get_forex_pool_pnl_pct
     
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
