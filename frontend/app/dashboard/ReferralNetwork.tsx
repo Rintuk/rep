@@ -166,7 +166,7 @@ export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInf
         minZoom={0.2}
         maxZoom={2}
       >
-        <Background color="#00cfff" gap={16} size={1} opacity={0.05} />
+        <Background color="#00cfff0d" gap={16} size={1} />
         <Controls style={{ display: 'flex', flexDirection: 'column' }} />
       </ReactFlow>
     </div>

@@ -178,6 +178,7 @@ export default function AdminPage() {
   };
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [trees, setTrees] = useState<Record<string, any[]>>({});
   const [forms, setForms] = useState<Record<string, InvestorForm>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<Record<string, string>>({});
@@ -413,6 +414,12 @@ export default function AdminPage() {
   async function toggleExpand(id: string) {
     if (expandedId === id) { setExpandedId(null); return; }
     setExpandedId(id);
+    try {
+      const treeData = await getUserReferralTree(id);
+      setTrees(prev => ({ ...prev, [id]: treeData }));
+    } catch (e) {
+      console.error("Failed to load referral tree", e);
+    }
     if (!forms[id]) {
       try {
         const detail = await getUserDetail(id);
