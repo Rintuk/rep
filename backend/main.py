@@ -46,8 +46,9 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS pool_type VARCHAR DEFAULT 'crypto'",
             "ALTER TABLE withdrawal_requests ADD COLUMN IF NOT EXISTS pool_type VARCHAR DEFAULT 'crypto'",
             "ALTER TABLE news_items ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname VARCHAR UNIQUE DEFAULT NULL",
+            "ALTER TABLE users ADD COLUMN nickname VARCHAR DEFAULT NULL",
             "UPDATE users SET nickname = email WHERE nickname IS NULL",
+            "ALTER TABLE users ADD CONSTRAINT users_nickname_key UNIQUE (nickname)",
             """CREATE TABLE IF NOT EXISTS deposit_requests (
                 id TEXT PRIMARY KEY,
                 user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
