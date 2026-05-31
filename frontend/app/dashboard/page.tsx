@@ -9,7 +9,9 @@ import {
 } from "@/lib/api";
 import { Wallet, ArrowRight, ArrowDownLeft, ArrowUpRight, Copy, LogOut, Loader2, CheckCircle2, TrendingUp, Info, TrendingDown, Activity, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import ReferralNetwork from "./ReferralNetwork";
+import dynamic from 'next/dynamic';
+
+const ReferralNetwork = dynamic(() => import('./ReferralNetwork'), { ssr: false });
 
 interface Position { symbol: string; amount: number; avg_price: number; current_price?: number; }
 interface Trade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }

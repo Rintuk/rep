@@ -22,7 +22,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from "recharts";
 import { TrendingUp, TrendingDown, Wallet, Activity, Users, CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Trash2, Save } from "lucide-react";
-import ReferralNetwork from "../dashboard/ReferralNetwork";
+import dynamic from 'next/dynamic';
+
+const ReferralNetwork = dynamic(() => import('../dashboard/ReferralNetwork'), { ssr: false });
 
 const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888" };
 
