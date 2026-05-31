@@ -10,6 +10,7 @@ import {
 import { Wallet, ArrowRight, ArrowDownLeft, ArrowUpRight, Copy, LogOut, Loader2, CheckCircle2, TrendingUp, Info, TrendingDown, Activity, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import dynamic from 'next/dynamic';
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 const ReferralNetwork = dynamic(() => import('./ReferralNetwork'), { ssr: false });
 
@@ -925,19 +926,29 @@ export default function DashboardPage() {
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: "rgba(0,0,0,0.85)",
             zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center",
-            padding: 20
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
-            src={selectedNewsImage} 
-            alt="Увеличенное фото" 
-            style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 8, objectFit: "contain" }} 
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <TransformWrapper
+              initialScale={1}
+              minScale={0.5}
+              maxScale={4}
+              centerOnInit={true}
+              wheel={{ step: 0.1 }}
+            >
+              <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }} contentStyle={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={selectedNewsImage} 
+                  alt="Увеличенное фото" 
+                  style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} 
+                />
+              </TransformComponent>
+            </TransformWrapper>
+          </div>
           <button 
             onClick={() => setSelectedNewsImage(null)}
-            style={{ position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", fontSize: 24, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            style={{ position: "absolute", top: 20, right: 20, background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", fontSize: 24, width: 40, height: 40, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10000 }}
           >
             &times;
           </button>
