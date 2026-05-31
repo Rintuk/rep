@@ -1285,8 +1285,10 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
 @router.post("/admin/emergency-fix-pnl")
 async def emergency_fix_pnl(db: AsyncSession = Depends(get_db)):
     pool_pnl_pct = await _get_pool_pnl_pct(db)
-    from sqlalchemy import text
-    await db.execute(text(f"UPDATE user_financials SET entry_pool_pnl_pct = {pool_pnl_pct} WHERE investment_usdt > 0"))
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    for f in fins:
+        if f.investment_usdt > 0:
+            f.entry_pool_pnl_pct = pool_pnl_pct
     await db.commit()
     return {"status": "success", "new_pct": pool_pnl_pct}
 
