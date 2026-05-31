@@ -9,11 +9,12 @@ import {
 } from "@/lib/api";
 import { Wallet, ArrowRight, ArrowDownLeft, ArrowUpRight, Copy, LogOut, Loader2, CheckCircle2, TrendingUp, Info, TrendingDown, Activity, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import ReferralNetwork from "./ReferralNetwork";
 
 interface Position { symbol: string; amount: number; avg_price: number; current_price?: number; }
 interface Trade { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string; }
 interface AIFeed { timestamp: string; action: string; symbol: string; reason: string; }
-interface ReferralInfo { email: string; investment_usdt: number; bonus_usdt: number; level: number; }
+interface ReferralInfo { id: string; parent_id: string | null; email: string; investment_usdt: number; bonus_usdt: number; level: number; }
 interface Dashboard {
   balance_usdt: number; pool_total_usdt: number; pool_positions_usdt: number;
   mode: string; hwm: number; drawdown_pct: number; server_online: boolean;
@@ -559,8 +560,13 @@ export default function DashboardPage() {
           {data.referrals.length === 0 ? (
             <p style={{ color: "#4a6a9a", fontSize: 13 }}>Пока никто не зарегистрировался по вашей ссылке</p>
           ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ color: "#fff", fontWeight: 600, marginBottom: 12 }}>Структура сети</h3>
+                <ReferralNetwork data={data.referrals} rootEmail="Вы" />
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ color: "#4a6a9a" }}>
                     <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 400 }}>Email</th>
@@ -589,6 +595,7 @@ export default function DashboardPage() {
                 )}
               </table>
             </div>
+          </>
           )}
 
           {/* Кнопки внизу блока */}

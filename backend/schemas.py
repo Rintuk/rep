@@ -76,6 +76,8 @@ class AIFeedOut(BaseModel):
     reason: str
 
 class ReferralInfo(BaseModel):
+    id: str
+    parent_id: str | None
     email: str          # замаскированный email
     investment_usdt: float
     bonus_usdt: float   # сколько реферер зарабатывает с этого человека

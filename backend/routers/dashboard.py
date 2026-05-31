@@ -122,7 +122,14 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             if cb > 0 or fb > 0 or depth == 1:
                 parts = child.email.split("@")
                 masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else child.email
-                refs_info.append(ReferralInfo(email=masked, investment_usdt=inv + fx, bonus_usdt=cb + fb, level=depth))
+                refs_info.append(ReferralInfo(
+                    id=child.id,
+                    parent_id=curr,
+                    email=masked, 
+                    investment_usdt=inv + fx, 
+                    bonus_usdt=cb + fb, 
+                    level=depth
+                ))
             
     return status, total_volume, next_vol, crypto_bonus, forex_bonus, refs_info
 
