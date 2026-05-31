@@ -171,7 +171,7 @@ export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInf
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 16 }}>{open ? "▲" : "▼"}</span>
           <span style={{ fontSize: 13, fontWeight: 600 }}>
-            Структура сети ({totalRefs} чел., активных: {activeRefs})
+            Структура сети
           </span>
         </div>
         <span style={{ fontSize: 11, color: "#4a6a9a" }}>
