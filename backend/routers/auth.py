@@ -1221,10 +1221,8 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     if req.status != "pending":
-        raise HTTPException(status_code=400, detail="Заявка уже обработана")
+        raise HTTPException(status_code=400, detail="Заявка не в ожидании")
 
-    # Деньги уже пришли в пул до одобрения — считаем PnL БЕЗ этого депозита,
-    # иначе сумма депозита войдёт в прибыль инвестора как будто это доход.
     snap = (await db.execute(
         select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
@@ -1232,7 +1230,6 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
         positions = (await db.execute(
             select(Position).where(Position.snapshot_id == snap.id)
         )).scalars().all()
-        # Вычет депозита убран: деньги подразумеваются ЕЩЕ НЕ заведенными на биржу
         pool_total_without_deposit = snap.balance_usdt + sum(
             p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
         )
@@ -1246,20 +1243,11 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
     else:
         current_pnl_pct = 0.0
 
-    # АВТО-МИГРАЦИЯ PNL (защита от размытия процентов)
     await _migrate_pnl_internal(db, override_crypto_pct=current_pnl_pct)
 
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
-        old_inv = fin.investment_usdt
-        new_inv = old_inv + actual_amount
-        if old_inv <= 0:
-            fin.entry_pool_pnl_pct = current_pnl_pct
-        else:
-            fin.entry_pool_pnl_pct = round(
-                (old_inv * fin.entry_pool_pnl_pct + actual_amount * current_pnl_pct) / new_inv, 4
-            )
-        fin.investment_usdt = new_inv
+        fin.investment_usdt += actual_amount
         fin.updated_at = datetime.utcnow()
     else:
         db.add(UserFinancials(
@@ -1271,8 +1259,36 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
     req.status = "approved"
     req.updated_at = datetime.utcnow()
     await db.commit()
+
+    if snap:
+        snap.balance_usdt += actual_amount
+        snap.net_invested += actual_amount
+        await db.commit()
+        
+        total_inv_new = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+        total_wd_new = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+        ref_new = start + total_inv_new - total_wd_new
+        if ref_new <= 0:
+            ref_new = snap.net_invested if snap.net_invested > 0 else start
+        
+        pool_total_new = snap.balance_usdt + sum(
+            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
+        )
+        post_deposit_pct = round((pool_total_new - ref_new) / ref_new * 100, 4) if ref_new > 0 else 0.0
+        
+        from sqlalchemy import text
+        await db.execute(text(f"UPDATE user_financials SET entry_pool_pnl_pct = {post_deposit_pct} WHERE investment_usdt > 0"))
+        await db.commit()
+
     return {"status": "approved", "amount": actual_amount}
 
+@router.post("/admin/emergency-fix-pnl")
+async def emergency_fix_pnl(db: AsyncSession = Depends(get_db)):
+    pool_pnl_pct = await _get_pool_pnl_pct(db)
+    from sqlalchemy import text
+    await db.execute(text(f"UPDATE user_financials SET entry_pool_pnl_pct = {pool_pnl_pct} WHERE investment_usdt > 0"))
+    await db.commit()
+    return {"status": "success", "new_pct": pool_pnl_pct}
 
 @router.post("/admin/deposits/{request_id}/reject", dependencies=[Depends(get_admin_user)])
 async def reject_deposit(request_id: str, db: AsyncSession = Depends(get_db)):
