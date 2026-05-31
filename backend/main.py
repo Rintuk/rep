@@ -6,12 +6,12 @@ from routers import bot, auth, dashboard, demo, forex, support
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from database import async_session
+    from database import AsyncSessionLocal
     from routers.auth import _get_pool_pnl_pct
     from models import UserFinancials
     from sqlalchemy.future import select
     try:
-        async with async_session() as s_db:
+        async with AsyncSessionLocal() as s_db:
             pct = await _get_pool_pnl_pct(s_db)
             fins = (await s_db.execute(select(UserFinancials))).scalars().all()
             for f in fins:
