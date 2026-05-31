@@ -97,6 +97,7 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                         id=child.id,
                         parent_id=curr,
                         email=child.email,
+                        nickname=child.nickname,
                         investment_usdt=inv + fx,
                         bonus_usdt=0.0,
                         level=depth
@@ -132,6 +133,7 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 id=child.id,
                 parent_id=curr,
                 email=child.email,
+                nickname=child.nickname,
                 investment_usdt=inv + fx,
                 bonus_usdt=cb + fb,
                 level=depth
@@ -317,4 +319,6 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         forex_ref_bonus=forex_ref_bonus,
         forex_positions=forex_positions_out,
         forex_recent_trades=forex_trades_out,
+        email=user.email,
+        nickname=user.nickname,
     )
