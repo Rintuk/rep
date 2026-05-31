@@ -1342,7 +1342,7 @@ export default function AdminPage() {
                                       </div>
                                     </div>
 
-                                    {trees[u.id] && trees[u.id].length > 0 && (
+                                    {trees[u.id] && (
                                       <div style={{ borderTop: `1px solid ${border}`, marginTop: 16, paddingTop: 16 }}>
                                         <p style={{ color: "#fff", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Дерево рефералов</p>
                                         <ReferralNetwork data={trees[u.id]} rootEmail={u.email} />
