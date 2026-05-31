@@ -395,6 +395,11 @@ export async function setStatusOverride(userId: string, status: string | null) {
   return res.data;
 }
 
+export async function setUserReferrer(userId: string, referredByEmail: string) {
+  const res = await api.patch(`/auth/admin/set-referrer/${userId}`, { referred_by_email: referredByEmail || null });
+  return res.data;
+}
+
 export async function setCustomInvestorShare(userId: string, share: number | null) {
   const res = await api.post(`/auth/admin/investor-share/${userId}`, { share });
   return res.data;

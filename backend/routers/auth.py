@@ -261,6 +261,13 @@ async def get_user_detail(user_id: str, db: AsyncSession = Depends(get_db)):
     # Финансы
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
 
+    # Поиск email пригласителя
+    referred_by_email = ""
+    if user.referred_by:
+        referrer = (await db.execute(select(User).where(User.id == user.referred_by))).scalar_one_or_none()
+        if referrer:
+            referred_by_email = referrer.email
+
     return {
         "id": user.id,
         "email": user.email,
@@ -270,6 +277,7 @@ async def get_user_detail(user_id: str, db: AsyncSession = Depends(get_db)):
         "referral_limit": user.referral_limit,
         "manual_status_override": user.manual_status_override,
         "referred_by": user.referred_by,
+        "referred_by_email": referred_by_email,
         "created_at": str(user.created_at),
         "investment_usdt": fin.investment_usdt if fin else 0.0,
         "withdrawal_usdt": fin.withdrawal_usdt if fin else 0.0,
@@ -559,6 +567,25 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         "pending_users": [{"id": u.id, "email": u.email, "created_at": str(u.created_at)} for u in pending],
     }
 
+class SetReferrerPayload(BaseModel):
+    referred_by_email: str | None
+
+@router.patch("/admin/set-referrer/{user_id}", dependencies=[Depends(get_admin_user)])
+async def set_user_referrer(user_id: str, payload: SetReferrerPayload, db: AsyncSession = Depends(get_db)):
+    u = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not u:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if payload.referred_by_email:
+        referrer = (await db.execute(select(User).where(User.email == payload.referred_by_email))).scalar_one_or_none()
+        if not referrer:
+            raise HTTPException(status_code=404, detail="Пригласитель с таким email не найден")
+        if referrer.id == u.id:
+            raise HTTPException(status_code=400, detail="Нельзя пригласить самого себя")
+        u.referred_by = referrer.id
+    else:
+        u.referred_by = None
+    await db.commit()
+    return {"status": "success", "referred_by": u.referred_by}
 
 @router.post("/admin/adjust-net-invested", dependencies=[Depends(get_admin_user)])
 async def adjust_net_invested(add_amount: float, db: AsyncSession = Depends(get_db)):

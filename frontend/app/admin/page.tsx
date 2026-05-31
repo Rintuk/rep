@@ -13,7 +13,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare,
+  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare, setUserReferrer,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw,
@@ -49,6 +49,7 @@ interface InvestorForm {
   forex_investment_usdt: string;
   forex_withdrawal_usdt: string;
   custom_investor_share: string;
+  referred_by_email: string;
 }
 
 function CircuitBackground() {
@@ -423,9 +424,10 @@ export default function AdminPage() {
           forex_investment_usdt: String(detail.forex_investment_usdt ?? 0),
           forex_withdrawal_usdt: String(detail.forex_withdrawal_usdt ?? 0),
           custom_investor_share: detail.custom_investor_share !== null ? String(detail.custom_investor_share * 100) : "75",
+          referred_by_email: detail.referred_by_email || "",
         }}));
       } catch {
-        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0", custom_investor_share: "75" } }));
+        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0", custom_investor_share: "75", referred_by_email: "" } }));
       }
     }
   }
@@ -1296,6 +1298,13 @@ export default function AdminPage() {
                                     <div style={{ borderTop: `1px solid ${border}`, paddingTop: 16, marginTop: 8 }}>
                                       <p style={{ color: "#fff", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Партнерские настройки (Общие)</p>
                                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                                        <div>
+                                          <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>Пригласитель (Email)</label>
+                                          <input type="email" value={f.referred_by_email}
+                                            onChange={e => updateForm(u.id, "referred_by_email", e.target.value)}
+                                            placeholder="admin@example.com"
+                                            style={inputStyle} />
+                                        </div>
                                         <div>
                                           <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>Статус (Вручную)</label>
                                           <select value={f.manual_status_override} onChange={e => updateForm(u.id, "manual_status_override", e.target.value)}
