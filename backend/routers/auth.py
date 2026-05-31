@@ -34,6 +34,15 @@ async def _get_pool_pnl_pct(db: AsyncSession) -> float:
         ref = snap.net_invested if snap.net_invested > 0 else start
     return round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
 
+@router.post("/admin/emergency-force-set-pct")
+async def emergency_force_set_pct(pct: float, db: AsyncSession = Depends(get_db)):
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    for f in fins:
+        if f.investment_usdt > 0:
+            f.entry_pool_pnl_pct = pct
+    await db.commit()
+    return {"status": "success", "new_pct": pct}
+
 @router.post("/register")
 async def register(data: RegisterIn, db: AsyncSession = Depends(get_db)):
     import traceback
