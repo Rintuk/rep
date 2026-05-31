@@ -14,7 +14,7 @@ import {
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
   cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare, setUserReferrer, getUserReferralTree,
-  getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
+  getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw,
 } from "@/lib/api";
@@ -226,6 +226,8 @@ export default function AdminPage() {
   const [newsPool, setNewsPool] = useState<"all" | "crypto" | "forex">("all");
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsMsg, setNewsMsg] = useState<string | null>(null);
+  const [newsImageUrl, setNewsImageUrl] = useState<string | null>(null);
+  const [newsImageLoading, setNewsImageLoading] = useState(false);
 
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [expandedTicket, setExpandedTicket] = useState<string | null>(null);
@@ -262,10 +264,11 @@ export default function AdminPage() {
     setNewsLoading(true);
     setNewsMsg(null);
     try {
-      await createNews(newsTitle.trim(), newsBody.trim(), newsPool);
+      await createNews(newsTitle.trim(), newsBody.trim(), newsPool, newsImageUrl);
       setNewsTitle("");
       setNewsBody("");
       setNewsPool("all");
+      setNewsImageUrl(null);
       setNewsMsg("Новость опубликована");
       await fetchNews();
     } catch {
@@ -273,6 +276,20 @@ export default function AdminPage() {
     } finally {
       setNewsLoading(false);
       setTimeout(() => setNewsMsg(null), 3000);
+    }
+  }
+
+  async function handleNewsImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setNewsImageLoading(true);
+    try {
+      const url = await uploadNewsImage(file);
+      setNewsImageUrl(url);
+    } catch {
+      setNewsMsg("Ошибка загрузки картинки");
+    } finally {
+      setNewsImageLoading(false);
     }
   }
 
@@ -1630,6 +1647,36 @@ export default function AdminPage() {
                   rows={4}
                   style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${border}`, borderRadius: 8, padding: "10px 14px", color: "#fff", fontSize: 14, outline: "none", resize: "vertical", fontFamily: "inherit" }}
                 />
+
+                {/* Загрузка картинки */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <label style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    background: "rgba(0,180,255,0.1)", border: `1px solid rgba(0,180,255,0.3)`,
+                    borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: "#00cfff",
+                    opacity: newsImageLoading ? 0.6 : 1,
+                  }}>
+                    📷 {newsImageLoading ? "Загрузка..." : newsImageUrl ? "Заменить картинку" : "Добавить картинку"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={handleNewsImageUpload}
+                      disabled={newsImageLoading}
+                    />
+                  </label>
+                  {newsImageUrl && (
+                    <>
+                      <img src={newsImageUrl} alt="preview" style={{ height: 48, width: 80, objectFit: "cover", borderRadius: 6, border: `1px solid ${border}` }} />
+                      <button
+                        onClick={() => setNewsImageUrl(null)}
+                        style={{ background: "none", border: "none", color: "#ff4d4d", cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+                        title="Удалить картинку"
+                      >✕</button>
+                    </>
+                  )}
+                </div>
+
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <select
                     value={newsPool}

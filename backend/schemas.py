@@ -110,12 +110,14 @@ class NewsItemCreate(BaseModel):
     title: str
     body: str
     pool_type: str = "all"  # "all", "crypto", "forex"
+    image_url: str | None = None
 
 class NewsItemOut(BaseModel):
     id: str
     title: str
     body: str
     pool_type: str
+    image_url: str | None = None
     created_at: datetime
 
 

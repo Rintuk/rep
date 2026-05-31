@@ -327,6 +327,7 @@ export interface NewsItem {
   title: string;
   body: string;
   pool_type: string;
+  image_url?: string | null;
   created_at: string;
 }
 
@@ -335,9 +336,18 @@ export async function getAdminNews() {
   return res.data as NewsItem[];
 }
 
-export async function createNews(title: string, body: string, pool_type: string) {
-  const res = await api.post("/auth/admin/news", { title, body, pool_type });
+export async function createNews(title: string, body: string, pool_type: string, image_url?: string | null) {
+  const res = await api.post("/auth/admin/news", { title, body, pool_type, image_url });
   return res.data as NewsItem;
+}
+
+export async function uploadNewsImage(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await api.post("/auth/admin/news/upload-image", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data.url as string;
 }
 
 export async function deleteNews(id: string) {

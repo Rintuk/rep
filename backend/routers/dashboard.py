@@ -73,46 +73,44 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
     
     # BFS для подсчета бонусов до 5 уровней
     queue = [(user_id, 1)]
+    crypto_bonus = 0.0
+    forex_bonus = 0.0
+    refs_info = []
+
     while queue:
         curr, depth = queue.pop(0)
         if depth > 5:
             continue
             
         for child in children_map.get(curr, []):
-            # Always traverse children (dynamic compression)
+            # Always traverse children
             queue.append((child.id, depth + 1))
             
             f = fins_map.get(child.id)
             inv = f.investment_usdt if f else 0.0
             fx = f.forex_investment_usdt if f else 0.0
-            
-            # Always append depth=1 referrals to refs_info so they show in the tree even if inactive
-            if depth == 1:
-                refs_info.append(ReferralInfo(
-                    id=child.id,
-                    parent_id=curr,
-                    email=child.email, 
-                    investment_usdt=inv + fx, 
-                    bonus_usdt=0.0, 
-                    level=depth
-                ))
 
+            # If inactive — show in tree (depth=1 only) but no bonuses
             if not child.is_active:
+                if depth == 1:
+                    refs_info.append(ReferralInfo(
+                        id=child.id,
+                        parent_id=curr,
+                        email=child.email,
+                        investment_usdt=inv + fx,
+                        bonus_usdt=0.0,
+                        level=depth
+                    ))
                 continue
-            inv = f.investment_usdt if f else 0.0
-            fx = f.forex_investment_usdt if f else 0.0
             
             # Crypto bonus
             cb = 0.0
             if inv > 0 and depth <= levels_allowed and depth in REF_FEES:
                 ref_entry = f.entry_pool_pnl_pct if f else 0.0
                 incr = crypto_pool_pct - ref_entry
-                
                 new_gross = inv * (incr / 100) if incr > 0 else 0.0
-                # Баг 4 fix: используем константу вместо жёсткого 0.75
                 locked_gross = f.locked_crypto_pnl / get_investor_share(f) if f and getattr(f, "locked_crypto_pnl", 0.0) > 0 else 0.0
                 total_gross = new_gross + locked_gross
-                
                 if total_gross > 0:
                     cb = total_gross * REF_FEES[depth]
                     crypto_bonus += cb
@@ -122,27 +120,22 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             if fx > 0 and depth <= levels_allowed and depth in REF_FEES:
                 fx_entry = f.forex_entry_pool_pnl_pct if f else 0.0
                 fx_incr = forex_pool_pct - fx_entry
-                
                 new_fx_gross = fx * (fx_incr / 100) if fx_incr > 0 else 0.0
-                # Баг 4 fix: используем константу вместо жёсткого 0.75
                 locked_fx_gross = f.locked_forex_pnl / get_investor_share(f) if f and getattr(f, "locked_forex_pnl", 0.0) > 0 else 0.0
                 total_fx_gross = new_fx_gross + locked_fx_gross
-                
                 if total_fx_gross > 0:
                     fb = total_fx_gross * REF_FEES[depth]
                     forex_bonus += fb
-                    
-            if cb > 0 or fb > 0:
-                # We already appended depth=1 above, so only append if depth > 1
-                if depth > 1:
-                    refs_info.append(ReferralInfo(
-                        id=child.id,
-                        parent_id=curr,
-                        email=child.email, 
-                        investment_usdt=inv + fx, 
-                        bonus_usdt=cb + fb, 
-                        level=depth
-                    ))
+
+            # Add to refs_info (all active refs, all levels)
+            refs_info.append(ReferralInfo(
+                id=child.id,
+                parent_id=curr,
+                email=child.email,
+                investment_usdt=inv + fx,
+                bonus_usdt=cb + fb,
+                level=depth
+            ))
             
     return status, total_volume, next_vol, crypto_bonus, forex_bonus, refs_info
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
@@ -1502,11 +1502,28 @@ async def admin_create_news(
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    item = NewsItem(title=data.title, body=data.body, pool_type=data.pool_type)
+    item = NewsItem(title=data.title, body=data.body, pool_type=data.pool_type, image_url=data.image_url)
     db.add(item)
     await db.commit()
     await db.refresh(item)
     return item
+
+
+@router.post("/admin/news/upload-image")
+async def admin_upload_news_image(
+    file: UploadFile = File(...),
+    admin: User = Depends(get_admin_user),
+):
+    import base64
+    allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Только JPG, PNG, WEBP, GIF")
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:  # 5MB limit
+        raise HTTPException(status_code=400, detail="Файл слишком большой (макс 5MB)")
+    b64 = base64.b64encode(content).decode("utf-8")
+    data_url = f"data:{file.content_type};base64,{b64}"
+    return {"url": data_url}
 
 
 @router.delete("/admin/news/{news_id}")
