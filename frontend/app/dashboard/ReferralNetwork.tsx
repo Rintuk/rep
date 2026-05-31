@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ReactFlow,
-  MiniMap,
   Controls,
   Background,
   useNodesState,
@@ -48,7 +47,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = "TB") => 
 
   const newNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
-    const newNode = {
+    return {
       ...node,
       targetPosition: isHorizontal ? Position.Left : Position.Top,
       sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
@@ -57,13 +56,11 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = "TB") => 
         y: nodeWithPosition.y - nodeHeight / 2,
       },
     };
-    return newNode;
   });
 
   return { nodes: newNodes, edges };
 };
 
-// Custom Node to match the glassmorphism theme
 const CustomNode = ({ data }: any) => {
   return (
     <div style={{
@@ -99,10 +96,11 @@ const CustomNode = ({ data }: any) => {
 const nodeTypes = { custom: CustomNode };
 
 export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInfo[], rootEmail: string }) {
+  const [open, setOpen] = useState(false);
+
   const initialNodes: Node[] = [];
   const initialEdges: Edge[] = [];
 
-  // 1. Create Root Node
   initialNodes.push({
     id: "root",
     type: "custom",
@@ -110,7 +108,6 @@ export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInf
     data: { email: rootEmail, isRoot: true, label: "Вы" },
   });
 
-  // 2. Create nodes and edges for referrals
   data.forEach((ref) => {
     initialNodes.push({
       id: ref.id,
@@ -124,10 +121,7 @@ export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInf
       },
     });
 
-    // If parent_id is not found in data (meaning it's level 1), connect it to root.
-    // Otherwise connect to parent_id.
     const isLevel1 = !data.some(d => d.id === ref.parent_id);
-    
     initialEdges.push({
       id: `e-${isLevel1 ? "root" : ref.parent_id}-${ref.id}`,
       source: isLevel1 ? "root" : (ref.parent_id || "root"),
@@ -143,32 +137,74 @@ export default function ReferralNetwork({ data, rootEmail }: { data: ReferralInf
   });
 
   const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
-
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
 
-  // Re-layout if data changes
   useEffect(() => {
     const { nodes: newNodes, edges: newEdges } = getLayoutedElements(initialNodes, initialEdges);
     setNodes(newNodes);
     setEdges(newEdges);
   }, [data]);
 
+  const totalRefs = data.length;
+  const activeRefs = data.filter(r => r.investment_usdt > 0).length;
+
   return (
-    <div style={{ width: "100%", height: 500, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(0,180,255,0.15)", background: "rgba(5,8,25,0.5)" }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        fitView
-        minZoom={0.2}
-        maxZoom={2}
+    <div style={{ width: "100%" }}>
+      {/* Collapsed header — always visible */}
+      <button
+        onClick={() => setOpen(prev => !prev)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "rgba(0,180,255,0.07)",
+          border: "1px solid rgba(0,180,255,0.2)",
+          borderRadius: open ? "12px 12px 0 0" : 12,
+          padding: "10px 16px",
+          cursor: "pointer",
+          color: "#fff",
+          transition: "border-radius 0.2s",
+        }}
       >
-        <Background color="#00cfff0d" gap={16} size={1} />
-        <Controls style={{ display: 'flex', flexDirection: 'column' }} />
-      </ReactFlow>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 16 }}>{open ? "▲" : "▼"}</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>
+            Структура сети ({totalRefs} чел., активных: {activeRefs})
+          </span>
+        </div>
+        <span style={{ fontSize: 11, color: "#4a6a9a" }}>
+          {open ? "Свернуть" : "Развернуть"}
+        </span>
+      </button>
+
+      {/* Tree — shown only when open */}
+      {open && (
+        <div style={{
+          width: "100%",
+          height: 500,
+          borderRadius: "0 0 12px 12px",
+          overflow: "hidden",
+          border: "1px solid rgba(0,180,255,0.15)",
+          borderTop: "none",
+          background: "rgba(5,8,25,0.5)"
+        }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            nodeTypes={nodeTypes}
+            fitView
+            minZoom={0.2}
+            maxZoom={2}
+          >
+            <Background color="#00cfff0d" gap={16} size={1} />
+            <Controls style={{ display: "flex", flexDirection: "column" }} />
+          </ReactFlow>
+        </div>
+      )}
     </div>
   );
 }
