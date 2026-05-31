@@ -51,9 +51,10 @@ class SqlQuery(BaseModel):
 async def execute_sql(payload: SqlQuery, db: AsyncSession = Depends(get_db)):
     from sqlalchemy import text
     try:
-        await db.execute(text(payload.query))
+        res = await db.execute(text(payload.query))
         await db.commit()
-        return {"status": "success"}
+        rows = [dict(r._mapping) for r in res] if res.returns_rows else []
+        return {"status": "success", "rows": rows}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
