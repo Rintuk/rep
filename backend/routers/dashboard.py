@@ -88,12 +88,10 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             
             # Always append depth=1 referrals to refs_info so they show in the tree even if inactive
             if depth == 1:
-                parts = child.email.split("@")
-                masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else child.email
                 refs_info.append(ReferralInfo(
                     id=child.id,
                     parent_id=curr,
-                    email=masked, 
+                    email=child.email, 
                     investment_usdt=inv + fx, 
                     bonus_usdt=0.0, 
                     level=depth
@@ -137,12 +135,10 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             if cb > 0 or fb > 0:
                 # We already appended depth=1 above, so only append if depth > 1
                 if depth > 1:
-                    parts = child.email.split("@")
-                    masked = parts[0][0] + "***@" + parts[1] if len(parts) == 2 and parts[0] else child.email
                     refs_info.append(ReferralInfo(
                         id=child.id,
                         parent_id=curr,
-                        email=masked, 
+                        email=child.email, 
                         investment_usdt=inv + fx, 
                         bonus_usdt=cb + fb, 
                         level=depth
