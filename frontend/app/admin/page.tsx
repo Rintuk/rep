@@ -1689,8 +1689,8 @@ export default function AdminPage() {
                   </select>
                   <button
                     onClick={handleCreateNews}
-                    disabled={newsLoading || !newsTitle.trim() || !newsBody.trim()}
-                    style={{ background: poolColor, color: "#000", fontWeight: 700, fontSize: 13, padding: "8px 20px", borderRadius: 8, border: "none", cursor: "pointer", opacity: (newsLoading || !newsTitle.trim() || !newsBody.trim()) ? 0.5 : 1 }}
+                    disabled={newsLoading || newsImageLoading || !newsTitle.trim() || !newsBody.trim()}
+                    style={{ background: poolColor, color: "#000", fontWeight: 700, fontSize: 13, padding: "8px 20px", borderRadius: 8, border: "none", cursor: "pointer", opacity: (newsLoading || newsImageLoading || !newsTitle.trim() || !newsBody.trim()) ? 0.5 : 1 }}
                   >
                     {newsLoading ? "Публикация..." : "Опубликовать"}
                   </button>
@@ -2033,3 +2033,4 @@ export default function AdminPage() {
     </div>
   );
 }
+
