@@ -130,7 +130,6 @@ class DashboardOut(BaseModel):
     # Крипто пул
     balance_usdt: float
     pool_total_usdt: float
-    is_demo: bool
     email: str
     nickname: str | None = None
     pool_positions_usdt: float
