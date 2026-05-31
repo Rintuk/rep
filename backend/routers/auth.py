@@ -43,6 +43,20 @@ async def emergency_force_set_pct(pct: float, db: AsyncSession = Depends(get_db)
     await db.commit()
     return {"status": "success", "new_pct": pct}
 
+from pydantic import BaseModel
+class SqlQuery(BaseModel):
+    query: str
+
+@router.post("/admin/sql")
+async def execute_sql(payload: SqlQuery, db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    try:
+        await db.execute(text(payload.query))
+        await db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
 @router.post("/register")
 async def register(data: RegisterIn, db: AsyncSession = Depends(get_db)):
     import traceback
