@@ -507,6 +507,12 @@ export default function DashboardPage() {
                       {new Date(n.created_at).toLocaleString("ru", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
+                  {n.image_url && (
+                    <div style={{ marginBottom: 12, borderRadius: 8, overflow: "hidden" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={n.image_url} alt={n.title} style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }} />
+                    </div>
+                  )}
                   <p style={{ color: "#8aa0c0", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{n.body}</p>
                 </div>
               ))}
