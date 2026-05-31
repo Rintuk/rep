@@ -5,7 +5,7 @@ import {
   getDashboard,
   createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals,
   createForexDepositRequest, getMyForexDeposits, createForexWithdrawalRequest, getMyForexWithdrawals,
-  changePassword, getNews, NewsItem as NewsItemType, getMyTickets, markTicketsRead,
+  changePassword, getNews, NewsItem as NewsItemType, getMyTickets, markTicketsRead, updateNickname,
 } from "@/lib/api";
 import { Wallet, ArrowRight, ArrowDownLeft, ArrowUpRight, Copy, LogOut, Loader2, CheckCircle2, TrendingUp, Info, TrendingDown, Activity, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -21,13 +21,13 @@ interface ReferralInfo { id: string; parent_id: string | null; email: string; in
 interface Dashboard {
   balance_usdt: number; pool_total_usdt: number; pool_positions_usdt: number;
   mode: string; hwm: number; drawdown_pct: number; server_online: boolean;
-  last_updated: string | null;
+  last_updated: string | null; nickname?: string | null;
   user_investment: number; user_pnl: number; user_pnl_pct: number;
   status: string; total_volume_usdt: number; next_status_volume: number | null;
   ref_bonus: number; referral_code: string; referrals: ReferralInfo[];
   positions: Position[]; recent_trades: Trade[]; ai_feed: AIFeed[];
   forex_pool_total: number; forex_pool_positions: number; forex_balance: number;
-  forex_server_online: boolean; forex_last_updated: string | null;
+  forex_server_online: boolean; forex_last_updated: string | null; nickname?: string | null;
   forex_investment: number; forex_pnl: number; forex_pnl_pct: number;
   forex_ref_bonus: number;
   forex_positions: Position[]; forex_recent_trades: Trade[];
@@ -183,6 +183,9 @@ export default function DashboardPage() {
   const [newPass2, setNewPass2] = useState("");
   const [changePassLoading, setChangePassLoading] = useState(false);
   const [changePassMsg, setChangePassMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [newNickname, setNewNickname] = useState("");
+  const [nicknameLoading, setNicknameLoading] = useState(false);
+  const [nicknameMsg, setNicknameMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");

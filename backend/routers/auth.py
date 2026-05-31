@@ -74,6 +74,15 @@ async def _register(data: RegisterIn, db: AsyncSession):
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email уже используется")
 
+    if not (3 <= len(data.nickname) <= 10):
+        raise HTTPException(status_code=400, detail="Никнейм должен быть от 3 до 10 символов")
+    import re
+    if not re.match(r"^[a-zA-Z0-9_]+$", data.nickname):
+        raise HTTPException(status_code=400, detail="Никнейм может содержать только английские буквы, цифры и подчеркивание")
+    existing_nick = await db.execute(select(User).where(User.nickname == data.nickname))
+    if existing_nick.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Никнейм уже занят")
+
     referred_by_id = None
     if data.referral_code:
         ref_user = await db.execute(select(User).where(User.referral_code == data.referral_code))
@@ -118,9 +127,10 @@ async def _register(data: RegisterIn, db: AsyncSession):
 
     user = User(
         email=data.email,
+        nickname=data.nickname,
         password_hash=hash_password(data.password),
         referred_by=referred_by_id,
-        is_active=False,  # ждёт одобрения администратора
+        is_active=False,  # Ждем апрува админом
     )
     db.add(user)
     await db.commit()
@@ -1539,6 +1549,23 @@ async def admin_delete_news(
     await db.commit()
     return {"status": "deleted"}
 
+
+from schemas import UpdateNicknameIn
+@router.post("/profile/nickname")
+async def update_nickname(data: UpdateNicknameIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if not (3 <= len(data.nickname) <= 10):
+        raise HTTPException(status_code=400, detail="Никнейм должен быть от 3 до 10 символов")
+    import re
+    if not re.match(r"^[a-zA-Z0-9_]+$", data.nickname):
+        raise HTTPException(status_code=400, detail="Только английские буквы, цифры и подчеркивание")
+    if data.nickname == user.nickname:
+        return {"status": "ok"}
+    existing = await db.execute(select(User).where(User.nickname == data.nickname))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Никнейм уже занят")
+    user.nickname = data.nickname
+    await db.commit()
+    return {"status": "ok"}
 
 @router.post("/change-password")
 async def change_password(

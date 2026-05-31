@@ -14,6 +14,7 @@ class User(Base):
 
     id:             Mapped[str]  = mapped_column(String, primary_key=True, default=gen_uuid)
     email:          Mapped[str]  = mapped_column(String, unique=True, index=True)
+    nickname:       Mapped[str | None] = mapped_column(String, unique=True, index=True, nullable=True)
     password_hash:  Mapped[str]  = mapped_column(String)
     is_admin:       Mapped[bool] = mapped_column(Boolean, default=False)
     is_active:      Mapped[bool] = mapped_column(Boolean, default=False)

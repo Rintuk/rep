@@ -1,90 +1,82 @@
-import re
-with open('backend/routers/auth.py', 'r', encoding='utf-8') as f:
+import codecs
+
+with codecs.open('frontend/app/dashboard/page.tsx', 'r', 'utf-8') as f:
     content = f.read()
 
-new_code = '''@router.post("/admin/deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
-async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSession = Depends(get_db)):
-    if actual_amount <= 0:
-        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
-    req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id))).scalar_one_or_none()
-    if not req:
-        raise HTTPException(status_code=404, detail="Заявка не найдена")
-    if req.status != "pending":
-        raise HTTPException(status_code=400, detail="Заявка не в ожидании")
+content = content.replace(
+    'changePassword, getNews, NewsItem as NewsItemType, getMyTickets, markTicketsRead,\n',
+    'changePassword, getNews, NewsItem as NewsItemType, getMyTickets, markTicketsRead, updateNickname,\n'
+)
 
-    snap = (await db.execute(
-        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
-    )).scalar_one_or_none()
-    if snap:
-        positions = (await db.execute(
-            select(Position).where(Position.snapshot_id == snap.id)
-        )).scalars().all()
-        pool_total_without_deposit = snap.balance_usdt + sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
-        )
-        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-        total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-        ref = start + total_inv - total_wd
-        if ref <= 0:
-            ref = snap.net_invested if snap.net_invested > 0 else start
-        current_pnl_pct = round((pool_total_without_deposit - ref) / ref * 100, 4) if ref > 0 else 0.0
-    else:
-        current_pnl_pct = 0.0
+content = content.replace(
+    'last_updated: string | null;',
+    'last_updated: string | null; nickname?: string | null;'
+)
 
-    await _migrate_pnl_internal(db, override_crypto_pct=current_pnl_pct)
+content = content.replace(
+    'const [changePassMsg, setChangePassMsg] = useState<{ ok: boolean; text: string } | null>(null);',
+    'const [changePassMsg, setChangePassMsg] = useState<{ ok: boolean; text: string } | null>(null);\n  const [newNickname, setNewNickname] = useState("");\n  const [nicknameLoading, setNicknameLoading] = useState(false);\n  const [nicknameMsg, setNicknameMsg] = useState<{ ok: boolean; text: string } | null>(null);'
+)
 
-    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
-    if fin:
-        fin.investment_usdt += actual_amount
-        fin.updated_at = datetime.utcnow()
-    else:
-        db.add(UserFinancials(
-            user_id=req.user_id,
-            investment_usdt=actual_amount,
-            entry_pool_pnl_pct=current_pnl_pct,
-        ))
+content = content.replace(
+    'label: "Настройки", color: "#a78bfa", icon: <Settings size={15}/>, action: () => { setMenuOpen(false); setShowChangePass(true); setChangePassMsg(null); setOldPass(""); setNewPass(""); setNewPass2(""); }',
+    'label: "Профиль", color: "#a78bfa", icon: <Settings size={15}/>, action: () => { setMenuOpen(false); setShowChangePass(true); setChangePassMsg(null); setOldPass(""); setNewPass(""); setNewPass2(""); setNewNickname(data?.nickname || ""); setNicknameMsg(null); }'
+)
 
-    req.status = "approved"
-    req.updated_at = datetime.utcnow()
-    await db.commit()
+modal_old = '''<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Смена пароля</h3>
+              <button onClick={() => setShowChangePass(false)} style={{ background: "none", border: "none", color: "#4a6a9a", cursor: "pointer" }}><X size={18} /></button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>'''
 
-    if snap:
-        snap.balance_usdt += actual_amount
-        snap.net_invested += actual_amount
-        await db.commit()
-        
-        total_inv_new = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-        total_wd_new = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-        ref_new = start + total_inv_new - total_wd_new
-        if ref_new <= 0:
-            ref_new = snap.net_invested if snap.net_invested > 0 else start
-        
-        pool_total_new = snap.balance_usdt + sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
-        )
-        post_deposit_pct = round((pool_total_new - ref_new) / ref_new * 100, 4) if ref_new > 0 else 0.0
-        
-        from sqlalchemy import text
-        await db.execute(text(f"UPDATE user_financials SET entry_pool_pnl_pct = {post_deposit_pct} WHERE investment_usdt > 0"))
-        await db.commit()
+modal_new = '''<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Профиль</h3>
+              <button onClick={() => setShowChangePass(false)} style={{ background: "none", border: "none", color: "#4a6a9a", cursor: "pointer" }}><X size={18} /></button>
+            </div>
 
-    return {"status": "approved", "amount": actual_amount}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+              <h4 style={{ color: "#a78bfa", fontSize: 14, margin: 0 }}>Изменить никнейм</h4>
+              <div>
+                <label style={{ fontSize: 11, color: "#4a6a9a", display: "block", marginBottom: 6 }}>Никнейм (3-10 символов)</label>
+                <input type="text" value={newNickname} onChange={e => setNewNickname(e.target.value)}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 13,
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(167,139,250,0.25)",
+                    color: "#fff", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {nicknameMsg && (
+                <p style={{ fontSize: 13, fontWeight: 600, color: nicknameMsg.ok ? "#22c97a" : "#ff4d4d", textAlign: "center", margin: 0 }}>
+                  {nicknameMsg.text}
+                </p>
+              )}
+              <button
+                disabled={nicknameLoading || !newNickname || newNickname === data?.nickname}
+                onClick={async () => {
+                  setNicknameLoading(true); setNicknameMsg(null);
+                  try {
+                    await updateNickname(newNickname);
+                    setNicknameMsg({ ok: true, text: "Никнейм изменен" });
+                    const d = await getDashboard();
+                    setData(d);
+                  } catch (e: any) {
+                    setNicknameMsg({ ok: false, text: e?.response?.data?.detail || "Ошибка" });
+                  } finally {
+                    setNicknameLoading(false);
+                  }
+                }}
+                style={{ padding: "12px", borderRadius: 8, fontSize: 14, fontWeight: 600, border: "none",
+                  background: "rgba(167,139,250,0.2)", color: "#a78bfa", cursor: "pointer",
+                  opacity: (nicknameLoading || !newNickname || newNickname === data?.nickname) ? 0.5 : 1 }}>
+                {nicknameLoading ? "Сохранение..." : "Сохранить"}
+              </button>
+            </div>
 
-@router.post("/admin/emergency-fix-pnl")
-async def emergency_fix_pnl(db: AsyncSession = Depends(get_db)):
-    pool_pnl_pct = await _get_pool_pnl_pct(db)
-    from sqlalchemy import text
-    await db.execute(text(f"UPDATE user_financials SET entry_pool_pnl_pct = {pool_pnl_pct} WHERE investment_usdt > 0"))
-    await db.commit()
-    return {"status": "success", "new_pct": pool_pnl_pct}'''
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <h4 style={{ color: "#a78bfa", fontSize: 14, margin: 0 }}>Изменить пароль</h4>'''
 
-start_idx = content.find('@router.post("/admin/deposits/{request_id}/approve"')
-end_idx = content.find('@router.post("/admin/deposits/{request_id}/reject"')
-if start_idx != -1 and end_idx != -1:
-    content = content[:start_idx] + new_code + '\n\n' + content[end_idx:]
-    with open('backend/routers/auth.py', 'w', encoding='utf-8') as f:
-        f.write(content)
-    print("Patched successfully")
-else:
-    print("Could not find markers")
+content = content.replace(modal_old, modal_new)
+
+# Greeting update
+content = content.replace('{data.email}', '{data.nickname || data.email}')
+
+with codecs.open('frontend/app/dashboard/page.tsx', 'w', 'utf-8') as f:
+    f.write(content)

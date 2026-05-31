@@ -40,6 +40,7 @@ class BotUpdateIn(BaseModel):
 # ── Авторизация ────────────────────────────────────────────────
 class RegisterIn(BaseModel):
     email: EmailStr
+    nickname: str
     password: str
     referral_code: str | None = None
 
@@ -47,6 +48,9 @@ class LoginIn(BaseModel):
     email: EmailStr
     password: str
     remember_me: bool = False
+
+class UpdateNicknameIn(BaseModel):
+    nickname: str
 
 class TokenOut(BaseModel):
     access_token: str
@@ -79,6 +83,7 @@ class ReferralInfo(BaseModel):
     id: str
     parent_id: str | None
     email: str          # замаскированный email
+    nickname: str | None = None
     investment_usdt: float
     bonus_usdt: float   # сколько реферер зарабатывает с этого человека
     level: int = 1      # уровень вложенности
@@ -125,6 +130,9 @@ class DashboardOut(BaseModel):
     # Крипто пул
     balance_usdt: float
     pool_total_usdt: float
+    is_demo: bool
+    email: str
+    nickname: str | None = None
     pool_positions_usdt: float
     mode: str
     hwm: float

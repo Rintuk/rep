@@ -38,9 +38,9 @@ interface Overview {
   positions: { symbol: string; amount: number; avg_price: number; current_price: number; value: number }[];
   trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
   ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
-  investors: { id: string; email: string; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; next_vol?: number; }[];
-  referrals: { id: string; email: string; is_active: boolean; referred_by_email: string; investment: number }[];
-  pending_users: { id: string; email: string; created_at: string }[];
+  investors: { id: string; email: string; nickname?: string | null; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; next_vol?: number; }[];
+  referrals: { id: string; email: string; nickname?: string | null; is_active: boolean; referred_by_email: string; investment: number }[];
+  pending_users: { id: string; email: string; nickname?: string | null; created_at: string }[];
 }
 
 interface InvestorForm {
@@ -754,7 +754,7 @@ export default function AdminPage() {
               {data.pending_users.map(u => (
                 <div key={u.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderRadius: 10, background: "rgba(10,8,0,0.6)" }}>
                   <div>
-                    <p style={{ color: "#fff", fontWeight: 500 }}>{u.email}</p>
+                    <p style={{ color: "#fff", fontWeight: 500 }}>{u.nickname ? `${u.nickname} (${u.email})` : u.email}</p>
                     <p style={{ fontSize: 11, color: muted }}>{new Date(u.created_at).toLocaleString("ru")}</p>
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -1198,7 +1198,7 @@ export default function AdminPage() {
                       return (
                         <React.Fragment key={u.id}>
                           <tr className="adm-row" style={{ borderBottom: `1px solid ${border}`, background: isOpen ? "rgba(4,8,28,0.8)" : "transparent" }}>
-                            <td style={{ padding: "12px 16px", color: "#fff", fontWeight: 500 }}>{u.email}</td>
+                            <td style={{ padding: "12px 16px", color: "#fff", fontWeight: 500 }}>{u.nickname ? `${u.nickname} (${u.email})` : u.email}</td>
                             <td style={{ padding: "12px 16px", color: "#fff" }}>{u.investment.toFixed(2)} $</td>
                             <td style={{ padding: "12px 16px", color: muted }}>{u.withdrawal.toFixed(2)} $</td>
                             <td style={{ padding: "12px 16px", fontWeight: 600, color: u.pnl >= 0 ? "#22c97a" : "#ff4d4d" }}>

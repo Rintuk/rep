@@ -24,8 +24,13 @@ export async function login(email: string, password: string, remember_me = false
   return res.data as { access_token: string; is_admin: boolean };
 }
 
-export async function register(email: string, password: string, referral_code?: string) {
-  const res = await api.post("/auth/register", { email, password, referral_code });
+export async function register(email: string, nickname: string, password: string, referral_code?: string) {
+  const res = await api.post("/auth/register", { email, nickname, password, referral_code });
+  return res.data;
+}
+
+export async function updateNickname(nickname: string) {
+  const res = await api.post("/auth/profile/nickname", { nickname });
   return res.data;
 }
 

@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { register } from "@/lib/api";
-import { Eye, EyeOff, Mail, Lock, Link } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Link, User } from "lucide-react";
 
 // ─── Circuit board canvas background ────────────────────────────────────────
 function CircuitBackground() {
@@ -153,6 +153,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
+  const [nickname, setNickname] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -179,7 +180,7 @@ function RegisterForm() {
 
     setLoading(true);
     try {
-      await register(email, password, referralCode || undefined);
+      await register(email, nickname, password, referralCode || undefined);
       setSuccess(true);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -298,9 +299,22 @@ function RegisterForm() {
                 </div>
               </div>
 
+              {/* Никнейм */}
+              <div>
+                <label style={{ color: "#6b8ab0", fontSize: 13, display: "block", marginBottom: 6 }}>Никнейм (3-10 символов)</label>
+                <div className="relative">
+                  <User size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#3b5a8a", pointerEvents: "none" }} />
+                  <input type="text" value={nickname} onChange={e => setNickname(e.target.value)} required placeholder="Nickname"
+                    style={inputStyle()}
+                    onFocus={e => (e.target.style.borderColor = "rgba(0,180,255,0.6)")}
+                    onBlur={e => (e.target.style.borderColor = "rgba(0,140,255,0.2)")}
+                  />
+                </div>
+              </div>
+
               {/* Пароль */}
               <div>
-                <label style={{ color: "#6b8ab0", fontSize: 13, display: "block", marginBottom: 6 }}>Пароль</label>
+                <label style={{ color: "#6b8ab0", fontSize: 13, display: "block", marginBottom: 6 }}>Пароль (от 6 символов)</label>
                 <div className="relative">
                   <Lock size={16} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#3b5a8a", pointerEvents: "none" }} />
                   <input type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
