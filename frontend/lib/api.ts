@@ -137,6 +137,11 @@ export async function getUserDetail(id: string) {
   return res.data;
 }
 
+export async function getUserReferralTree(id: string) {
+  const res = await api.get(`/auth/admin/users/${id}/tree`);
+  return res.data.referrals;
+}
+
 export async function getUserHistory(id: string) {
   const res = await api.get(`/auth/admin/users/${id}/history`);
   return res.data as {

@@ -1633,3 +1633,19 @@ async def admin_revert_silent_withdraw(payload: RevertSilentPayload, db: AsyncSe
         await db.commit()
         return {"status": "success"}
 
+@router.get("/admin/users/{user_id}/tree", dependencies=[Depends(get_admin_user)])
+async def get_user_referral_tree(user_id: str, db: AsyncSession = Depends(get_db)):
+    from routers.dashboard import _calc_referral_tree, _get_pool_pnl_pct
+    from routers.forex import _get_forex_pool_pnl_pct
+    
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
+    crypto_pool_pct = await _get_pool_pnl_pct(db)
+    forex_pool_pct = await _get_forex_pool_pnl_pct(db)
+    
+    _, _, _, _, _, refs_info = await _calc_referral_tree(user_id, db, crypto_pool_pct, forex_pool_pct, fin, user.manual_status_override)
+    return {"referrals": refs_info}
+

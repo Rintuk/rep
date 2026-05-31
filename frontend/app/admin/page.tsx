@@ -13,7 +13,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare, setUserReferrer,
+  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare, setUserReferrer, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw,
@@ -22,6 +22,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from "recharts";
 import { TrendingUp, TrendingDown, Wallet, Activity, Users, CheckCircle, XCircle, RefreshCw, ChevronDown, ChevronUp, Trash2, Save } from "lucide-react";
+import ReferralNetwork from "../dashboard/ReferralNetwork";
 
 const ACTION_COLOR: Record<string, string> = { BUY: "#22c97a", SELL: "#4488dd", HOLD: "#888" };
 
@@ -1331,6 +1332,13 @@ export default function AdminPage() {
                                         {statusOverrideMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: statusOverrideMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{statusOverrideMsg[u.id]}</span>}
                                       </div>
                                     </div>
+
+                                    {trees[u.id] && trees[u.id].length > 0 && (
+                                      <div style={{ borderTop: `1px solid ${border}`, marginTop: 16, paddingTop: 16 }}>
+                                        <p style={{ color: "#fff", fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Дерево рефералов</p>
+                                        <ReferralNetwork data={trees[u.id]} rootEmail={u.email} />
+                                      </div>
+                                    )}
 
                                     {/* Служебные операции инвестора */}
                                     <div style={{ borderTop: `1px solid ${border}`, marginTop: 16, paddingTop: 8 }}>
