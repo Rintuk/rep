@@ -271,7 +271,7 @@ export default function DashboardPage() {
       <CircuitBackground />
       <div style={{ ...card, padding: 32, textAlign: "center", position: "relative", zIndex: 1 }}>
         <p style={{ color: "#ff5555", marginBottom: 16 }}>{error}</p>
-        <a href="/login" style={{ color: "#4488dd" }}>Войти снова</a>
+        <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/login/`} style={{ color: "#4488dd" }}>Войти снова</a>
       </div>
     </div>
   );

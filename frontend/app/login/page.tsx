@@ -529,7 +529,7 @@ export default function LoginPage() {
 
             <p style={{ color: "#4a5a7a", fontSize: 13, textAlign: "center", marginTop: 20 }}>
               Нет аккаунта?{" "}
-              <a href="/register" style={{ color: "#4488dd" }}
+              <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/register/`} style={{ color: "#4488dd" }}
                 onMouseEnter={e => ((e.target as HTMLAnchorElement).style.textDecoration = "underline")}
                 onMouseLeave={e => ((e.target as HTMLAnchorElement).style.textDecoration = "none")}>
                 Зарегистрироваться

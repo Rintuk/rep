@@ -209,7 +209,7 @@ function RegisterForm() {
           <p style={{ color: "#6b8ab0", fontSize: 14, lineHeight: 1.6 }}>
             Ожидайте одобрения администратора.<br />Вы получите уведомление на email.
           </p>
-          <a href="/login" style={{
+          <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/login/`} style={{
             display: "inline-block", marginTop: 24, color: "#4488dd", fontSize: 14,
           }}
             onMouseEnter={e => ((e.target as HTMLAnchorElement).style.textDecoration = "underline")}
@@ -410,7 +410,7 @@ function RegisterForm() {
 
             <p style={{ color: "#4a5a7a", fontSize: 13, textAlign: "center", marginTop: 10 }}>
               Уже есть аккаунт?{" "}
-              <a href="/login" style={{ color: "#4488dd" }}
+              <a href={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/login/`} style={{ color: "#4488dd" }}
                 onMouseEnter={e => ((e.target as HTMLAnchorElement).style.textDecoration = "underline")}
                 onMouseLeave={e => ((e.target as HTMLAnchorElement).style.textDecoration = "none")}>
                 Войти
