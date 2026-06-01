@@ -774,7 +774,7 @@ export default function DashboardPage() {
                 try {
                   await updateNickname(newNickname);
                   setNicknameMsg({ ok: true, text: "Никнейм изменен!" });
-                  mutate();
+                  fetchData();
                 } catch (e: any) { setNicknameMsg({ ok: false, text: e?.response?.data?.detail || "Ошибка" }); }
                 finally { setNicknameLoading(false); }
               }} disabled={nicknameLoading}
