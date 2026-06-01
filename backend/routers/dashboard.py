@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +12,7 @@ from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
-def _get_status_and_limits(total_volume: float, manual_override: str | None):
+def _get_status_and_limits(total_volume: float, manual_override: Optional[str]):
     if manual_override and manual_override in STATUS_THRESHOLDS:
         status = manual_override
     else:
@@ -39,7 +40,7 @@ def _get_status_and_limits(total_volume: float, manual_override: str | None):
     
     return status, next_vol, levels_allowed
 
-async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: float, forex_pool_pct: float, my_fin: UserFinancials | None, manual_override: str | None):
+async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: float, forex_pool_pct: float, my_fin: Optional[UserFinancials], manual_override: Optional[str]):
     all_users = (await db.execute(select(User))).scalars().all()
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     fins_map = {f.user_id: f for f in all_fins}
@@ -197,7 +198,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             select(AIFeedEntry).order_by(AIFeedEntry.timestamp.desc()).limit(20)
         )).scalars().all()
 
-        pool_positions_usdt = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
+        pool_positions_usdt = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions)
         pool_total_usdt = snap.balance_usdt + pool_positions_usdt
         server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
 
@@ -243,7 +244,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             select(ForexPosition).where(ForexPosition.snapshot_id == forex_snap.id)
         )).scalars().all()
         forex_pool_positions = sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in fx_positions
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in fx_positions
         )
         forex_balance = forex_snap.balance_usdt
         forex_pool_total = forex_balance
@@ -262,7 +263,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
 
         forex_positions_out = [
             PositionOut(symbol=p.symbol, amount=p.amount, avg_price=p.avg_price,
-                        current_price=p.current_price if p.current_price > 0 else p.avg_price)
+                        current_price=p.current_price if (p.current_price or 0) > 0 else p.avg_price)
             for p in fx_positions
         ]
 
@@ -301,7 +302,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         status=status, total_volume_usdt=round(total_volume, 2), next_status_volume=next_vol,
         ref_bonus=ref_bonus, referral_code=user.referral_code, referrals=refs_info,
         positions=[PositionOut(symbol=p.symbol, amount=p.amount, avg_price=p.avg_price,
-                               current_price=p.current_price if p.current_price > 0 else p.avg_price)
+                               current_price=p.current_price if (p.current_price or 0) > 0 else p.avg_price)
                    for p in positions],
         recent_trades=[TradeOut(symbol=t.symbol, action=t.action, amount=t.amount,
                                 price=t.price, pnl=t.pnl, timestamp=t.timestamp) for t in trades],

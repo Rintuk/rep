@@ -1,3 +1,4 @@
+from typing import Optional
 import uuid
 from datetime import datetime
 from sqlalchemy import String, Float, Boolean, DateTime, ForeignKey, Text, Integer
@@ -14,20 +15,20 @@ class User(Base):
 
     id:             Mapped[str]  = mapped_column(String, primary_key=True, default=gen_uuid)
     email:          Mapped[str]  = mapped_column(String, unique=True, index=True)
-    nickname:       Mapped[str | None] = mapped_column(String, unique=True, index=True, nullable=True)
+    nickname:       Optional[Mapped[str]] = mapped_column(String, unique=True, index=True, nullable=True)
     password_hash:  Mapped[str]  = mapped_column(String)
     is_admin:       Mapped[bool] = mapped_column(Boolean, default=False)
     is_active:      Mapped[bool] = mapped_column(Boolean, default=False)
     referral_code:  Mapped[str]  = mapped_column(String, unique=True, default=gen_uuid)
-    referred_by:    Mapped[str | None] = mapped_column(String, ForeignKey("users.id"), nullable=True)
+    referred_by:    Optional[Mapped[str]] = mapped_column(String, ForeignKey("users.id"), nullable=True)
     referral_limit: Mapped[int]  = mapped_column(Integer, default=3)
-    manual_status_override: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    manual_status_override: Optional[Mapped[str]] = mapped_column(String, nullable=True, default=None)
     created_at:     Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     referrals:             Mapped[list["User"]]                   = relationship("User", foreign_keys=[referred_by])
-    financials:            Mapped["UserFinancials | None"]        = relationship("UserFinancials", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    virtual_account:       Mapped["VirtualAccount | None"]        = relationship("VirtualAccount", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    forex_virtual_account: Mapped["ForexVirtualAccount | None"]   = relationship("ForexVirtualAccount", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    financials:            Mapped["Optional[UserFinancials]"]        = relationship("UserFinancials", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    virtual_account:       Mapped["Optional[VirtualAccount]"]        = relationship("VirtualAccount", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    forex_virtual_account: Mapped["Optional[ForexVirtualAccount]"]   = relationship("ForexVirtualAccount", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class UserFinancials(Base):
@@ -48,7 +49,7 @@ class UserFinancials(Base):
     # Зафиксированный исторический реферальный доход
     locked_crypto_ref_bonus: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     locked_forex_ref_bonus:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
-    custom_investor_share:   Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    custom_investor_share:   Optional[Mapped[float]] = mapped_column(Float, nullable=True, default=None)
 
     note:       Mapped[str]      = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -303,5 +304,5 @@ class NewsItem(Base):
     title:      Mapped[str]           = mapped_column(String)
     body:       Mapped[str]           = mapped_column(Text)
     pool_type:  Mapped[str]           = mapped_column(String, default="all")  # "all", "crypto", "forex"
-    image_url:  Mapped[str | None]    = mapped_column(Text, nullable=True, default=None)
+    image_url:  Optional[Mapped[str]]    = mapped_column(Text, nullable=True, default=None)
     created_at: Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)

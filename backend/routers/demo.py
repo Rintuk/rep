@@ -34,7 +34,7 @@ async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSess
         )).scalars().all()
         scale = va.start_balance / va.start_real_total
         for p in real_positions:
-            cur_price = p.current_price if p.current_price > 0 else p.avg_price
+            cur_price = p.current_price if (p.current_price or 0) > 0 else p.avg_price
             positions.append({"symbol": p.symbol, "amount": round(p.amount * scale, 6),
                                "avg_price": p.avg_price, "value": round(p.amount * cur_price * scale, 2)})
 
@@ -71,7 +71,7 @@ async def start_demo_account(
             select(Position).where(Position.snapshot_id == snap.id)
         )).scalars().all()
         real_total = snap.balance_usdt + sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in snap_positions
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in snap_positions
         )
 
     va = (await db.execute(select(VirtualAccount).where(VirtualAccount.user_id == user.id))).scalar_one_or_none()
@@ -134,7 +134,7 @@ async def get_forex_demo_account(user: User = Depends(get_current_user), db: Asy
         )).scalars().all()
         scale = va.start_balance / va.start_real_total
         for p in real_positions:
-            cur_price = p.current_price if p.current_price > 0 else p.avg_price
+            cur_price = p.current_price if (p.current_price or 0) > 0 else p.avg_price
             pool_positions_pnl += p.amount * cur_price * scale
             positions.append({"symbol": p.symbol, "amount": round(p.amount * scale, 6),
                                "avg_price": p.avg_price, "value": round(p.amount * cur_price * scale, 2)})

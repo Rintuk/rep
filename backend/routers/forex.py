@@ -44,14 +44,14 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
         )).scalars().all()
         pool_positions_usdt = sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
             for p in snap_positions
         )
         pool_free = snap.balance_usdt
         pool_total = pool_free
         positions = [{"symbol": p.symbol, "amount": p.amount, "avg_price": p.avg_price,
-                      "current_price": p.current_price if p.current_price > 0 else p.avg_price,
-                      "value": round(p.amount * (p.current_price if p.current_price > 0 else p.avg_price), 2)}
+                      "current_price": p.current_price if (p.current_price or 0) > 0 else p.avg_price,
+                      "value": round(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price), 2)}
                      for p in snap_positions]
 
         all_trade_rows = (await db.execute(

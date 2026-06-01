@@ -22,7 +22,7 @@ async def main():
                 return
 
             positions = (await db.execute(select(Position).where(Position.snapshot_id == snap.id))).scalars().all()
-            pool_total_usdt = snap.balance_usdt + sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
+            pool_total_usdt = snap.balance_usdt + sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions)
             
             _start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
             _total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
@@ -69,7 +69,7 @@ async def main():
                 return
 
             fx_positions = (await db.execute(select(ForexPosition).where(ForexPosition.snapshot_id == snap.id))).scalars().all()
-            forex_pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in fx_positions)
+            forex_pool_positions = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in fx_positions)
             pool_total_usdt = snap.balance_usdt + forex_pool_positions
 
             net_inv = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm)

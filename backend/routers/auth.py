@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -23,7 +24,7 @@ async def _get_pool_pnl_pct(db: AsyncSession) -> float:
         select(Position).where(Position.snapshot_id == snap.id)
     )).scalars().all()
     pool_total = snap.balance_usdt + sum(
-        p.amount * (p.current_price if p.current_price > 0 else p.avg_price)
+        p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
         for p in positions
     )
     start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
@@ -194,7 +195,7 @@ async def set_referral_limit(user_id: str, limit: int, db: AsyncSession = Depend
 
 from pydantic import BaseModel
 class InvestorShareRequest(BaseModel):
-    share: float | None
+    share: Optional[float]
 
 @router.post("/admin/investor-share/{user_id}", dependencies=[Depends(get_admin_user)])
 async def set_investor_share(user_id: str, data: InvestorShareRequest, db: AsyncSession = Depends(get_db)):
@@ -243,7 +244,7 @@ async def set_investor_share(user_id: str, data: InvestorShareRequest, db: Async
     return {"status": "ok"}
 
 @router.patch("/admin/status-override/{user_id}", dependencies=[Depends(get_admin_user)])
-async def set_status_override(user_id: str, status: str | None, db: AsyncSession = Depends(get_db)):
+async def set_status_override(user_id: str, status: Optional[str], db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -394,7 +395,7 @@ async def admin_pool_history(db: AsyncSession = Depends(get_db)):
         positions = (await db.execute(
             select(Position).where(Position.snapshot_id == s.id)
         )).scalars().all()
-        pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
+        pool_positions = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions)
         pool_total = round(s.balance_usdt + pool_positions, 2)
         pnl = round(pool_total - s.net_invested, 2)
         pnl_pct = round((pnl / s.net_invested) * 100, 2)
@@ -428,12 +429,12 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         snap_positions = (await db.execute(
             select(Position).where(Position.snapshot_id == snap.id)
         )).scalars().all()
-        pool_positions_usdt = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in snap_positions)
+        pool_positions_usdt = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in snap_positions)
         pool_free = snap.balance_usdt
         pool_total = pool_free + pool_positions_usdt
         positions = [{"symbol": p.symbol, "amount": p.amount, "avg_price": p.avg_price,
-                      "current_price": p.current_price if p.current_price > 0 else p.avg_price,
-                      "value": round(p.amount * (p.current_price if p.current_price > 0 else p.avg_price), 2)} for p in snap_positions]
+                      "current_price": p.current_price if (p.current_price or 0) > 0 else p.avg_price,
+                      "value": round(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price), 2)} for p in snap_positions]
 
         all_trade_rows = (await db.execute(
             select(Trade).order_by(Trade.timestamp.desc()).limit(500)
@@ -578,7 +579,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     }
 
 class SetReferrerPayload(BaseModel):
-    referred_by_email: str | None
+    referred_by_email: Optional[str]
 
 @router.patch("/admin/set-referrer/{user_id}", dependencies=[Depends(get_admin_user)])
 async def set_user_referrer(user_id: str, payload: SetReferrerPayload, db: AsyncSession = Depends(get_db)):
@@ -702,10 +703,10 @@ async def crypto_full_reset(db: AsyncSession = Depends(get_db)):
 
 @router.post("/admin/rollback-hwm", dependencies=[Depends(get_admin_user)])
 async def rollback_hwm(
-    target_crypto_pct: float | None = None, 
-    target_forex_pct: float | None = None, 
-    target_crypto_profit_usdt: float | None = None,
-    target_forex_profit_usdt: float | None = None,
+    target_crypto_pct: Optional[float] = None, 
+    target_forex_pct: Optional[float] = None, 
+    target_crypto_profit_usdt: Optional[float] = None,
+    target_forex_profit_usdt: Optional[float] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -1057,7 +1058,7 @@ async def migrate_pnl(db: AsyncSession = Depends(get_db)):
     Защищает прибыль от ретроспективного урезания или размытия.
     """
     return await _migrate_pnl_internal(db)
-async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: float | None = None, override_forex_pct: float | None = None):
+async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: Optional[float] = None, override_forex_pct: Optional[float] = None):
     # 1. Получаем текущие PnL пулов
     crypto_pool_pct = override_crypto_pct if override_crypto_pct is not None else await _get_pool_pnl_pct(db)
     
@@ -1292,7 +1293,7 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
             select(Position).where(Position.snapshot_id == snap.id)
         )).scalars().all()
         pool_total_without_deposit = snap.balance_usdt + sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
         start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
@@ -1333,7 +1334,7 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
             ref_new = snap.net_invested if snap.net_invested > 0 else start
         
         pool_total_new = snap.balance_usdt + sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
         post_deposit_pct = round((pool_total_new - ref_new) / ref_new * 100, 4) if ref_new > 0 else 0.0
         
@@ -1456,7 +1457,7 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
         )).scalars().all()
         # Прибавляем выведенную сумму обратно к пулу, чтобы узнать % до вывода
         pool_total_before_withdrawal = snap.balance_usdt + actual_amount + sum(
-            p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
         start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
@@ -1604,7 +1605,7 @@ async def admin_silent_withdraw(payload: SilentWithdrawPayload, db: AsyncSession
             raise HTTPException(status_code=404, detail="Снапшот crypto пула не найден.")
 
         positions = (await db.execute(select(Position).where(Position.snapshot_id == snap.id))).scalars().all()
-        pool_total_usdt = snap.balance_usdt + sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in positions)
+        pool_total_usdt = snap.balance_usdt + sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions)
         
         _start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         _total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
@@ -1633,7 +1634,7 @@ async def admin_silent_withdraw(payload: SilentWithdrawPayload, db: AsyncSession
             raise HTTPException(status_code=404, detail="Снапшот forex пула не найден.")
 
         fx_positions = (await db.execute(select(ForexPosition).where(ForexPosition.snapshot_id == snap.id))).scalars().all()
-        forex_pool_positions = sum(p.amount * (p.current_price if p.current_price > 0 else p.avg_price) for p in fx_positions)
+        forex_pool_positions = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in fx_positions)
         pool_total_usdt = snap.balance_usdt + forex_pool_positions
 
         net_inv = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm)

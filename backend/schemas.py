@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
@@ -14,7 +15,7 @@ class TradeIn(BaseModel):
     action: str
     amount: float
     price: float
-    pnl: float | None = None
+    pnl: Optional[float] = None
     timestamp: str
 
 class AIFeedEntryIn(BaseModel):
@@ -42,7 +43,7 @@ class RegisterIn(BaseModel):
     email: EmailStr
     nickname: str
     password: str
-    referral_code: str | None = None
+    referral_code: Optional[str] = None
 
 class LoginIn(BaseModel):
     email: EmailStr
@@ -70,7 +71,7 @@ class TradeOut(BaseModel):
     action: str
     amount: float
     price: float
-    pnl: float | None
+    pnl: Optional[float]
     timestamp: str
 
 class AIFeedOut(BaseModel):
@@ -81,9 +82,9 @@ class AIFeedOut(BaseModel):
 
 class ReferralInfo(BaseModel):
     id: str
-    parent_id: str | None
+    parent_id: Optional[str]
     email: str          # замаскированный email
-    nickname: str | None = None
+    nickname: Optional[str] = None
     investment_usdt: float
     bonus_usdt: float   # сколько реферер зарабатывает с этого человека
     level: int = 1      # уровень вложенности
@@ -105,7 +106,7 @@ class SupportTicketOut(BaseModel):
     created_at: datetime
     has_unread: bool = False
     replies: list[SupportReplyOut] = []
-    user_email: str | None = None
+    user_email: Optional[str] = None
 
 class SupportTicketAdminOut(SupportTicketOut):
     user_email: str
@@ -115,14 +116,14 @@ class NewsItemCreate(BaseModel):
     title: str
     body: str
     pool_type: str = "all"  # "all", "crypto", "forex"
-    image_url: str | None = None
+    image_url: Optional[str] = None
 
 class NewsItemOut(BaseModel):
     id: str
     title: str
     body: str
     pool_type: str
-    image_url: str | None = None
+    image_url: Optional[str] = None
     created_at: datetime
 
 
@@ -131,22 +132,22 @@ class DashboardOut(BaseModel):
     balance_usdt: float
     pool_total_usdt: float
     email: str
-    nickname: str | None = None
+    nickname: Optional[str] = None
     pool_positions_usdt: float
     mode: str
     hwm: float
     drawdown_pct: float
     server_online: bool
-    last_updated: str | None
+    last_updated: Optional[str]
     # Данные пользователя (крипто)
     user_investment: float
     user_pnl: float
     user_pnl_pct: float
     status: str = "PARTNER"
     total_volume_usdt: float = 0.0
-    next_status_volume: float | None = None
+    next_status_volume: Optional[float] = None
     ref_bonus: float = 0.0
-    referral_code: str = ""
+    referral_code: Optional[str] = ""
     referrals: list[ReferralInfo] = []
     positions: list[PositionOut]
     recent_trades: list[TradeOut]
@@ -156,7 +157,7 @@ class DashboardOut(BaseModel):
     forex_pool_positions: float = 0.0
     forex_balance: float = 0.0
     forex_server_online: bool = False
-    forex_last_updated: str | None = None
+    forex_last_updated: Optional[str] = None
     # Данные пользователя (форекс)
     forex_investment: float = 0.0
     forex_pnl: float = 0.0
