@@ -762,7 +762,30 @@ export default function DashboardPage() {
               <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>🔒 Профиль</h3>
               <button onClick={() => setShowChangePass(false)} style={{ background: "none", border: "none", color: "#4a6a9a", cursor: "pointer" }}><X size={18} /></button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            
+            <div style={{ marginBottom: 24, paddingBottom: 24, borderBottom: "1px solid rgba(167,139,250,0.2)" }}>
+              <h4 style={{ color: "#a78bfa", fontSize: 13, marginBottom: 12 }}>Личные данные</h4>
+              <label style={{ fontSize: 11, color: "#4a6a9a", display: "block", marginBottom: 6 }}>Никнейм (только латиница, цифры, _, мин 3 символа)</label>
+              <input type="text" value={newNickname} onChange={e => setNewNickname(e.target.value)} placeholder={data?.nickname || "Не установлен"}
+                style={{ width: "100%", padding: "10px 14px", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 8, color: "#fff", fontSize: 14, outline: "none", marginBottom: 12 }} />
+              <button onClick={async () => {
+                if (!newNickname || newNickname.length < 3) { setNicknameMsg({ ok: false, text: "Никнейм слишком короткий" }); return; }
+                setNicknameLoading(true); setNicknameMsg(null);
+                try {
+                  await updateNickname(newNickname);
+                  setNicknameMsg({ ok: true, text: "Никнейм изменен!" });
+                  mutate();
+                } catch (e: any) { setNicknameMsg({ ok: false, text: e?.response?.data?.detail || "Ошибка" }); }
+                finally { setNicknameLoading(false); }
+              }} disabled={nicknameLoading}
+                style={{ width: "100%", padding: "10px", borderRadius: 8, border: "none", background: "linear-gradient(90deg, #a78bfa 0%, #c084fc 100%)", color: "#fff", fontWeight: 600, cursor: nicknameLoading ? "default" : "pointer", opacity: nicknameLoading ? 0.7 : 1 }}>
+                {nicknameLoading ? <Loader2 size={18} className="spin" style={{ margin: "0 auto" }} /> : "Сохранить Никнейм"}
+              </button>
+              {nicknameMsg && <p style={{ fontSize: 12, marginTop: 8, color: nicknameMsg.ok ? "#22c97a" : "#ff4d4d", textAlign: "center" }}>{nicknameMsg.text}</p>}
+            </div>
+            
+            <h4 style={{ color: "#a78bfa", fontSize: 13, marginBottom: 4 }}>Смена пароля</h4>
+<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[
                 { label: "Текущий пароль", value: oldPass, set: setOldPass },
                 { label: "Новый пароль", value: newPass, set: setNewPass },
