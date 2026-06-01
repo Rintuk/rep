@@ -21,7 +21,7 @@ interface ReferralInfo { id: string; parent_id: string | null; email: string; in
 interface Dashboard {
   balance_usdt: number; pool_total_usdt: number; pool_positions_usdt: number;
   mode: string; hwm: number; drawdown_pct: number; server_online: boolean;
-  last_updated: string | null; nickname?: string | null;
+  last_updated: string | null; nickname?: string | null; email: string;
   user_investment: number; user_pnl: number; user_pnl_pct: number;
   status: string; total_volume_usdt: number; next_status_volume: number | null;
   ref_bonus: number; referral_code: string; referrals: ReferralInfo[];
@@ -759,10 +759,33 @@ export default function DashboardPage() {
           onClick={e => { if (e.target === e.currentTarget) setShowChangePass(false); }}>
           <div style={{ background: "#0a0f2a", border: "1px solid rgba(167,139,250,0.3)", borderRadius: 16, padding: 28, width: "100%", maxWidth: 380, boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>🔒 Профиль</h3>
+              <h3 style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>⚙️ Профиль</h3>
               <button onClick={() => setShowChangePass(false)} style={{ background: "none", border: "none", color: "#4a6a9a", cursor: "pointer" }}><X size={18} /></button>
             </div>
-            
+
+            {/* Карточка пользователя */}
+            <div style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: 12, padding: "14px 16px", marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, #a78bfa, #6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: "#fff", flexShrink: 0 }}>
+                  {(data?.nickname || data?.email || "U")[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>{data?.nickname || <span style={{color:"#6b8ab0"}}>Никнейм не установлен</span>}</div>
+                  <div style={{ color: "#6b8ab0", fontSize: 12, marginTop: 2 }}>{data?.email}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ background: "rgba(34,201,122,0.12)", border: "1px solid rgba(34,201,122,0.3)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "#22c97a" }}>
+                  {data?.status || "PARTNER"}
+                </span>
+                {data?.referral_code && (
+                  <span style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "#a78bfa" }}>
+                    Реф. код: {data.referral_code.slice(0,8)}...
+                  </span>
+                )}
+              </div>
+            </div>
+
             <div style={{ marginBottom: 24, paddingBottom: 24, borderBottom: "1px solid rgba(167,139,250,0.2)" }}>
               <h4 style={{ color: "#a78bfa", fontSize: 13, marginBottom: 12 }}>Личные данные</h4>
               <label style={{ fontSize: 11, color: "#4a6a9a", display: "block", marginBottom: 6 }}>Никнейм (только латиница, цифры, _, мин 3 символа)</label>
