@@ -167,3 +167,22 @@ async def debug_register():
             return {"db": "ok"}
     except Exception as e:
         return {"db": "error", "detail": str(e), "trace": traceback.format_exc()}
+
+@app.get("/debug/dashboard/{email}")
+async def debug_dashboard(email: str):
+    import traceback
+    from database import AsyncSessionLocal
+    from sqlalchemy.future import select
+    from models import User
+    from routers.dashboard import dashboard
+    try:
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(User).where(User.email == email))
+            user = res.scalar_one_or_none()
+            if not user:
+                return {"error": "User not found"}
+            dash_data = await dashboard(user=user, db=session)
+            return {"status": "ok"}
+    except Exception as e:
+        return {"error": str(e), "trace": traceback.format_exc()}
+
