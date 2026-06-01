@@ -27,7 +27,7 @@ interface Dashboard {
   ref_bonus: number; referral_code: string; referrals: ReferralInfo[];
   positions: Position[]; recent_trades: Trade[]; ai_feed: AIFeed[];
   forex_pool_total: number; forex_pool_positions: number; forex_balance: number;
-  forex_server_online: boolean; forex_last_updated: string | null; nickname?: string | null;
+  forex_server_online: boolean; forex_last_updated: string | null;
   forex_investment: number; forex_pnl: number; forex_pnl_pct: number;
   forex_ref_bonus: number;
   forex_positions: Position[]; forex_recent_trades: Trade[];
