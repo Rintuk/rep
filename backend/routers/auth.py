@@ -622,6 +622,28 @@ async def adjust_net_invested(add_amount: float, db: AsyncSession = Depends(get_
     }
 
 
+@router.post("/admin/forex-adjust-net-invested", dependencies=[Depends(get_admin_user)])
+async def adjust_forex_net_invested(add_amount: float, db: AsyncSession = Depends(get_db)):
+    """Прибавляет add_amount к net_invested во всех снимках форекс-пула."""
+    if add_amount == 0:
+        raise HTTPException(status_code=400, detail="add_amount не может быть 0")
+        
+    await _migrate_pnl_internal(db)
+    
+    from models import ForexBotSnapshot
+    snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
+    updated = 0
+    for s in snaps:
+        s.net_invested = round(s.net_invested + add_amount, 4)
+        updated += 1
+    await db.commit()
+    return {
+        "updated_snapshots": updated,
+        "add_amount": add_amount,
+        "message": f"Forex net_invested скорректирован на {add_amount:+g} $ в {updated} снимках",
+    }
+
+
 @router.post("/admin/cleanup-demo-snapshots", dependencies=[Depends(get_admin_user)])
 async def cleanup_demo_snapshots(db: AsyncSession = Depends(get_db)):
     """Удаляет демо-снимки из БД и сбрасывает точки входа инвесторов.
