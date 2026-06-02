@@ -28,11 +28,7 @@ async def _get_pool_pnl_pct(db: AsyncSession) -> float:
         for p in positions
     )
     start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-    total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-    total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-    ref = start + total_inv - total_wd
-    if ref <= 0:
-        ref = snap.net_invested if snap.net_invested > 0 else start
+    ref = snap.net_invested if snap.net_invested > 0 else start
     return round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
 
 @router.post("/admin/emergency-force-set-pct")
@@ -496,9 +492,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     if snap:
         real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         # Считаем net_invested из БД: стартовый капитал + депозиты инвесторов - снятия
-        net_invested_pool = real_start + total_invested - total_withdrawn
-        if net_invested_pool <= 0:
-            net_invested_pool = snap.net_invested if snap.net_invested > 0 else real_start
+        net_invested_pool = snap.net_invested if snap.net_invested > 0 else real_start
         if net_invested_pool > 0:
             pool_pnl_usdt = round(pool_total - net_invested_pool, 2)
             pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 4)
@@ -762,11 +756,7 @@ async def rollback_hwm(
         snap = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
         if snap:
             start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-            total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-            total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-            ref = start + total_inv - total_wd
-            if ref <= 0:
-                ref = snap.net_invested if snap.net_invested > 0 else start
+            ref = snap.net_invested if snap.net_invested > 0 else start
             if ref > 0:
                 target_crypto_pct = round((target_crypto_profit_usdt / ref) * 100, 4)
 
@@ -1499,11 +1489,7 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
             p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
         start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-        total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-        ref = start + total_inv - total_wd
-        if ref <= 0:
-            ref = snap.net_invested if snap.net_invested > 0 else start
+        ref = snap.net_invested if snap.net_invested > 0 else start
         current_pnl_pct = round((pool_total_without_deposit - ref) / ref * 100, 4) if ref > 0 else 0.0
     else:
         current_pnl_pct = 0.0
@@ -1595,11 +1581,7 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
             p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
         start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-        total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-        ref = start + total_inv - total_wd
-        if ref <= 0:
-            ref = snap.net_invested if snap.net_invested > 0 else start
+        ref = snap.net_invested if snap.net_invested > 0 else start
 
         # Истинный PnL пула ДО депозита: так как админ использует это для перевода своей прибыли,
         # сумма уже является частью pool_total как прибыль. Не вычитаем её!
@@ -1647,7 +1629,7 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
         ))
 
     if snap:
-        snap.net_invested += payload.amount
+        pass # No change to net_invested for internal transfer
 
     await db.commit()
 
@@ -1725,7 +1707,7 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
         ))
 
     if forex_snap:
-        forex_snap.net_invested += payload.amount
+        pass # No change to net_invested for internal transfer
 
     await db.commit()
 
@@ -1834,11 +1816,7 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
             p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
         start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-        total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-        ref = start + total_inv - total_wd
-        if ref <= 0:
-            ref = snap.net_invested if snap.net_invested > 0 else start
+        ref = snap.net_invested if snap.net_invested > 0 else start
         current_pnl_pct = round((pool_total_before_withdrawal - ref) / ref * 100, 4) if ref > 0 else 0.0
 
     # АВТО-МИГРАЦИЯ PNL (чтобы не стереть накопленную прибыль пользователя при уменьшении его депозита)
@@ -1855,6 +1833,14 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
 
     req.status = "approved"
     req.updated_at = datetime.utcnow()
+    
+    # ВАЖНО: Уменьшаем капитал пула
+    snap_update = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+    if snap_update:
+        snap_update.net_invested -= actual_amount
+        if snap_update.net_invested < 0:
+            snap_update.net_invested = 0
+
     await db.commit()
     return {"status": "approved", "amount": actual_amount}
 

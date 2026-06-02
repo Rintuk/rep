@@ -203,11 +203,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
 
         _start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        _total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-        _total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-        net_inv = _start + _total_inv - _total_wd
-        if net_inv <= 0:
-            net_inv = snap.net_invested if snap.net_invested > 0 else _start
+        net_inv = snap.net_invested if snap.net_invested > 0 else _start
         pool_pnl_pct = round((pool_total_usdt - net_inv) / net_inv * 100, 4) if net_inv > 0 else 0.0
 
         entry_pnl_pct = fin.entry_pool_pnl_pct if fin else 0.0
