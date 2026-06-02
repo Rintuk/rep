@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import React from "react";
 import {
+  api,
   getAdminOverview, getAdminForexOverview,
   approveUser, rejectUser,
   updateUserFinancials, updateUserForexFinancials, setReferralLimit,
@@ -13,7 +14,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare, setUserReferrer, getUserReferralTree,
+  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool,
@@ -551,8 +552,9 @@ export default function AdminPage() {
       setSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
       setTimeout(() => setSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
       fetchData();
-    } catch {
-      setSaveMsg(prev => ({ ...prev, [id]: "✗ Ошибка" }));
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || "Ошибка";
+      setSaveMsg(prev => ({ ...prev, [id]: "✗ " + detail }));
     } finally { setSavingId(null); }
   }
 
@@ -567,9 +569,10 @@ export default function AdminPage() {
       setForexSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
       setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
       fetchData();
-    } catch {
-      setForexSaveMsg(prev => ({ ...prev, [id]: "✗ Ошибка" }));
-      setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 3000);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || "Ошибка";
+      setForexSaveMsg(prev => ({ ...prev, [id]: "✗ " + detail }));
+      setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 5000);
     } finally { setForexSavingId(null); }
   }
 
