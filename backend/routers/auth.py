@@ -340,23 +340,25 @@ async def update_user_financials(
     old_inv = fin.investment_usdt if fin else 0.0
     old_wd  = fin.withdrawal_usdt if fin else 0.0
 
-    inv_delta = investment_usdt - old_inv
-
-    # Точка входа (entry_pct) = текущий pool PnL на момент сохранения.
-    # Используем _get_pool_pnl_pct — она читает живой SUM(investment_usdt) из БД.
-    # fin.investment_usdt обновится ниже (после расчёта entry_pct), это нормально:
-    # мы ставим точку входа на ТЕКУЩИЙ уровень пула, а не на послесохраненный.
     current_pnl_pct = await _get_pool_pnl_pct(db)
 
     if fin:
         if investment_usdt > 0 and old_inv != investment_usdt:
             if old_inv <= 0:
+                # Новый инвестор — стартует с текущего уровня пула
                 fin.entry_pool_pnl_pct = current_pnl_pct
             elif investment_usdt > old_inv:
-                # Взвешенное среднее: старая сумма с историческим entry, новая с текущим PnL
-                fin.entry_pool_pnl_pct = round(
-                    (old_inv * fin.entry_pool_pnl_pct + inv_delta * current_pnl_pct) / investment_usdt, 4
-                )
+                # Существующий инвестор добавляет — сначала фиксируем плавающую прибыль,
+                # потом сбрасываем точку входа на текущий PnL.
+                # Это гарантирует что 509$ новых зарабатывают только вперёд,
+                # а старая прибыль не пересчитывается на увеличенную сумму.
+                incr = current_pnl_pct - fin.entry_pool_pnl_pct
+                if incr > 0:
+                    gross = old_inv * (incr / 100)
+                    user_profit = round(gross * get_investor_share(fin), 2)
+                    if user_profit > 0:
+                        fin.locked_crypto_pnl += user_profit
+                fin.entry_pool_pnl_pct = current_pnl_pct
         fin.investment_usdt = investment_usdt
         fin.withdrawal_usdt = withdrawal_usdt
         fin.note = note

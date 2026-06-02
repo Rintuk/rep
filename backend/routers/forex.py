@@ -220,7 +220,6 @@ async def update_user_forex_financials(
     old_inv = fin.forex_investment_usdt if fin else 0.0
     old_wd  = fin.forex_withdrawal_usdt if fin else 0.0
 
-    inv_delta = forex_investment_usdt - old_inv
     current_pnl_pct = await _get_forex_pool_pnl_pct(db)
 
     if fin:
@@ -228,10 +227,15 @@ async def update_user_forex_financials(
             if old_inv <= 0:
                 fin.forex_entry_pool_pnl_pct = current_pnl_pct
             elif forex_investment_usdt > old_inv:
-                fin.forex_entry_pool_pnl_pct = round(
-                    (old_inv * fin.forex_entry_pool_pnl_pct + inv_delta * current_pnl_pct)
-                    / forex_investment_usdt, 4
-                )
+                # Фиксируем плавающую прибыль старой суммы, затем обновляем точку входа.
+                # Новые деньги начинают зарабатывать только с этого момента.
+                incr = current_pnl_pct - fin.forex_entry_pool_pnl_pct
+                if incr > 0:
+                    gross = old_inv * (incr / 100)
+                    user_profit = round(gross * get_investor_share(fin), 2)
+                    if user_profit > 0:
+                        fin.locked_forex_pnl += user_profit
+                fin.forex_entry_pool_pnl_pct = current_pnl_pct
         fin.forex_investment_usdt = forex_investment_usdt
         fin.forex_withdrawal_usdt = forex_withdrawal_usdt
         fin.note = note
