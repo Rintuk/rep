@@ -341,41 +341,21 @@ async def update_user_financials(
     old_wd  = fin.withdrawal_usdt if fin else 0.0
 
     inv_delta = investment_usdt - old_inv
-    wd_delta  = withdrawal_usdt - old_wd
-    net_delta = inv_delta - wd_delta
 
-    # Вычисляем post_pnl вручную — НЕЛЬЗЯ вызывать _get_pool_pnl_pct потому что
-    # она читает SUM(investment_usdt) из БД, а fin.investment_usdt ещё не обновлён.
-    # Используем delta напрямую, чтобы ref отражал итоговое состояние.
-    snap = (await db.execute(
-        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
-    )).scalar_one_or_none()
-    post_pnl_pct = 0.0
-    if snap:
-        positions = (await db.execute(
-            select(Position).where(Position.snapshot_id == snap.id)
-        )).scalars().all()
-        pool_total = snap.balance_usdt + sum(
-            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
-            for p in positions
-        )
-        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-        total_wd  = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-        ref_post = start + (total_inv + inv_delta) - (total_wd + wd_delta)
-        if ref_post <= 0:
-            ref_post = (snap.net_invested + net_delta) if (snap.net_invested + net_delta) > 0 else start
-        post_pnl_pct = round((pool_total - ref_post) / ref_post * 100, 4) if ref_post > 0 else 0.0
-        if net_delta != 0:
-            snap.net_invested = round(snap.net_invested + net_delta, 4)
+    # Точка входа (entry_pct) = текущий pool PnL на момент сохранения.
+    # Используем _get_pool_pnl_pct — она читает живой SUM(investment_usdt) из БД.
+    # fin.investment_usdt обновится ниже (после расчёта entry_pct), это нормально:
+    # мы ставим точку входа на ТЕКУЩИЙ уровень пула, а не на послесохраненный.
+    current_pnl_pct = await _get_pool_pnl_pct(db)
 
     if fin:
         if investment_usdt > 0 and old_inv != investment_usdt:
             if old_inv <= 0:
-                fin.entry_pool_pnl_pct = post_pnl_pct
+                fin.entry_pool_pnl_pct = current_pnl_pct
             elif investment_usdt > old_inv:
+                # Взвешенное среднее: старая сумма с историческим entry, новая с текущим PnL
                 fin.entry_pool_pnl_pct = round(
-                    (old_inv * fin.entry_pool_pnl_pct + inv_delta * post_pnl_pct) / investment_usdt, 4
+                    (old_inv * fin.entry_pool_pnl_pct + inv_delta * current_pnl_pct) / investment_usdt, 4
                 )
         fin.investment_usdt = investment_usdt
         fin.withdrawal_usdt = withdrawal_usdt
@@ -387,7 +367,7 @@ async def update_user_financials(
             investment_usdt=investment_usdt,
             withdrawal_usdt=withdrawal_usdt,
             note=note,
-            entry_pool_pnl_pct=post_pnl_pct if investment_usdt > 0 else 0.0,
+            entry_pool_pnl_pct=current_pnl_pct if investment_usdt > 0 else 0.0,
         ))
 
     await db.commit()
