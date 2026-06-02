@@ -1025,6 +1025,19 @@ export default function AdminPage() {
                       finally { e.target.value = ""; }
                     }} style={{ display: "none" }} />
                   </label>
+                  
+                  <button onClick={async () => {
+                    if (!confirm("Это действие отменит влияние последней кнопки 'Пополнить из пула' на баланс пула. Продолжить?")) return;
+                    try {
+                      const res = await api.post("/auth/admin/emergency-revert-reinvest");
+                      if (res.data.status === "success") {
+                        alert(`Готово! Отменено крипто: ${res.data.crypto_reverted}$, форекс: ${res.data.forex_reverted}$`);
+                        fetchData();
+                      }
+                    } catch (e: any) { alert("Ошибка: " + e.message); }
+                  }} style={{ background: "rgba(255, 100, 100, 0.1)", color: "#ff4d4d", padding: "6px 12px", border: "1px solid #ff4d4d", borderRadius: 4, cursor: "pointer", fontSize: 13, marginTop: 10 }}>
+                    Сбросить глюк пула
+                  </button>
                 </div>
 
                 {/* Очистка демо */}
