@@ -1072,10 +1072,10 @@ async def backup_db(db: AsyncSession = Depends(get_db)):
     pool_crypto_data = None
     if crypto_snap:
         pool_crypto_data = {
-            "balance_usdt": crypto_snap.balance_usdt,
-            "net_invested": crypto_snap.net_invested,
-            "hwm": crypto_snap.hwm,
-            "real_start_balance": crypto_snap.real_start_balance,
+            "balance_usdt": float(crypto_snap.balance_usdt),
+            "net_invested": float(crypto_snap.net_invested),
+            "hwm": float(crypto_snap.hwm),
+            "real_start_balance": float(getattr(crypto_snap, 'real_start_balance', 0.0)),
             "timestamp": str(crypto_snap.timestamp),
             "positions": crypto_positions
         }
@@ -1083,21 +1083,32 @@ async def backup_db(db: AsyncSession = Depends(get_db)):
     pool_forex_data = None
     if forex_snap:
         pool_forex_data = {
-            "balance_usdt": forex_snap.balance_usdt,
-            "net_invested": forex_snap.net_invested,
-            "hwm": forex_snap.hwm,
-            "real_start_balance": forex_snap.real_start_balance,
+            "balance_usdt": float(forex_snap.balance_usdt),
+            "net_invested": float(forex_snap.net_invested),
+            "hwm": float(forex_snap.hwm),
+            "real_start_balance": float(getattr(forex_snap, 'real_start_balance', 0.0)),
             "timestamp": str(forex_snap.timestamp),
             "positions": forex_positions
         }
 
-    return {
+    from fastapi.responses import JSONResponse
+    import json
+    res = {
         "timestamp": datetime.utcnow().isoformat(),
         "users_count": len(users),
         "pool_crypto": pool_crypto_data,
         "pool_forex": pool_forex_data,
         "data": backup_data
     }
+    
+    try:
+        # Test if it serializes correctly, otherwise return error
+        dump = json.dumps(res)
+    except Exception as e:
+        import traceback
+        return JSONResponse(status_code=500, content={"error": "Serialization failed: " + str(e), "trace": traceback.format_exc()})
+        
+    return JSONResponse(content=res)
 
 
 @router.post("/admin/migrate-pnl", dependencies=[Depends(get_admin_user)])
