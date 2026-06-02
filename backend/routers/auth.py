@@ -528,6 +528,15 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             locked_gross = locked_crypto_pnl / get_investor_share(fin)
             
             total_gross_pnl += (gross_pnl + locked_gross)
+
+        forex_pnl = 0.0
+        forex_inv = fin.forex_investment_usdt if fin else 0.0
+        if forex_inv > 0 and forex_snap and forex_pool_pct is not None:
+            fx_entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
+            fx_incremental = forex_pool_pct - fx_entry_pct
+            fx_gross_pnl = forex_inv * (fx_incremental / 100) if fx_incremental > 0 else 0.0
+            fx_locked = fin.locked_forex_pnl if fin else 0.0
+            forex_pnl = round(fx_gross_pnl * get_investor_share(fin) + fx_locked, 2)
             
             # Временно упрощаем для админской статы: 
             # Админ получает POOL_FEE (20%) со всех. 
@@ -542,7 +551,11 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
-            "pnl": pnl, "referrals_count": refs_count,
+            "pnl": pnl,
+            "forex_investment": fin.forex_investment_usdt if fin else 0.0,
+            "forex_withdrawal": fin.forex_withdrawal_usdt if fin else 0.0,
+            "forex_pnl": forex_pnl,
+            "referrals_count": refs_count,
             "ref_income": round(crypto_ref, 2),
             "status": status,
             "total_volume": round(total_volume, 2),
