@@ -1241,7 +1241,19 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
         if crypto_bonus > 0 or forex_bonus > 0:
             fin_db.locked_crypto_ref_bonus = round(crypto_bonus, 2)
             fin_db.locked_forex_ref_bonus = round(forex_bonus, 2)
-            updated += 1
+            
+        # [CRITICAL FIX] Actually restore the user's financials from the backup!
+        if u.id in backup_fins:
+            my_b = backup_fins[u.id]
+            if "investment_usdt" in my_b: fin_db.investment_usdt = my_b["investment_usdt"]
+            if "entry_pool_pnl_pct" in my_b: fin_db.entry_pool_pnl_pct = my_b["entry_pool_pnl_pct"]
+            if "locked_crypto_pnl" in my_b: fin_db.locked_crypto_pnl = my_b["locked_crypto_pnl"]
+            if "forex_investment_usdt" in my_b: fin_db.forex_investment_usdt = my_b["forex_investment_usdt"]
+            if "forex_entry_pool_pnl_pct" in my_b: fin_db.forex_entry_pool_pnl_pct = my_b["forex_entry_pool_pnl_pct"]
+            if "locked_forex_pnl" in my_b: fin_db.locked_forex_pnl = my_b["locked_forex_pnl"]
+            if "withdrawal_usdt" in my_b: fin_db.withdrawal_usdt = my_b["withdrawal_usdt"]
+            
+        updated += 1
             
     await db.commit()
     return {"status": "success", "updated": updated}
