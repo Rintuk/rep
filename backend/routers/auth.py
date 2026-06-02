@@ -27,7 +27,7 @@ async def _get_pool_pnl_pct(db: AsyncSession) -> float:
         p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
         for p in positions
     )
-    start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+    start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
     total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
     total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
     ref = start + total_inv - total_wd
@@ -209,7 +209,7 @@ async def set_investor_share(user_id: str, data: InvestorShareRequest, db: Async
         forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
         forex_pool_pct = 0.0
         if forex_snap:
-            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm)
             if fx_net_inv > 0:
                 forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
                 
@@ -494,7 +494,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
     real_start = 0.0
     net_invested_pool = 0.0
     if snap:
-        real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        real_start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         # Считаем net_invested из БД: стартовый капитал + депозиты инвесторов - снятия
         net_invested_pool = real_start + total_invested - total_withdrawn
         if net_invested_pool <= 0:
@@ -761,7 +761,7 @@ async def rollback_hwm(
     if target_crypto_profit_usdt is not None:
         snap = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
         if snap:
-            start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+            start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
             total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
             total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
             ref = start + total_inv - total_wd
@@ -774,7 +774,7 @@ async def rollback_hwm(
         from models import ForexBotSnapshot
         forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
         if forex_snap:
-            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm)
             if fx_net_inv > 0:
                 target_forex_pct = round((target_forex_profit_usdt / fx_net_inv) * 100, 4)
 
@@ -1192,7 +1192,7 @@ async def _migrate_pnl_internal(
     forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
     forex_pool_pct = override_forex_pct if override_forex_pct is not None else 0.0
     if forex_snap and override_forex_pct is None:
-        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm)
         if fx_net_inv > 0:
             forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
     forex_final_pct = final_forex_pct if final_forex_pct is not None else forex_pool_pct
@@ -1498,7 +1498,7 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
         pool_total_without_deposit = snap.balance_usdt + sum(
             p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
-        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
         total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
         ref = start + total_inv - total_wd
@@ -1594,7 +1594,7 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
         pool_total = snap.balance_usdt + sum(
             p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
-        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
         total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
         ref = start + total_inv - total_wd
@@ -1647,7 +1647,10 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
         ))
 
     if snap:
-        snap.net_invested += payload.amount
+        if snap.real_start_balance == 0.0:
+            snap.real_start_balance = snap.hwm
+        snap.real_start_balance -= payload.amount
+        # net_invested is explicitly NOT increased because it's an internal transfer
 
     await db.commit()
 
@@ -1676,7 +1679,7 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
 
     if forex_snap:
         fx_ref = forex_snap.net_invested if forex_snap.net_invested > 0 else (
-            forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
+            forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
         )
         # Истинный PnL ДО депозита: так как админ использует это для перевода своей прибыли,
         # сумма уже является частью balance_usdt как прибыль. Не вычитаем её!
@@ -1725,7 +1728,10 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
         ))
 
     if forex_snap:
-        forex_snap.net_invested += payload.amount
+        if forex_snap.real_start_balance == 0.0:
+            forex_snap.real_start_balance = forex_snap.hwm
+        forex_snap.real_start_balance -= payload.amount
+        # net_invested is explicitly NOT increased because it's an internal transfer
 
     await db.commit()
 
@@ -1833,7 +1839,7 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
         pool_total_before_withdrawal = snap.balance_usdt + actual_amount + sum(
             p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
-        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
         total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
         ref = start + total_inv - total_wd
@@ -1981,7 +1987,7 @@ async def admin_silent_withdraw(payload: SilentWithdrawPayload, db: AsyncSession
         positions = (await db.execute(select(Position).where(Position.snapshot_id == snap.id))).scalars().all()
         pool_total_usdt = snap.balance_usdt + sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions)
         
-        _start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        _start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         _total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
         _total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
         
@@ -2011,7 +2017,7 @@ async def admin_silent_withdraw(payload: SilentWithdrawPayload, db: AsyncSession
         forex_pool_positions = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in fx_positions)
         pool_total_usdt = snap.balance_usdt + forex_pool_positions
 
-        net_inv = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm)
+        net_inv = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm)
         
         if net_inv <= 0 or pool_total_usdt <= 0:
             raise HTTPException(status_code=400, detail="Ошибка: net_inv или pool_total <= 0")
@@ -2020,7 +2026,7 @@ async def admin_silent_withdraw(payload: SilentWithdrawPayload, db: AsyncSession
         new_net_inv = net_inv - delta_n
 
         snap.net_invested = new_net_inv
-        snap.real_start_balance = snap.real_start_balance - delta_n if snap.real_start_balance > 0 else 0
+        snap.real_start_balance = snap.real_start_balance - delta_n if snap.real_start_balance != 0.0 else 0
         await db.commit()
         return {"status": "success", "pool": "forex", "decreased_base_by": delta_n, "new_net_inv": new_net_inv}
 

@@ -202,7 +202,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         pool_total_usdt = snap.balance_usdt + pool_positions_usdt
         server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
 
-        _start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        _start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         _total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
         _total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
         net_inv = _start + _total_inv - _total_wd
@@ -250,7 +250,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         forex_pool_total = forex_balance
 
         fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
-            forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
+            forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
         )
         forex_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4) if fx_net_inv > 0 else 0.0
 

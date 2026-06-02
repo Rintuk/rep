@@ -21,7 +21,7 @@ async def _get_forex_pool_pnl_pct(db: AsyncSession) -> float:
     if not snap:
         return 0.0
     ref = snap.net_invested if snap.net_invested > 0 else (
-        snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
     )
     return round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
 
@@ -98,9 +98,9 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     pool_pnl_usdt = pool_pnl_pct = net_invested_pool = real_start = 0.0
     if snap:
         net_invested_pool = snap.net_invested if snap.net_invested > 0 else (
-            snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+            snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         )
-        real_start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        real_start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         if net_invested_pool > 0:
             pool_pnl_usdt = round(pool_free - net_invested_pool, 2)
             pool_pnl_pct = round((pool_free - net_invested_pool) / net_invested_pool * 100, 4)
@@ -466,7 +466,7 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
     
     current_pnl_pct = 0.0
     if forex_snap:
-        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
+        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm)
         if fx_net_inv > 0:
             # Прибавляем выведенную сумму обратно к пулу
             pool_total_before = forex_snap.balance_usdt + actual_amount
