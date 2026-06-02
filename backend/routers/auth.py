@@ -1787,3 +1787,8 @@ async def get_user_referral_tree(user_id: str, db: AsyncSession = Depends(get_db
     _, _, _, _, _, refs_info = await _calc_referral_tree(user_id, db, crypto_pool_pct, forex_pool_pct, fin, user.manual_status_override)
     return {"referrals": refs_info}
 
+
+
+@router.get("/admin/backup-db-debug")
+async def backup_db_debug(db: AsyncSession = Depends(get_db)):
+    return await backup_db(db)
