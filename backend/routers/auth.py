@@ -1474,13 +1474,17 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
         pool_total = snap.balance_usdt + sum(
             p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
+        # Вычитаем сумму депозита: эти деньги уже в пуле, но принадлежат инвестору,
+        # а не являются прибылью. Без этого вычитания они ложно считаются прибылью пула
+        # и фиксируются на счетах ВСЕХ инвесторов через _migrate_pnl_internal.
+        pool_total_for_pnl = pool_total - payload.amount
         start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
         total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
         ref = start + total_inv - total_wd
         if ref <= 0:
             ref = snap.net_invested if snap.net_invested > 0 else start
-        current_pnl_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+        current_pnl_pct = round((pool_total_for_pnl - ref) / ref * 100, 4) if ref > 0 else 0.0
     else:
         current_pnl_pct = 0.0
 
@@ -1553,7 +1557,10 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
         fx_ref = forex_snap.net_invested if forex_snap.net_invested > 0 else (
             forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
         )
-        current_forex_pct = round((forex_snap.balance_usdt - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
+        # Вычитаем сумму депозита: эти деньги уже в пуле, но принадлежат инвестору,
+        # а не являются прибылью. Без вычитания они ложно фиксируются как прибыль пула.
+        adjusted_forex_balance = forex_snap.balance_usdt - payload.amount
+        current_forex_pct = round((adjusted_forex_balance - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
     else:
         current_forex_pct = 0.0
 
