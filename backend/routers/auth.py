@@ -1083,12 +1083,10 @@ async def revert_entry_points_hotfix(db: AsyncSession = Depends(get_db)):
 async def lock_referral_baseline(db: AsyncSession = Depends(get_db)):
     """
     Фиксирует базовые значения рефбонусов для инвесторов у которых entry > pool_pct.
-    Сохраняет смещение gross в crypto_ref_gross_offset / forex_ref_gross_offset (raw SQL),
+    Сохраняет смещение в locked_crypto_ref_bonus / locked_forex_ref_bonus,
     чтобы апплайнеры видели старые бонусы и рост от текущего уровня пула.
-    Запускать ОДИН РАЗ после пополнений с пула.
     """
     from routers.forex import _get_forex_pool_pnl_pct
-    from sqlalchemy import text
 
     crypto_pct = await _get_pool_pnl_pct(db)
     forex_pct  = await _get_forex_pool_pnl_pct(db)
@@ -1100,26 +1098,26 @@ async def lock_referral_baseline(db: AsyncSession = Depends(get_db)):
     updated = []
     for f in all_fins:
         email = user_map.get(f.user_id, f.user_id)
-        crypto_offset = 0.0
-        forex_offset  = 0.0
+        changed = False
 
         if (f.investment_usdt > 0
                 and f.entry_pool_pnl_pct > crypto_pct
                 and f.locked_crypto_pnl > 0):
-            crypto_offset = round(f.investment_usdt * (f.entry_pool_pnl_pct - crypto_pct) / 100, 4)
+            f.locked_crypto_ref_bonus = round(
+                f.investment_usdt * (f.entry_pool_pnl_pct - crypto_pct) / 100, 4)
+            changed = True
 
         if (f.forex_investment_usdt > 0
                 and f.forex_entry_pool_pnl_pct > forex_pct
                 and f.locked_forex_pnl > 0):
-            forex_offset = round(f.forex_investment_usdt * (f.forex_entry_pool_pnl_pct - forex_pct) / 100, 4)
+            f.locked_forex_ref_bonus = round(
+                f.forex_investment_usdt * (f.forex_entry_pool_pnl_pct - forex_pct) / 100, 4)
+            changed = True
 
-        if crypto_offset > 0 or forex_offset > 0:
-            await db.execute(text(
-                "UPDATE user_financials SET "
-                "crypto_ref_gross_offset = :c, forex_ref_gross_offset = :fx "
-                "WHERE user_id = :uid"
-            ), {"c": crypto_offset, "fx": forex_offset, "uid": f.user_id})
-            updated.append({"email": email, "crypto_offset": crypto_offset, "forex_offset": forex_offset})
+        if changed:
+            updated.append({"email": email,
+                            "crypto_offset": f.locked_crypto_ref_bonus,
+                            "forex_offset":  f.locked_forex_ref_bonus})
 
     await db.commit()
     return {"status": "success", "updated_count": len(updated), "updated": updated}

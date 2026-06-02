@@ -112,7 +112,7 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 incr = crypto_pool_pct - ref_entry
                 floating_gross = inv * (incr / 100)
                 locked_gross = f.locked_crypto_pnl / get_investor_share(f) if f and getattr(f, "locked_crypto_pnl", 0.0) > 0 else 0.0
-                offset = getattr(f, "crypto_ref_gross_offset", 0.0) or 0.0
+                offset = (f.locked_crypto_ref_bonus or 0.0) if f else 0.0
                 total_gross = locked_gross + floating_gross + offset
                 if total_gross > 0:
                     cb = total_gross * REF_FEES[depth]
@@ -125,7 +125,7 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                 fx_incr = forex_pool_pct - fx_entry
                 fx_floating_gross = fx * (fx_incr / 100)
                 locked_fx_gross = f.locked_forex_pnl / get_investor_share(f) if f and getattr(f, "locked_forex_pnl", 0.0) > 0 else 0.0
-                fx_offset = getattr(f, "forex_ref_gross_offset", 0.0) or 0.0
+                fx_offset = (f.locked_forex_ref_bonus or 0.0) if f else 0.0
                 total_fx_gross = locked_fx_gross + fx_floating_gross + fx_offset
                 if total_fx_gross > 0:
                     fb = total_fx_gross * REF_FEES[depth]
