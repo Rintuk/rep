@@ -153,6 +153,30 @@ app.include_router(support.router)
 async def health():
     return {"status": "ok"}
 
+@app.get("/debug-pool")
+async def debug_pool(db: AsyncSession = Depends(get_db)):
+    from models import BotSnapshot, UserFinancials, Position
+    from sqlalchemy import select, func
+    snap = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+    total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+    total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+    positions = []
+    if snap:
+        positions = (await db.execute(select(Position).where(Position.snapshot_id == snap.id))).scalars().all()
+    pool_total = (snap.balance_usdt if snap else 0.0) + sum(
+        p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+        for p in positions
+    )
+    return {
+        "snap_net_invested": snap.net_invested if snap else None,
+        "snap_hwm": snap.hwm if snap else None,
+        "snap_balance": snap.balance_usdt if snap else None,
+        "snap_real_start": snap.real_start_balance if snap else None,
+        "total_inv": total_inv,
+        "total_wd": total_wd,
+        "pool_total": pool_total
+    }
+
 
 @app.get("/debug/register-test")
 async def debug_register():
