@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
@@ -28,9 +28,9 @@ class BotUpdateIn(BaseModel):
     bot_id: str
     timestamp: str
     balance_usdt: float
-    positions: list[PositionIn] = []
-    recent_trades: list[TradeIn] = []
-    ai_feed: list[AIFeedEntryIn] = []
+    positions: List[PositionIn] = []
+    recent_trades: List[TradeIn] = []
+    ai_feed: List[AIFeedEntryIn] = []
     mode: str = "NORMAL"
     hwm: float = 0.0
     drawdown_pct: float = 0.0
@@ -105,7 +105,7 @@ class SupportTicketOut(BaseModel):
     status: str
     created_at: datetime
     has_unread: bool = False
-    replies: list[SupportReplyOut] = []
+    replies: List[SupportReplyOut] = []
     user_email: Optional[str] = None
 
 class SupportTicketAdminOut(SupportTicketOut):
@@ -148,10 +148,10 @@ class DashboardOut(BaseModel):
     next_status_volume: Optional[float] = None
     ref_bonus: float = 0.0
     referral_code: Optional[str] = ""
-    referrals: list[ReferralInfo] = []
-    positions: list[PositionOut]
-    recent_trades: list[TradeOut]
-    ai_feed: list[AIFeedOut]
+    referrals: List[ReferralInfo] = []
+    positions: List[PositionOut]
+    recent_trades: List[TradeOut]
+    ai_feed: List[AIFeedOut]
     # Форекс пул
     forex_pool_total: float = 0.0
     forex_pool_positions: float = 0.0
@@ -163,5 +163,5 @@ class DashboardOut(BaseModel):
     forex_pnl: float = 0.0
     forex_pnl_pct: float = 0.0
     forex_ref_bonus: float = 0.0
-    forex_positions: list[PositionOut] = []
-    forex_recent_trades: list[TradeOut] = []
+    forex_positions: List[PositionOut] = []
+    forex_recent_trades: List[TradeOut] = []

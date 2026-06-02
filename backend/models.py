@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 import uuid
 from datetime import datetime
 from sqlalchemy import String, Float, Boolean, DateTime, ForeignKey, Text, Integer
@@ -25,7 +25,7 @@ class User(Base):
     manual_status_override: Mapped[Optional[str]] = mapped_column(String, nullable=True, default=None)
     created_at:     Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    referrals:             Mapped[list["User"]]                   = relationship("User", foreign_keys=[referred_by])
+    referrals:             Mapped[List["User"]]                   = relationship("User", foreign_keys=[referred_by])
     financials:            Mapped["Optional[UserFinancials]"]        = relationship("UserFinancials", back_populates="user", uselist=False, cascade="all, delete-orphan")
     virtual_account:       Mapped["Optional[VirtualAccount]"]        = relationship("VirtualAccount", back_populates="user", uselist=False, cascade="all, delete-orphan")
     forex_virtual_account: Mapped["Optional[ForexVirtualAccount]"]   = relationship("ForexVirtualAccount", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -72,7 +72,7 @@ class VirtualAccount(Base):
     updated_at:       Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user:   Mapped["User"]              = relationship("User", back_populates="virtual_account")
-    trades: Mapped[list["VirtualTrade"]] = relationship("VirtualTrade", back_populates="account", cascade="all, delete-orphan")
+    trades: Mapped[List["VirtualTrade"]] = relationship("VirtualTrade", back_populates="account", cascade="all, delete-orphan")
 
 
 class VirtualTrade(Base):
@@ -84,7 +84,7 @@ class VirtualTrade(Base):
     action:    Mapped[str]        = mapped_column(String)
     amount:    Mapped[float]      = mapped_column(Float)
     price:     Mapped[float]      = mapped_column(Float)
-    pnl:       Mapped[float|None] = mapped_column(Float, nullable=True)
+    pnl:       Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     timestamp: Mapped[str]        = mapped_column(String)
 
     account: Mapped["VirtualAccount"] = relationship("VirtualAccount", back_populates="trades")
@@ -102,7 +102,7 @@ class ForexVirtualAccount(Base):
     updated_at:       Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user:   Mapped["User"]                   = relationship("User", back_populates="forex_virtual_account")
-    trades: Mapped[list["ForexVirtualTrade"]] = relationship("ForexVirtualTrade", back_populates="account", cascade="all, delete-orphan")
+    trades: Mapped[List["ForexVirtualTrade"]] = relationship("ForexVirtualTrade", back_populates="account", cascade="all, delete-orphan")
 
 
 class ForexVirtualTrade(Base):
@@ -114,7 +114,7 @@ class ForexVirtualTrade(Base):
     action:    Mapped[str]        = mapped_column(String)
     amount:    Mapped[float]      = mapped_column(Float)
     price:     Mapped[float]      = mapped_column(Float)
-    pnl:       Mapped[float|None] = mapped_column(Float, nullable=True)
+    pnl:       Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     timestamp: Mapped[str]        = mapped_column(String)
 
     account: Mapped["ForexVirtualAccount"] = relationship("ForexVirtualAccount", back_populates="trades")
@@ -163,9 +163,9 @@ class BotSnapshot(Base):
     real_start_balance: Mapped[float]    = mapped_column(Float, default=0.0)
     net_invested:       Mapped[float]    = mapped_column(Float, default=0.0, server_default="0")
 
-    positions: Mapped[list["Position"]]    = relationship("Position",    back_populates="snapshot", cascade="all, delete-orphan")
-    trades:    Mapped[list["Trade"]]       = relationship("Trade",       back_populates="snapshot", cascade="all, delete-orphan")
-    ai_feed:   Mapped[list["AIFeedEntry"]] = relationship("AIFeedEntry", back_populates="snapshot", cascade="all, delete-orphan")
+    positions: Mapped[List["Position"]]    = relationship("Position",    back_populates="snapshot", cascade="all, delete-orphan")
+    trades:    Mapped[List["Trade"]]       = relationship("Trade",       back_populates="snapshot", cascade="all, delete-orphan")
+    ai_feed:   Mapped[List["AIFeedEntry"]] = relationship("AIFeedEntry", back_populates="snapshot", cascade="all, delete-orphan")
 
 
 class Position(Base):
@@ -190,7 +190,7 @@ class Trade(Base):
     action:      Mapped[str]        = mapped_column(String)
     amount:      Mapped[float]      = mapped_column(Float)
     price:       Mapped[float]      = mapped_column(Float)
-    pnl:         Mapped[float|None] = mapped_column(Float, nullable=True)
+    pnl:         Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     timestamp:   Mapped[str]        = mapped_column(String)
 
     snapshot: Mapped["BotSnapshot"] = relationship("BotSnapshot", back_populates="trades")
@@ -224,9 +224,9 @@ class ForexBotSnapshot(Base):
     real_start_balance: Mapped[float]    = mapped_column(Float, default=0.0)
     net_invested:       Mapped[float]    = mapped_column(Float, default=0.0)
 
-    positions: Mapped[list["ForexPosition"]]    = relationship("ForexPosition",    back_populates="snapshot", cascade="all, delete-orphan")
-    trades:    Mapped[list["ForexTrade"]]       = relationship("ForexTrade",       back_populates="snapshot", cascade="all, delete-orphan")
-    ai_feed:   Mapped[list["ForexAIFeedEntry"]] = relationship("ForexAIFeedEntry", back_populates="snapshot", cascade="all, delete-orphan")
+    positions: Mapped[List["ForexPosition"]]    = relationship("ForexPosition",    back_populates="snapshot", cascade="all, delete-orphan")
+    trades:    Mapped[List["ForexTrade"]]       = relationship("ForexTrade",       back_populates="snapshot", cascade="all, delete-orphan")
+    ai_feed:   Mapped[List["ForexAIFeedEntry"]] = relationship("ForexAIFeedEntry", back_populates="snapshot", cascade="all, delete-orphan")
 
 
 class ForexPosition(Base):
@@ -251,7 +251,7 @@ class ForexTrade(Base):
     action:      Mapped[str]        = mapped_column(String)
     amount:      Mapped[float]      = mapped_column(Float)
     price:       Mapped[float]      = mapped_column(Float)
-    pnl:         Mapped[float|None] = mapped_column(Float, nullable=True)
+    pnl:         Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     timestamp:   Mapped[str]        = mapped_column(String)
 
     snapshot: Mapped["ForexBotSnapshot"] = relationship("ForexBotSnapshot", back_populates="trades")
@@ -278,12 +278,12 @@ class SupportTicket(Base):
     subject:          Mapped[str]           = mapped_column(String)
     message:          Mapped[str]           = mapped_column(Text)
     status:           Mapped[str]           = mapped_column(String, default="open")  # open / answered / closed
-    replied_at:       Mapped[datetime|None] = mapped_column(DateTime, nullable=True, default=None)
-    investor_read_at: Mapped[datetime|None] = mapped_column(DateTime, nullable=True, default=None)
+    replied_at:       Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+    investor_read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
     created_at:       Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)
 
     user:    Mapped["User"]               = relationship("User")
-    replies: Mapped[list["SupportReply"]] = relationship("SupportReply", back_populates="ticket", cascade="all, delete-orphan")
+    replies: Mapped[List["SupportReply"]] = relationship("SupportReply", back_populates="ticket", cascade="all, delete-orphan")
 
 
 class SupportReply(Base):
