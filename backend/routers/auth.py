@@ -1387,6 +1387,75 @@ async def reject_deposit(request_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "rejected"}
 
 
+class DepositFromPoolPayload(BaseModel):
+    user_id: str
+    amount: float
+
+@router.post("/admin/deposit-from-pool", dependencies=[Depends(get_admin_user)])
+async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = Depends(get_db)):
+    """
+    Пополнение депозита пользователя из средств пула (деньги уже в пуле).
+    Регистрирует вклад без увеличения balance_usdt снапшота.
+    Это гарантирует, что PnL% пула не изменится после операции.
+    """
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+
+    # Вычисляем текущий PnL% пула ДО пополнения (для миграции прибыли)
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    if snap:
+        positions = (await db.execute(
+            select(Position).where(Position.snapshot_id == snap.id)
+        )).scalars().all()
+        pool_total = snap.balance_usdt + sum(
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
+        )
+        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+        total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+        ref = start + total_inv - total_wd
+        if ref <= 0:
+            ref = snap.net_invested if snap.net_invested > 0 else start
+        current_pnl_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+    else:
+        current_pnl_pct = 0.0
+
+    # Фиксируем текущую прибыль ВСЕХ инвесторов (чтобы новый депозит не размыл их прибыль)
+    await _migrate_pnl_internal(db, override_crypto_pct=current_pnl_pct)
+
+    # Добавляем депозит в UserFinancials (без изменения balance в пуле!)
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == payload.user_id))).scalar_one_or_none()
+    if fin:
+        fin.investment_usdt += payload.amount
+        fin.entry_pool_pnl_pct = current_pnl_pct
+        fin.updated_at = datetime.utcnow()
+    else:
+        db.add(UserFinancials(
+            user_id=payload.user_id,
+            investment_usdt=payload.amount,
+            entry_pool_pnl_pct=current_pnl_pct,
+        ))
+
+    # Увеличиваем net_invested в снапшоте (это учётная база для PnL%),
+    # но НЕ трогаем balance_usdt (деньги уже там физически)
+    if snap:
+        snap.net_invested += payload.amount
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "user_id": payload.user_id,
+        "amount": payload.amount,
+        "entry_pct": current_pnl_pct,
+        "note": "Депозит зарегистрирован. balance_usdt пула не изменён (деньги уже в пуле)."
+    }
+
+
+
 # ── Заявки на вывод средств ────────────────────────────────────
 
 @router.post("/withdrawals/request")

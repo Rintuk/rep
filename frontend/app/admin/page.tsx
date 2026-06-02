@@ -16,7 +16,7 @@ import {
   cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare, setUserReferrer, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
-  silentWithdraw, revertSilentWithdraw,
+  silentWithdraw, revertSilentWithdraw, depositFromPool,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -1295,6 +1295,37 @@ export default function AdminPage() {
                                             <Save size={13} />{savingId === u.id ? "Сохранение..." : "Сохранить крипто"}
                                           </button>
                                           {saveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: saveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{saveMsg[u.id]}</span>}
+                                        </div>
+                                        {/* Пополнение из пула */}
+                                        <div style={{ marginTop: 14, padding: 12, borderRadius: 8, background: "rgba(34,201,122,0.05)", border: "1px solid rgba(34,201,122,0.2)" }}>
+                                          <p style={{ color: "#22c97a", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>💰 Пополнить из средств пула (Крипто)</p>
+                                          <p style={{ color: "#888", fontSize: 11, marginBottom: 10 }}>Деньги уже физически в пуле. Только регистрирует вклад в базе, не меняет баланс пула.</p>
+                                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                            <input type="number" id={`pool-deposit-${u.id}`}
+                                              placeholder="Сумма USDT..."
+                                              style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                                                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(34,201,122,0.3)",
+                                                color: "#fff", outline: "none" }} />
+                                            <button
+                                              onClick={async () => {
+                                                const inp = document.getElementById(`pool-deposit-${u.id}`) as HTMLInputElement;
+                                                const amt = parseFloat(inp?.value || "0");
+                                                if (!amt || isNaN(amt) || amt <= 0) return alert("Введите корректную сумму");
+                                                if (!confirm(`Пополнить депозит ${u.email} на ${amt} $ из пула? Баланс пула не изменится.`)) return;
+                                                try {
+                                                  const r = await depositFromPool(u.id, amt);
+                                                  alert(`✅ Готово! Депозит зарегистрирован. entry_pct: ${r.entry_pct}%`);
+                                                  if (inp) inp.value = "";
+                                                  fetchData();
+                                                } catch (e: any) {
+                                                  alert("Ошибка: " + (e?.response?.data?.detail || e.message));
+                                                }
+                                              }}
+                                              style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
+                                                background: "rgba(34,201,122,0.6)", color: "#fff", cursor: "pointer" }}>
+                                              Пополнить из пула
+                                            </button>
+                                          </div>
                                         </div>
                                       </div>
                                     ) : (

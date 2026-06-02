@@ -434,3 +434,8 @@ export async function revertSilentWithdraw(pool: string, decreased_base_by: numb
   const res = await api.post("/auth/admin/revert-silent-withdraw", { pool, decreased_base_by });
   return res.data;
 }
+
+export async function depositFromPool(user_id: string, amount: number) {
+  const res = await api.post("/auth/admin/deposit-from-pool", { user_id, amount });
+  return res.data;
+}
