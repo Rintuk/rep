@@ -425,6 +425,11 @@ export async function fixBrokenEntryPoints() {
   return res.data;
 }
 
+export async function lockReferralBaseline() {
+  const res = await api.post("/auth/admin/lock-referral-baseline");
+  return res.data;
+}
+
 export async function setStatusOverride(userId: string, status: string | null) {
   const res = await api.patch(`/auth/admin/status-override/${userId}`, null, {
     params: { status: status || "NONE" }

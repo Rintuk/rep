@@ -49,6 +49,10 @@ class UserFinancials(Base):
     # Зафиксированный исторический реферальный доход
     locked_crypto_ref_bonus: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     locked_forex_ref_bonus:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    # Смещение gross для реф-формулы: компенсирует отрицательный флоатинг
+    # чтобы апплайнеры видели старые бонусы и рост от текущего уровня пула
+    crypto_ref_gross_offset: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    forex_ref_gross_offset:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     custom_investor_share:   Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
 
     note:       Mapped[str]      = mapped_column(Text, default="")

@@ -14,7 +14,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
+  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, lockReferralBaseline, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool,
@@ -218,6 +218,8 @@ export default function AdminPage() {
   const [diagResult, setDiagResult] = useState<any>(null);
   const [fixLoading, setFixLoading] = useState(false);
   const [fixResult, setFixResult] = useState<any>(null);
+  const [baselineLoading, setBaselineLoading] = useState(false);
+  const [baselineResult, setBaselineResult] = useState<any>(null);
 
   const [silentWAmount, setSilentWAmount] = useState("");
   const [silentWLoading, setSilentWLoading] = useState(false);
@@ -506,6 +508,19 @@ export default function AdminPage() {
       setDiagResult({ error: "Ошибка запроса" });
     } finally {
       setDiagLoading(false);
+    }
+  }
+
+  async function handleLockReferralBaseline() {
+    if (!confirm("Зафиксировать текущие рефбонусы как базу и начать рост от текущего уровня пула?")) return;
+    setBaselineLoading(true); setBaselineResult(null);
+    try {
+      const r = await lockReferralBaseline();
+      setBaselineResult(r);
+    } catch {
+      setBaselineResult({ error: "Ошибка" });
+    } finally {
+      setBaselineLoading(false);
     }
   }
 
@@ -1128,6 +1143,27 @@ export default function AdminPage() {
                         : <p style={{ color: "#22c97a" }}>✅ Исправлено инвесторов: {fixResult.fixed_count}. Нажми «Проверить» чтобы убедиться.</p>
                       }
                     </div>
+                  )}
+                </div>
+
+                {/* Зафиксировать рефбонусы как базу */}
+                <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,153,68,0.3)", marginTop: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <p style={{ color: "#ff9944", fontSize: 13, fontWeight: 600 }}>📌 Зафиксировать базу рефбонусов</p>
+                      <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Сохраняет текущие значения бонусов и включает рост от текущего уровня пула. Запускать один раз.</p>
+                    </div>
+                    <button onClick={handleLockReferralBaseline} disabled={baselineLoading}
+                      style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                        background: "rgba(68,34,13,0.8)", color: "#ff9944", cursor: "pointer",
+                        border: "1px solid rgba(255,153,68,0.3)", opacity: baselineLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                      {baselineLoading ? "..." : "Зафиксировать"}
+                    </button>
+                  </div>
+                  {baselineResult && (
+                    <p style={{ marginTop: 8, fontSize: 12, color: baselineResult.error ? "#ff6b6b" : "#22c97a" }}>
+                      {baselineResult.error ? `Ошибка: ${baselineResult.error}` : `✅ Обновлено инвесторов: ${baselineResult.updated_count}`}
+                    </p>
                   )}
                 </div>
 

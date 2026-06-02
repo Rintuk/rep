@@ -1079,6 +1079,51 @@ async def revert_entry_points_hotfix(db: AsyncSession = Depends(get_db)):
     return {"status": "reverted", "count": len(restored), "restored": restored}
 
 
+@router.post("/admin/lock-referral-baseline", dependencies=[Depends(get_admin_user)])
+async def lock_referral_baseline(db: AsyncSession = Depends(get_db)):
+    """
+    Фиксирует базовые значения рефбонусов для инвесторов у которых entry > pool_pct.
+    Сохраняет смещение gross в crypto_ref_gross_offset / forex_ref_gross_offset,
+    чтобы апплайнеры видели старые бонусы и рост от текущего уровня пула.
+    Запускать ОДИН РАЗ после пополнений с пула.
+    """
+    from routers.forex import _get_forex_pool_pnl_pct
+
+    crypto_pct = await _get_pool_pnl_pct(db)
+    forex_pct  = await _get_forex_pool_pnl_pct(db)
+
+    all_fins  = (await db.execute(select(UserFinancials))).scalars().all()
+    all_users = (await db.execute(select(User))).scalars().all()
+    user_map  = {u.id: u.email for u in all_users}
+
+    updated = []
+    for f in all_fins:
+        email = user_map.get(f.user_id, f.user_id)
+        changed = False
+
+        if (f.investment_usdt > 0
+                and f.entry_pool_pnl_pct > crypto_pct
+                and f.locked_crypto_pnl > 0):
+            delta = f.investment_usdt * (f.entry_pool_pnl_pct - crypto_pct) / 100
+            f.crypto_ref_gross_offset = round(delta, 4)
+            changed = True
+
+        if (f.forex_investment_usdt > 0
+                and f.forex_entry_pool_pnl_pct > forex_pct
+                and f.locked_forex_pnl > 0):
+            delta = f.forex_investment_usdt * (f.forex_entry_pool_pnl_pct - forex_pct) / 100
+            f.forex_ref_gross_offset = round(delta, 4)
+            changed = True
+
+        if changed:
+            updated.append({"email": email,
+                            "crypto_offset": getattr(f, "crypto_ref_gross_offset", 0),
+                            "forex_offset":  getattr(f, "forex_ref_gross_offset", 0)})
+
+    await db.commit()
+    return {"status": "success", "updated_count": len(updated), "updated": updated}
+
+
 @router.post("/admin/fix-broken-entry-points", dependencies=[Depends(get_admin_user)])
 async def fix_broken_entry_points(db: AsyncSession = Depends(get_db)):
     """
