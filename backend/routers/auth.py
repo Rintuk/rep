@@ -12,9 +12,10 @@ from constants import INVESTOR_SHARE, get_investor_share, POOL_FEE, REF_FEES, ST
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-async def _get_pool_pnl_pct(db: AsyncSession) -> float:
+async def _get_pool_pnl_pct(db: AsyncSession, extra_investment: float = 0.0) -> float:
     """Текущий PnL% пула — использует реальный net_invested из БД (депозиты инвесторов),
-    чтобы пополнения не отображались как прибыль."""
+    чтобы пополнения не отображались как прибыль.
+    extra_investment — виртуальная добавка к total_inv для расчёта post-update pct."""
     snap = (await db.execute(
         select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
@@ -30,7 +31,7 @@ async def _get_pool_pnl_pct(db: AsyncSession) -> float:
     start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
     total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
     total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-    ref = start + total_inv - total_wd
+    ref = start + total_inv + extra_investment - total_wd
     if ref <= 0:
         ref = snap.net_invested if snap.net_invested > 0 else start
     return round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
@@ -340,36 +341,44 @@ async def update_user_financials(
     old_inv = fin.investment_usdt if fin else 0.0
     old_wd  = fin.withdrawal_usdt if fin else 0.0
 
-    current_pnl_pct = await _get_pool_pnl_pct(db)
+    # PnL пула ДО изменения — используется для фиксации плавающей прибыли инвестора
+    pre_pnl_pct = await _get_pool_pnl_pct(db)
 
     if fin:
         if investment_usdt > 0 and old_inv != investment_usdt:
+            delta = investment_usdt - old_inv
+            # PnL пула ПОСЛЕ изменения: ref вырастет на delta, поэтому pct упадёт.
+            # Именно этот pct должен стать новой точкой входа,
+            # чтобы floating_pnl сразу после операции был = 0.
+            post_pnl_pct = await _get_pool_pnl_pct(db, extra_investment=delta)
+
             if old_inv <= 0:
-                # Новый инвестор — стартует с текущего уровня пула
-                fin.entry_pool_pnl_pct = current_pnl_pct
+                # Новый инвестор — сразу ставим post-update точку входа
+                fin.entry_pool_pnl_pct = post_pnl_pct
             elif investment_usdt > old_inv:
-                # Существующий инвестор добавляет — сначала фиксируем плавающую прибыль,
-                # потом сбрасываем точку входа на текущий PnL.
-                # Это гарантирует что 509$ новых зарабатывают только вперёд,
-                # а старая прибыль не пересчитывается на увеличенную сумму.
-                incr = current_pnl_pct - fin.entry_pool_pnl_pct
+                # Существующий инвестор пополняется с пула:
+                # 1. Фиксируем накопленную прибыль на СТАРУЮ сумму по PRE pct
+                incr = pre_pnl_pct - fin.entry_pool_pnl_pct
                 if incr > 0:
                     gross = old_inv * (incr / 100)
                     user_profit = round(gross * get_investor_share(fin), 2)
                     if user_profit > 0:
                         fin.locked_crypto_pnl += user_profit
-                fin.entry_pool_pnl_pct = current_pnl_pct
+                # 2. Точку входа ставим на POST-update pct — профит с нуля на новую сумму
+                fin.entry_pool_pnl_pct = post_pnl_pct
         fin.investment_usdt = investment_usdt
         fin.withdrawal_usdt = withdrawal_usdt
         fin.note = note
         fin.updated_at = datetime.utcnow()
     else:
+        delta = investment_usdt
+        post_pnl_pct = await _get_pool_pnl_pct(db, extra_investment=delta) if investment_usdt > 0 else 0.0
         db.add(UserFinancials(
             user_id=user_id,
             investment_usdt=investment_usdt,
             withdrawal_usdt=withdrawal_usdt,
             note=note,
-            entry_pool_pnl_pct=current_pnl_pct if investment_usdt > 0 else 0.0,
+            entry_pool_pnl_pct=post_pnl_pct,
         ))
 
     await db.commit()
@@ -988,6 +997,65 @@ async def emergency_fix_exact_193(db: AsyncSession = Depends(get_db)):
                 
     await db.commit()
     return {"status": "success", "updated": updated, "new_pct": current_pct, "applied_profits": correct_profits}
+
+@router.get("/admin/diag-entry-points", dependencies=[Depends(get_admin_user)])
+async def diag_entry_points(db: AsyncSession = Depends(get_db)):
+    """
+    READ-ONLY диагностика: показывает инвесторов у которых entry_pool_pnl_pct
+    выше текущего pool_pnl_pct пула. Такие инвесторы имеют отрицательную
+    плавающую прибыль и их апплайнеры видят стагнирующий реферальный бонус.
+    Ничего не изменяет.
+    """
+    from routers.forex import _get_forex_pool_pnl_pct
+
+    crypto_pct = await _get_pool_pnl_pct(db)
+    forex_pct  = await _get_forex_pool_pnl_pct(db)
+
+    all_fins  = (await db.execute(select(UserFinancials))).scalars().all()
+    all_users = (await db.execute(select(User))).scalars().all()
+    user_map  = {u.id: u.email for u in all_users}
+
+    broken_crypto = []
+    broken_forex  = []
+
+    for f in all_fins:
+        email = user_map.get(f.user_id, f.user_id)
+
+        if f.investment_usdt > 0 and f.entry_pool_pnl_pct > crypto_pct:
+            gap = round(f.entry_pool_pnl_pct - crypto_pct, 4)
+            phantom_gross = f.investment_usdt * (gap / 100)
+            broken_crypto.append({
+                "email":          email,
+                "investment":     f.investment_usdt,
+                "entry_pct":      f.entry_pool_pnl_pct,
+                "current_pct":    crypto_pct,
+                "gap_pct":        gap,
+                "phantom_gross":  round(phantom_gross, 2),
+                "locked_pnl":     f.locked_crypto_pnl,
+            })
+
+        if f.forex_investment_usdt > 0 and f.forex_entry_pool_pnl_pct > forex_pct:
+            gap = round(f.forex_entry_pool_pnl_pct - forex_pct, 4)
+            phantom_gross = f.forex_investment_usdt * (gap / 100)
+            broken_forex.append({
+                "email":          email,
+                "forex_investment": f.forex_investment_usdt,
+                "entry_pct":      f.forex_entry_pool_pnl_pct,
+                "current_pct":    forex_pct,
+                "gap_pct":        gap,
+                "phantom_gross":  round(phantom_gross, 2),
+                "locked_forex_pnl": f.locked_forex_pnl,
+            })
+
+    return {
+        "current_crypto_pool_pct": crypto_pct,
+        "current_forex_pool_pct":  forex_pct,
+        "broken_crypto_count":     len(broken_crypto),
+        "broken_forex_count":      len(broken_forex),
+        "broken_crypto":           sorted(broken_crypto, key=lambda x: x["gap_pct"], reverse=True),
+        "broken_forex":            sorted(broken_forex,  key=lambda x: x["gap_pct"], reverse=True),
+    }
+
 
 class SetProfitPayload(BaseModel):
     email: str
