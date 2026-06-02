@@ -336,43 +336,41 @@ async def update_user_financials(
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    current_pnl_pct = await _get_pool_pnl_pct(db)
-
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
+    old_inv = fin.investment_usdt if fin else 0.0
+    old_wd  = fin.withdrawal_usdt if fin else 0.0
+
+    # Сначала обновляем net_invested — чтобы entry_pct считался по ИТОГОВОМУ PnL пула.
+    net_delta = (investment_usdt - old_inv) - (withdrawal_usdt - old_wd)
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if snap and net_delta != 0:
+        snap.net_invested = round(snap.net_invested + net_delta, 4)
+
+    # PnL пула ПОСЛЕ изменения net_invested — правильная точка входа.
+    post_pnl_pct = await _get_pool_pnl_pct(db) if snap else 0.0
+
     if fin:
-        old_inv = fin.investment_usdt
-        old_wd  = fin.withdrawal_usdt
         if investment_usdt > 0 and old_inv != investment_usdt:
             if old_inv <= 0:
-                fin.entry_pool_pnl_pct = current_pnl_pct
+                fin.entry_pool_pnl_pct = post_pnl_pct
             elif investment_usdt > old_inv:
                 fin.entry_pool_pnl_pct = round(
-                    (old_inv * fin.entry_pool_pnl_pct + (investment_usdt - old_inv) * current_pnl_pct) / investment_usdt, 4
+                    (old_inv * fin.entry_pool_pnl_pct + (investment_usdt - old_inv) * post_pnl_pct) / investment_usdt, 4
                 )
         fin.investment_usdt = investment_usdt
         fin.withdrawal_usdt = withdrawal_usdt
         fin.note = note
         fin.updated_at = datetime.utcnow()
     else:
-        old_inv = 0.0
-        old_wd  = 0.0
         db.add(UserFinancials(
             user_id=user_id,
             investment_usdt=investment_usdt,
             withdrawal_usdt=withdrawal_usdt,
             note=note,
-            entry_pool_pnl_pct=current_pnl_pct if investment_usdt > 0 else 0.0,
+            entry_pool_pnl_pct=post_pnl_pct if investment_usdt > 0 else 0.0,
         ))
-
-    # Синхронизируем net_invested в снапшоте чтобы PnL пула отображался правильно.
-    # Используем дельту: не перезаписываем всё значение, а сдвигаем на изменение.
-    net_delta = (investment_usdt - old_inv) - (withdrawal_usdt - old_wd)
-    if net_delta != 0:
-        snap = (await db.execute(
-            select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
-        )).scalar_one_or_none()
-        if snap:
-            snap.net_invested = round(snap.net_invested + net_delta, 4)
 
     await db.commit()
     return {"status": "ok"}

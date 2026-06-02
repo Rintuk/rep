@@ -216,18 +216,31 @@ async def update_user_forex_financials(
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    current_pnl_pct = await _get_forex_pool_pnl_pct(db)
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
+    old_inv = fin.forex_investment_usdt if fin else 0.0
+    old_wd  = fin.forex_withdrawal_usdt if fin else 0.0
+
+    # Сначала обновляем net_invested — чтобы entry_pct считался по ИТОГОВОМУ PnL пула,
+    # а не по завышенному (деньги инвестора уже в балансе, но ещё не в базе учёта).
+    net_delta = (forex_investment_usdt - old_inv) - (forex_withdrawal_usdt - old_wd)
+    fsnap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if fsnap and net_delta != 0:
+        fsnap.net_invested = round(fsnap.net_invested + net_delta, 4)
+
+    # PnL пула ПОСЛЕ изменения net_invested — это правильная точка входа.
+    post_pnl_pct = await _get_forex_pool_pnl_pct(db) if fsnap else 0.0
 
     if fin:
-        old_inv = fin.forex_investment_usdt
-        old_wd  = fin.forex_withdrawal_usdt
         if forex_investment_usdt > 0 and old_inv != forex_investment_usdt:
             if old_inv <= 0:
-                fin.forex_entry_pool_pnl_pct = current_pnl_pct
+                # Новый инвестор — стартует с текущего (post) PnL, зарабатывает вперёд
+                fin.forex_entry_pool_pnl_pct = post_pnl_pct
             elif forex_investment_usdt > old_inv:
+                # Добавляет к существующей позиции — взвешенное среднее
                 fin.forex_entry_pool_pnl_pct = round(
-                    (old_inv * fin.forex_entry_pool_pnl_pct + (forex_investment_usdt - old_inv) * current_pnl_pct)
+                    (old_inv * fin.forex_entry_pool_pnl_pct + (forex_investment_usdt - old_inv) * post_pnl_pct)
                     / forex_investment_usdt, 4
                 )
         fin.forex_investment_usdt = forex_investment_usdt
@@ -235,24 +248,13 @@ async def update_user_forex_financials(
         fin.note = note
         fin.updated_at = datetime.utcnow()
     else:
-        old_inv = 0.0
-        old_wd  = 0.0
         db.add(UserFinancials(
             user_id=user_id,
             forex_investment_usdt=forex_investment_usdt,
             forex_withdrawal_usdt=forex_withdrawal_usdt,
             note=note,
-            forex_entry_pool_pnl_pct=current_pnl_pct if forex_investment_usdt > 0 else 0.0,
+            forex_entry_pool_pnl_pct=post_pnl_pct if forex_investment_usdt > 0 else 0.0,
         ))
-
-    # Синхронизируем net_invested форекс-снапшота чтобы PnL пула отображался правильно.
-    net_delta = (forex_investment_usdt - old_inv) - (forex_withdrawal_usdt - old_wd)
-    if net_delta != 0:
-        fsnap = (await db.execute(
-            select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
-        )).scalar_one_or_none()
-        if fsnap:
-            fsnap.net_invested = round(fsnap.net_invested + net_delta, 4)
 
     await db.commit()
     return {"status": "ok"}
