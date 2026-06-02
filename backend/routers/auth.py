@@ -555,7 +555,9 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
 
     # Собственный капитал администратора = всё что в пуле минус деньги инвесторов
     admin_own_capital = round(max(net_invested_pool - total_invested, 0.0), 2)
-    admin_own_pnl = round(admin_own_capital * (pool_pnl_pct / 100), 2) if admin_own_capital > 0 else 0.0
+    admin_own_pnl = round(pool_pnl_usdt - pool_profit - admin_income, 2)
+    if admin_own_pnl < 0 and admin_own_capital <= 0:
+        admin_own_pnl = 0.0
     admin_total_income = round(admin_income + admin_own_pnl, 2)
 
     return {

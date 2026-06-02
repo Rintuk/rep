@@ -145,8 +145,13 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         })
 
     admin_income = round(total_admin_pnl, 2) if total_admin_pnl > 0 else 0.0
-    admin_own_capital = round(max(net_invested_pool - total_invested, 0.0), 2)
-    admin_own_pnl = round(admin_own_capital * (pool_pnl_pct / 100), 2) if admin_own_capital > 0 else 0.0
+    admin_own_capital = round(net_invested_pool - total_user_capital, 2)
+    # Admin profit
+    # Рассчитываем профит админа как остаток от общей прибыли пула, чтобы избежать математических дыр
+    # при размытии пула (когда net_invested меняется, а у админа нет фиксированной точки входа)
+    admin_own_pnl = round(pool_pnl_usdt - total_gross_pnl - admin_income, 2)
+    if admin_own_pnl < 0 and admin_own_capital <= 0:
+        admin_own_pnl = 0.0
 
     return {
         "pool_total": round(pool_total, 2),
