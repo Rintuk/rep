@@ -1586,9 +1586,9 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
         if ref <= 0:
             ref = snap.net_invested if snap.net_invested > 0 else start
 
-        # Истинный PnL пула ДО депозита: вычитаем сумму, уже физически в пуле,
-        # чтобы она не считалась прибылью при расчёте прибыли существующих инвесторов.
-        pool_total_for_pnl = pool_total - payload.amount
+        # Истинный PnL пула ДО депозита: так как админ использует это для перевода своей прибыли,
+        # сумма уже является частью pool_total как прибыль. Не вычитаем её!
+        pool_total_for_pnl = pool_total
         current_pnl_pct = round((pool_total_for_pnl - ref) / ref * 100, 4) if ref > 0 else 0.0
 
         # PnL пула ПОСЛЕ регистрации депозита (ref вырастет на payload.amount, pool_total не меняется).
@@ -1654,8 +1654,9 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
         fx_ref = forex_snap.net_invested if forex_snap.net_invested > 0 else (
             forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
         )
-        # Истинный PnL ДО депозита: вычитаем уже физически внесённые деньги.
-        adjusted_forex_balance = forex_snap.balance_usdt - payload.amount
+        # Истинный PnL ДО депозита: так как админ использует это для перевода своей прибыли,
+        # сумма уже является частью balance_usdt как прибыль. Не вычитаем её!
+        adjusted_forex_balance = forex_snap.balance_usdt
         current_forex_pct = round((adjusted_forex_balance - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
 
         # PnL ПОСЛЕ регистрации: fx_ref вырастет на payload.amount, баланс не изменится.
