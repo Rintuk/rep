@@ -340,22 +340,22 @@ async def update_user_financials(
 
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
     if fin:
-        # Взвешенная точка входа при изменении суммы инвестиции
         old_inv = fin.investment_usdt
+        old_wd  = fin.withdrawal_usdt
         if investment_usdt > 0 and old_inv != investment_usdt:
             if old_inv <= 0:
                 fin.entry_pool_pnl_pct = current_pnl_pct
             elif investment_usdt > old_inv:
-                # Взвешенная точка входа только при увеличении суммы
                 fin.entry_pool_pnl_pct = round(
                     (old_inv * fin.entry_pool_pnl_pct + (investment_usdt - old_inv) * current_pnl_pct) / investment_usdt, 4
                 )
-            # При уменьшении суммы — точку входа не меняем
         fin.investment_usdt = investment_usdt
         fin.withdrawal_usdt = withdrawal_usdt
         fin.note = note
         fin.updated_at = datetime.utcnow()
     else:
+        old_inv = 0.0
+        old_wd  = 0.0
         db.add(UserFinancials(
             user_id=user_id,
             investment_usdt=investment_usdt,
@@ -363,6 +363,17 @@ async def update_user_financials(
             note=note,
             entry_pool_pnl_pct=current_pnl_pct if investment_usdt > 0 else 0.0,
         ))
+
+    # Синхронизируем net_invested в снапшоте чтобы PnL пула отображался правильно.
+    # Используем дельту: не перезаписываем всё значение, а сдвигаем на изменение.
+    net_delta = (investment_usdt - old_inv) - (withdrawal_usdt - old_wd)
+    if net_delta != 0:
+        snap = (await db.execute(
+            select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+        )).scalar_one_or_none()
+        if snap:
+            snap.net_invested = round(snap.net_invested + net_delta, 4)
+
     await db.commit()
     return {"status": "ok"}
 
