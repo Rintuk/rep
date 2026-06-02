@@ -1057,6 +1057,28 @@ async def diag_entry_points(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/admin/revert-entry-points-hotfix", dependencies=[Depends(get_admin_user)])
+async def revert_entry_points_hotfix(db: AsyncSession = Depends(get_db)):
+    """Экстренный откат: восстанавливает forex_entry_pool_pnl_pct к значениям до fix-broken-entry-points."""
+    restore_map = {
+        "sanekkushnarenko777@gmail.com": 25.0712,
+        "kushnar080868@mail.ru":         25.0712,
+        "maksimsegolev6@gmail.com":      25.0712,
+        "aleko_k@inbox.ru":              25.0712,
+        "melyarus085@gmail.com":         17.3711,
+    }
+    restored = []
+    for email, entry_pct in restore_map.items():
+        user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if user:
+            fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user.id))).scalar_one_or_none()
+            if fin:
+                fin.forex_entry_pool_pnl_pct = entry_pct
+                restored.append({"email": email, "restored_entry_pct": entry_pct})
+    await db.commit()
+    return {"status": "reverted", "count": len(restored), "restored": restored}
+
+
 @router.post("/admin/fix-broken-entry-points", dependencies=[Depends(get_admin_user)])
 async def fix_broken_entry_points(db: AsyncSession = Depends(get_db)):
     """
