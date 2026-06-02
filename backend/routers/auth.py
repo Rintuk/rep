@@ -1455,6 +1455,60 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
     }
 
 
+@router.post("/admin/forex-deposit-from-pool", dependencies=[Depends(get_admin_user)])
+async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = Depends(get_db)):
+    """
+    Пополнение Форекс-депозита пользователя из средств пула (деньги уже в пуле).
+    Регистрирует вклад без увеличения balance_usdt форекс-снапшота.
+    """
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+
+    # Текущий PnL% форекс пула
+    forex_snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    if forex_snap:
+        fx_ref = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+            forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
+        )
+        current_forex_pct = round((forex_snap.balance_usdt - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
+    else:
+        current_forex_pct = 0.0
+
+    # Фиксируем прибыль всех инвесторов
+    await _migrate_pnl_internal(db, override_forex_pct=current_forex_pct)
+
+    # Добавляем форекс-депозит в UserFinancials (без изменения баланса в пуле!)
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == payload.user_id))).scalar_one_or_none()
+    if fin:
+        fin.forex_investment_usdt += payload.amount
+        fin.forex_entry_pool_pnl_pct = current_forex_pct
+        fin.updated_at = datetime.utcnow()
+    else:
+        db.add(UserFinancials(
+            user_id=payload.user_id,
+            forex_investment_usdt=payload.amount,
+            forex_entry_pool_pnl_pct=current_forex_pct,
+        ))
+
+    # Увеличиваем net_invested в форекс-снапшоте,
+    # но НЕ трогаем balance_usdt (деньги уже там физически)
+    if forex_snap:
+        forex_snap.net_invested += payload.amount
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "user_id": payload.user_id,
+        "amount": payload.amount,
+        "entry_pct": current_forex_pct,
+        "note": "Форекс-депозит зарегистрирован. balance_usdt пула не изменён (деньги уже в пуле)."
+    }
+
+
 
 # ── Заявки на вывод средств ────────────────────────────────────
 

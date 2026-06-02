@@ -439,3 +439,8 @@ export async function depositFromPool(user_id: string, amount: number) {
   const res = await api.post("/auth/admin/deposit-from-pool", { user_id, amount });
   return res.data;
 }
+
+export async function depositForexFromPool(user_id: string, amount: number) {
+  const res = await api.post("/auth/admin/forex-deposit-from-pool", { user_id, amount });
+  return res.data;
+}
