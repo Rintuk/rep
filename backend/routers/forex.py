@@ -220,27 +220,32 @@ async def update_user_forex_financials(
     old_inv = fin.forex_investment_usdt if fin else 0.0
     old_wd  = fin.forex_withdrawal_usdt if fin else 0.0
 
-    # Сначала обновляем net_invested — чтобы entry_pct считался по ИТОГОВОМУ PnL пула,
-    # а не по завышенному (деньги инвестора уже в балансе, но ещё не в базе учёта).
-    net_delta = (forex_investment_usdt - old_inv) - (forex_withdrawal_usdt - old_wd)
+    inv_delta = forex_investment_usdt - old_inv
+    wd_delta  = forex_withdrawal_usdt - old_wd
+    net_delta = inv_delta - wd_delta
+
+    # Вычисляем post_pnl вручную используя delta, не перечитывая SUM из БД.
     fsnap = (await db.execute(
         select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
-    if fsnap and net_delta != 0:
-        fsnap.net_invested = round(fsnap.net_invested + net_delta, 4)
-
-    # PnL пула ПОСЛЕ изменения net_invested — это правильная точка входа.
-    post_pnl_pct = await _get_forex_pool_pnl_pct(db) if fsnap else 0.0
+    post_pnl_pct = 0.0
+    if fsnap:
+        fx_ref_old = fsnap.net_invested if fsnap.net_invested > 0 else (
+            fsnap.real_start_balance if fsnap.real_start_balance > 0 else fsnap.hwm
+        )
+        fx_ref_post = fx_ref_old + net_delta
+        if fx_ref_post > 0:
+            post_pnl_pct = round((fsnap.balance_usdt - fx_ref_post) / fx_ref_post * 100, 4)
+        if net_delta != 0:
+            fsnap.net_invested = round(fx_ref_old + net_delta, 4)
 
     if fin:
         if forex_investment_usdt > 0 and old_inv != forex_investment_usdt:
             if old_inv <= 0:
-                # Новый инвестор — стартует с текущего (post) PnL, зарабатывает вперёд
                 fin.forex_entry_pool_pnl_pct = post_pnl_pct
             elif forex_investment_usdt > old_inv:
-                # Добавляет к существующей позиции — взвешенное среднее
                 fin.forex_entry_pool_pnl_pct = round(
-                    (old_inv * fin.forex_entry_pool_pnl_pct + (forex_investment_usdt - old_inv) * post_pnl_pct)
+                    (old_inv * fin.forex_entry_pool_pnl_pct + inv_delta * post_pnl_pct)
                     / forex_investment_usdt, 4
                 )
         fin.forex_investment_usdt = forex_investment_usdt
