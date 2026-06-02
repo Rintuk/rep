@@ -415,6 +415,11 @@ export async function migratePnL() {
   return res.data;
 }
 
+export async function diagEntryPoints() {
+  const res = await api.get("/auth/admin/diag-entry-points");
+  return res.data;
+}
+
 export async function setStatusOverride(userId: string, status: string | null) {
   const res = await api.patch(`/auth/admin/status-override/${userId}`, null, {
     params: { status: status || "NONE" }

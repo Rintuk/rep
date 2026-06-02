@@ -14,7 +14,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
+  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool,
@@ -214,6 +214,8 @@ export default function AdminPage() {
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [migrateLoading, setMigrateLoading] = useState(false);
   const [migrateMsg, setMigrateMsg] = useState<string | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagResult, setDiagResult] = useState<any>(null);
 
   const [silentWAmount, setSilentWAmount] = useState("");
   const [silentWLoading, setSilentWLoading] = useState(false);
@@ -490,6 +492,18 @@ export default function AdminPage() {
       setMigrateMsg("Ошибка миграции");
     } finally {
       setMigrateLoading(false);
+    }
+  }
+
+  async function handleDiagEntryPoints() {
+    setDiagLoading(true); setDiagResult(null);
+    try {
+      const r = await diagEntryPoints();
+      setDiagResult(r);
+    } catch {
+      setDiagResult({ error: "Ошибка запроса" });
+    } finally {
+      setDiagLoading(false);
     }
   }
 
@@ -1029,6 +1043,62 @@ export default function AdminPage() {
                       background: "rgba(68,34,13,0.8)", color: "#ff9944", cursor: "pointer", border: "1px solid rgba(255,153,68,0.3)", opacity: migrateLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
                     {migrateLoading ? "..." : "Запустить миграцию"}
                   </button>
+                </div>
+
+                {/* Диагностика точек входа */}
+                <div style={{ padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(100,180,255,0.3)", marginTop: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <p style={{ color: "#64b4ff", fontSize: 13, fontWeight: 600 }}>🔍 Диагностика точек входа (рефбонусы)</p>
+                      <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Показывает инвесторов у которых entry_pct завышен — их рефбонусы не растут.</p>
+                    </div>
+                    <button onClick={handleDiagEntryPoints} disabled={diagLoading}
+                      style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                        background: "rgba(13,34,68,0.8)", color: "#64b4ff", cursor: "pointer", border: "1px solid rgba(100,180,255,0.3)", opacity: diagLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                      {diagLoading ? "..." : "Проверить"}
+                    </button>
+                  </div>
+                  {diagResult && (
+                    <div style={{ marginTop: 12, fontSize: 12, color: muted }}>
+                      <p>Крипто пул: <b style={{ color: "#fff" }}>{diagResult.current_crypto_pool_pct}%</b> &nbsp;|&nbsp; Форекс пул: <b style={{ color: "#fff" }}>{diagResult.current_forex_pool_pct}%</b></p>
+                      {diagResult.broken_crypto_count === 0 && diagResult.broken_forex_count === 0 ? (
+                        <p style={{ color: "#22c97a", marginTop: 6 }}>✅ Всё в порядке — сломанных точек входа нет</p>
+                      ) : (
+                        <>
+                          {diagResult.broken_crypto_count > 0 && (
+                            <div style={{ marginTop: 8 }}>
+                              <p style={{ color: "#ff6b6b", fontWeight: 600 }}>❌ Крипто — сломано: {diagResult.broken_crypto_count}</p>
+                              {diagResult.broken_crypto.map((r: any, i: number) => (
+                                <div key={i} style={{ marginTop: 4, padding: "6px 10px", background: "rgba(255,60,60,0.07)", borderRadius: 6 }}>
+                                  <b style={{ color: "#fff" }}>{r.email}</b> &nbsp;
+                                  депозит: ${r.investment} &nbsp;|&nbsp;
+                                  entry: <b style={{ color: "#ff6b6b" }}>{r.entry_pct}%</b> &nbsp;→&nbsp;
+                                  текущий pct: <b style={{ color: "#22c97a" }}>{r.current_pct}%</b> &nbsp;|&nbsp;
+                                  разрыв: <b style={{ color: "#ff9944" }}>+{r.gap_pct}%</b> &nbsp;|&nbsp;
+                                  locked: ${r.locked_pnl}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {diagResult.broken_forex_count > 0 && (
+                            <div style={{ marginTop: 8 }}>
+                              <p style={{ color: "#ff6b6b", fontWeight: 600 }}>❌ Форекс — сломано: {diagResult.broken_forex_count}</p>
+                              {diagResult.broken_forex.map((r: any, i: number) => (
+                                <div key={i} style={{ marginTop: 4, padding: "6px 10px", background: "rgba(255,60,60,0.07)", borderRadius: 6 }}>
+                                  <b style={{ color: "#fff" }}>{r.email}</b> &nbsp;
+                                  депозит: ${r.forex_investment} &nbsp;|&nbsp;
+                                  entry: <b style={{ color: "#ff6b6b" }}>{r.entry_pct}%</b> &nbsp;→&nbsp;
+                                  текущий pct: <b style={{ color: "#22c97a" }}>{r.current_pct}%</b> &nbsp;|&nbsp;
+                                  разрыв: <b style={{ color: "#ff9944" }}>+{r.gap_pct}%</b> &nbsp;|&nbsp;
+                                  locked: ${r.locked_forex_pnl}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Восстановление реф. дохода */}
