@@ -1012,12 +1012,9 @@ export default function AdminPage() {
                       try {
                         const formData = new FormData();
                         formData.append("backup_file", file);
-                        const token = localStorage.getItem("access_token");
-                        const res = await fetch("https://api.makler-site.ru/api/auth/admin/restore-ref-bonus", {
-                          method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData
-                        });
-                        const data = await res.json();
-                        if (res.ok && data.status === "success") {
+                        const res = await api.post("/auth/admin/restore-ref-bonus", formData);
+                        const data = res.data;
+                        if (data.status === "success") {
                           alert("Успешно!\nОбновлено инвесторов: " + data.updated);
                           fetchData();
                         } else alert("Ошибка: " + (data.detail || JSON.stringify(data)));
