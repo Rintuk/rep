@@ -1048,28 +1048,89 @@ async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/admin/backup-db", dependencies=[Depends(get_admin_user)])
 async def backup_db(db: AsyncSession = Depends(get_db)):
-    """Создает бэкап пользователей и их финансов в формате JSON."""
+    """Полный бэкап: пользователи, финансы, пулы."""
+    from models import BotSnapshot, ForexBotSnapshot, Position, ForexPosition
     users = (await db.execute(select(User))).scalars().all()
     fins = (await db.execute(select(UserFinancials))).scalars().all()
-    
-    backup_data = []
     fins_map = {f.user_id: f for f in fins}
-    
+
+    backup_data = []
     for u in users:
         f = fins_map.get(u.id)
         backup_data.append({
-            "id": u.id, "email": u.email, "is_admin": u.is_admin, "referral_code": u.referral_code,
-            "referred_by": u.referred_by, "is_active": u.is_active,
+            # Данные пользователя
+            "id": u.id,
+            "email": u.email,
+            "nickname": u.nickname,
+            "is_admin": u.is_admin,
+            "is_active": u.is_active,
+            "referral_code": u.referral_code,
+            "referred_by": u.referred_by,
+            "referral_limit": u.referral_limit,
+            "manual_status_override": u.manual_status_override,
+            "created_at": str(u.created_at),
+            # Финансы
             "financials": {
-                "investment_usdt": f.investment_usdt if f else 0,
-                "entry_pool_pnl_pct": f.entry_pool_pnl_pct if f else 0,
-                "locked_crypto_pnl": f.locked_crypto_pnl if f else 0,
-                "forex_investment_usdt": f.forex_investment_usdt if f else 0,
-                "forex_entry_pool_pnl_pct": f.forex_entry_pool_pnl_pct if f else 0,
-                "locked_forex_pnl": f.locked_forex_pnl if f else 0
+                # Крипто пул
+                "investment_usdt": f.investment_usdt,
+                "withdrawal_usdt": f.withdrawal_usdt,
+                "entry_pool_pnl_pct": f.entry_pool_pnl_pct,
+                "locked_crypto_pnl": f.locked_crypto_pnl,
+                "locked_crypto_ref_bonus": f.locked_crypto_ref_bonus,
+                # Форекс пул
+                "forex_investment_usdt": f.forex_investment_usdt,
+                "forex_withdrawal_usdt": f.forex_withdrawal_usdt,
+                "forex_entry_pool_pnl_pct": f.forex_entry_pool_pnl_pct,
+                "locked_forex_pnl": f.locked_forex_pnl,
+                "locked_forex_ref_bonus": f.locked_forex_ref_bonus,
+                # Настройки
+                "custom_investor_share": f.custom_investor_share,
+                "note": f.note,
             } if f else None
         })
-    return {"timestamp": datetime.utcnow().isoformat(), "users_count": len(users), "data": backup_data}
+
+    # Снапшот крипто пула
+    crypto_snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    pool_crypto = None
+    if crypto_snap:
+        c_pos = (await db.execute(select(Position).where(Position.snapshot_id == crypto_snap.id))).scalars().all()
+        pool_crypto = {
+            "balance_usdt": crypto_snap.balance_usdt,
+            "net_invested": crypto_snap.net_invested,
+            "hwm": crypto_snap.hwm,
+            "real_start_balance": crypto_snap.real_start_balance,
+            "drawdown_pct": crypto_snap.drawdown_pct,
+            "timestamp": str(crypto_snap.timestamp),
+            "positions": [{"symbol": p.symbol, "amount": p.amount, "avg_price": p.avg_price, "current_price": p.current_price} for p in c_pos]
+        }
+
+    # Снапшот форекс пула
+    forex_snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    pool_forex = None
+    if forex_snap:
+        f_pos = (await db.execute(select(ForexPosition).where(ForexPosition.snapshot_id == forex_snap.id))).scalars().all()
+        pool_forex = {
+            "balance_usdt": forex_snap.balance_usdt,
+            "net_invested": forex_snap.net_invested,
+            "hwm": forex_snap.hwm,
+            "real_start_balance": forex_snap.real_start_balance,
+            "drawdown_pct": forex_snap.drawdown_pct,
+            "timestamp": str(forex_snap.timestamp),
+            "positions": [{"symbol": p.symbol, "amount": p.amount, "avg_price": p.avg_price, "current_price": p.current_price} for p in f_pos]
+        }
+
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "users_count": len(users),
+        "pool_crypto": pool_crypto,
+        "pool_forex": pool_forex,
+        "data": backup_data
+    }
+
 
 
 @router.post("/admin/migrate-pnl", dependencies=[Depends(get_admin_user)])
