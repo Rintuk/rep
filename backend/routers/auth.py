@@ -1046,7 +1046,7 @@ async def delete_user(user_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "deleted"}
 
 
-@router.get("/admin/backup-db")
+@router.get("/admin/backup-db", dependencies=[Depends(get_admin_user)])
 async def backup_db(db: AsyncSession = Depends(get_db)):
     """Создает бэкап пользователей и их финансов в формате JSON."""
     users = (await db.execute(select(User))).scalars().all()
@@ -1069,35 +1069,7 @@ async def backup_db(db: AsyncSession = Depends(get_db)):
                 "locked_forex_pnl": f.locked_forex_pnl if f else 0
             } if f else None
         })
-    pool_crypto_data = None
-    if crypto_snap:
-        pool_crypto_data = {
-            "balance_usdt": crypto_snap.balance_usdt,
-            "net_invested": crypto_snap.net_invested,
-            "hwm": crypto_snap.hwm,
-            "real_start_balance": crypto_snap.real_start_balance,
-            "timestamp": str(crypto_snap.timestamp),
-            "positions": crypto_positions
-        }
-        
-    pool_forex_data = None
-    if forex_snap:
-        pool_forex_data = {
-            "balance_usdt": forex_snap.balance_usdt,
-            "net_invested": forex_snap.net_invested,
-            "hwm": forex_snap.hwm,
-            "real_start_balance": forex_snap.real_start_balance,
-            "timestamp": str(forex_snap.timestamp),
-            "positions": forex_positions
-        }
-
-    return {
-        "timestamp": datetime.utcnow().isoformat(),
-        "users_count": len(users),
-        "pool_crypto": pool_crypto_data,
-        "pool_forex": pool_forex_data,
-        "data": backup_data
-    }
+    return {"timestamp": datetime.utcnow().isoformat(), "users_count": len(users), "data": backup_data}
 
 
 @router.post("/admin/migrate-pnl", dependencies=[Depends(get_admin_user)])
@@ -1166,26 +1138,6 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: Optional[
         "new_crypto_entry_pct": crypto_pool_pct,
         "new_forex_entry_pct": forex_pool_pct
     }
-
-@router.post("/admin/emergency-revert-reinvest", dependencies=[Depends(get_admin_user)])
-async def emergency_revert_reinvest(db: AsyncSession = Depends(get_db)):
-    snap = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
-    crypto_reverted = 0
-    if snap and getattr(snap, 'internal_reinvested', 0.0) > 0:
-        crypto_reverted = snap.internal_reinvested
-        snap.net_invested -= snap.internal_reinvested
-        snap.internal_reinvested = 0.0
-
-    from models import ForexBotSnapshot
-    fsnap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
-    forex_reverted = 0
-    if fsnap and getattr(fsnap, 'internal_reinvested', 0.0) > 0:
-        forex_reverted = fsnap.internal_reinvested
-        fsnap.net_invested -= fsnap.internal_reinvested
-        fsnap.internal_reinvested = 0.0
-        
-    await db.commit()
-    return {"status": "success", "crypto_reverted": crypto_reverted, "forex_reverted": forex_reverted}
 
 from fastapi import UploadFile, File
 import json
@@ -1289,19 +1241,7 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
         if crypto_bonus > 0 or forex_bonus > 0:
             fin_db.locked_crypto_ref_bonus = round(crypto_bonus, 2)
             fin_db.locked_forex_ref_bonus = round(forex_bonus, 2)
-            
-        # [CRITICAL FIX] Actually restore the user's financials from the backup!
-        if u.id in backup_fins:
-            my_b = backup_fins[u.id]
-            if "investment_usdt" in my_b: fin_db.investment_usdt = my_b["investment_usdt"]
-            if "entry_pool_pnl_pct" in my_b: fin_db.entry_pool_pnl_pct = my_b["entry_pool_pnl_pct"]
-            if "locked_crypto_pnl" in my_b: fin_db.locked_crypto_pnl = my_b["locked_crypto_pnl"]
-            if "forex_investment_usdt" in my_b: fin_db.forex_investment_usdt = my_b["forex_investment_usdt"]
-            if "forex_entry_pool_pnl_pct" in my_b: fin_db.forex_entry_pool_pnl_pct = my_b["forex_entry_pool_pnl_pct"]
-            if "locked_forex_pnl" in my_b: fin_db.locked_forex_pnl = my_b["locked_forex_pnl"]
-            if "withdrawal_usdt" in my_b: fin_db.withdrawal_usdt = my_b["withdrawal_usdt"]
-            
-        updated += 1
+            updated += 1
             
     await db.commit()
     return {"status": "success", "updated": updated}
