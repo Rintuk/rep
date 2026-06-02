@@ -1139,6 +1139,26 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: Optional[
         "new_forex_entry_pct": forex_pool_pct
     }
 
+@router.post("/admin/emergency-revert-reinvest", dependencies=[Depends(get_admin_user)])
+async def emergency_revert_reinvest(db: AsyncSession = Depends(get_db)):
+    snap = (await db.execute(select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+    crypto_reverted = 0
+    if snap and getattr(snap, 'internal_reinvested', 0.0) > 0:
+        crypto_reverted = snap.internal_reinvested
+        snap.net_invested -= snap.internal_reinvested
+        snap.internal_reinvested = 0.0
+
+    from models import ForexBotSnapshot
+    fsnap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+    forex_reverted = 0
+    if fsnap and getattr(fsnap, 'internal_reinvested', 0.0) > 0:
+        forex_reverted = fsnap.internal_reinvested
+        fsnap.net_invested -= fsnap.internal_reinvested
+        fsnap.internal_reinvested = 0.0
+        
+    await db.commit()
+    return {"status": "success", "crypto_reverted": crypto_reverted, "forex_reverted": forex_reverted}
+
 from fastapi import UploadFile, File
 import json
 
