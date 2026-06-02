@@ -1443,8 +1443,27 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
     # но НЕ трогаем balance_usdt (деньги уже там физически)
     if snap:
         snap.net_invested += payload.amount
-
-    await db.commit()
+        await db.commit()
+        
+        # КРИТИЧНО: после увеличения net_invested PnL% пула изменился.
+        # Нужно обновить entry_pct всех инвесторов на новое значение,
+        # иначе у них появится ложный «плавающий убыток», который съест их locked прибыль!
+        total_inv_new = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+        total_wd_new = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
+        ref_new = start + total_inv_new - total_wd_new
+        if ref_new <= 0:
+            ref_new = snap.net_invested if snap.net_invested > 0 else start
+        pool_total_new = snap.balance_usdt + sum(
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
+        )
+        post_deposit_pct = round((pool_total_new - ref_new) / ref_new * 100, 4) if ref_new > 0 else 0.0
+        
+        from sqlalchemy import text
+        await db.execute(text(f"UPDATE user_financials SET entry_pool_pnl_pct = {post_deposit_pct} WHERE investment_usdt > 0"))
+        await db.commit()
+    else:
+        await db.commit()
 
     return {
         "status": "success",
@@ -1497,8 +1516,21 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
     # но НЕ трогаем balance_usdt (деньги уже там физически)
     if forex_snap:
         forex_snap.net_invested += payload.amount
-
-    await db.commit()
+        await db.commit()
+        
+        # КРИТИЧНО: после увеличения net_invested PnL% пула изменился.
+        # Обновляем entry_pct всех форекс-инвесторов на новое значение,
+        # иначе у них появится ложный «плавающий убыток»!
+        fx_ref_new = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+            forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
+        )
+        post_deposit_forex_pct = round((forex_snap.balance_usdt - fx_ref_new) / fx_ref_new * 100, 4) if fx_ref_new > 0 else 0.0
+        
+        from sqlalchemy import text
+        await db.execute(text(f"UPDATE user_financials SET forex_entry_pool_pnl_pct = {post_deposit_forex_pct} WHERE forex_investment_usdt > 0"))
+        await db.commit()
+    else:
+        await db.commit()
 
     return {
         "status": "success",
