@@ -1141,11 +1141,29 @@ async def migrate_pnl(db: AsyncSession = Depends(get_db)):
     Защищает прибыль от ретроспективного урезания или размытия.
     """
     return await _migrate_pnl_internal(db)
-async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: Optional[float] = None, override_forex_pct: Optional[float] = None):
+async def _migrate_pnl_internal(
+    db: AsyncSession,
+    override_crypto_pct: Optional[float] = None,
+    override_forex_pct: Optional[float] = None,
+    final_crypto_pct: Optional[float] = None,
+    final_forex_pct: Optional[float] = None,
+):
+    """
+    Фиксирует прибыль инвесторов и обновляет точки входа.
+
+    override_*_pct  — PnL пула ДО операции, используется для расчёта прибыли.
+    final_*_pct     — PnL пула ПОСЛЕ операции, на который обновляется entry_pct.
+                      Если не передан — равен override_*_pct (обычный режим).
+
+    Ключевое правило: entry_pct меняется ТОЛЬКО когда прибыль > 0.
+    Для инвесторов с убытком или нулём — entry_pct не трогаем:
+    формула дашборда сама правильно отобразит изменение pool_pnl_pct.
+    """
     # 1. Получаем текущие PnL пулов
     crypto_pool_pct = override_crypto_pct if override_crypto_pct is not None else await _get_pool_pnl_pct(db)
-    
-    # 2. Получаем форекс PnL пула
+    crypto_final_pct = final_crypto_pct if final_crypto_pct is not None else crypto_pool_pct
+
+    # 2. Форекс PnL
     from models import ForexBotSnapshot
     forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
     forex_pool_pct = override_forex_pct if override_forex_pct is not None else 0.0
@@ -1153,13 +1171,14 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: Optional[
         fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm)
         if fx_net_inv > 0:
             forex_pool_pct = round((forex_snap.balance_usdt - fx_net_inv) / fx_net_inv * 100, 4)
+    forex_final_pct = final_forex_pct if final_forex_pct is not None else forex_pool_pct
 
     # 3. Фиксируем прибыль
     from constants import INVESTOR_SHARE, get_investor_share
     all_fins = (await db.execute(select(UserFinancials))).scalars().all()
     updated = 0
     total_crypto_locked = 0.0
-    
+
     for f in all_fins:
         # Crypto
         if f.investment_usdt > 0:
@@ -1169,13 +1188,12 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: Optional[
             if user_profit > 0:
                 f.locked_crypto_pnl += user_profit
                 total_crypto_locked += user_profit
-                f.entry_pool_pnl_pct = crypto_pool_pct
-            elif override_crypto_pct is not None:
-                # Если это принудительная миграция перед депозитом/выводом
-                f.entry_pool_pnl_pct = crypto_pool_pct
+                f.entry_pool_pnl_pct = crypto_final_pct
+            # Инвесторов с убытком/нулём НЕ трогаем: entry_pct остаётся прежним,
+            # формула дашборда сама учтёт изменение pool_pnl_pct.
         else:
-            f.entry_pool_pnl_pct = crypto_pool_pct
-        
+            f.entry_pool_pnl_pct = crypto_final_pct
+
         # Forex
         if f.forex_investment_usdt > 0:
             fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
@@ -1183,21 +1201,20 @@ async def _migrate_pnl_internal(db: AsyncSession, override_crypto_pct: Optional[
             fx_user_profit = round(fx_gross * get_investor_share(f), 2)
             if fx_user_profit > 0:
                 f.locked_forex_pnl += fx_user_profit
-                f.forex_entry_pool_pnl_pct = forex_pool_pct
-            elif override_forex_pct is not None:
-                f.forex_entry_pool_pnl_pct = forex_pool_pct
+                f.forex_entry_pool_pnl_pct = forex_final_pct
+            # Аналогично — убытки не скрываем
         else:
-            f.forex_entry_pool_pnl_pct = forex_pool_pct
-        
+            f.forex_entry_pool_pnl_pct = forex_final_pct
+
         updated += 1
-        
+
     await db.commit()
     return {
-        "status": "success", 
-        "updated_investors": updated, 
+        "status": "success",
+        "updated_investors": updated,
         "total_crypto_locked": round(total_crypto_locked, 2),
-        "new_crypto_entry_pct": crypto_pool_pct,
-        "new_forex_entry_pct": forex_pool_pct
+        "new_crypto_entry_pct": crypto_final_pct,
+        "new_forex_entry_pct": forex_final_pct,
     }
 
 from fastapi import UploadFile, File
@@ -1563,67 +1580,59 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
         pool_total = snap.balance_usdt + sum(
             p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
         )
-        # Вычитаем сумму депозита: эти деньги уже в пуле, но принадлежат инвестору,
-        # а не являются прибылью. Без этого вычитания они ложно считаются прибылью пула
-        # и фиксируются на счетах ВСЕХ инвесторов через _migrate_pnl_internal.
-        pool_total_for_pnl = pool_total - payload.amount
         start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
         total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
         total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
         ref = start + total_inv - total_wd
         if ref <= 0:
             ref = snap.net_invested if snap.net_invested > 0 else start
+
+        # Истинный PnL пула ДО депозита: вычитаем сумму, уже физически в пуле,
+        # чтобы она не считалась прибылью при расчёте прибыли существующих инвесторов.
+        pool_total_for_pnl = pool_total - payload.amount
         current_pnl_pct = round((pool_total_for_pnl - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+        # PnL пула ПОСЛЕ регистрации депозита (ref вырастет на payload.amount, pool_total не меняется).
+        # Передаём в миграцию как final_pct: только инвесторы с положительной прибылью
+        # получат этот entry_pct — остальных не трогаем, чтобы не скрыть их убытки.
+        ref_post = ref + payload.amount
+        post_deposit_pct = round((pool_total - ref_post) / ref_post * 100, 4) if ref_post > 0 else 0.0
     else:
         current_pnl_pct = 0.0
+        post_deposit_pct = 0.0
 
-    # Фиксируем текущую прибыль ВСЕХ инвесторов (чтобы новый депозит не размыл их прибыль)
-    await _migrate_pnl_internal(db, override_crypto_pct=current_pnl_pct)
+    # Фиксируем прибыль существующих инвесторов.
+    # Прибыль считается по current_pnl_pct (до депозита),
+    # entry_pct выставляется в post_deposit_pct (после) — только для тех у кого profit > 0.
+    await _migrate_pnl_internal(
+        db,
+        override_crypto_pct=current_pnl_pct,
+        final_crypto_pct=post_deposit_pct,
+    )
 
     # Добавляем депозит в UserFinancials (без изменения balance в пуле!)
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == payload.user_id))).scalar_one_or_none()
     if fin:
         fin.investment_usdt += payload.amount
-        fin.entry_pool_pnl_pct = current_pnl_pct
+        fin.entry_pool_pnl_pct = post_deposit_pct
         fin.updated_at = datetime.utcnow()
     else:
         db.add(UserFinancials(
             user_id=payload.user_id,
             investment_usdt=payload.amount,
-            entry_pool_pnl_pct=current_pnl_pct,
+            entry_pool_pnl_pct=post_deposit_pct,
         ))
 
-    # Увеличиваем net_invested в снапшоте (это учётная база для PnL%),
-    # но НЕ трогаем balance_usdt (деньги уже там физически)
     if snap:
         snap.net_invested += payload.amount
-        await db.commit()
-        
-        # КРИТИЧНО: после увеличения net_invested PnL% пула изменился.
-        # Нужно обновить entry_pct всех инвесторов на новое значение,
-        # иначе у них появится ложный «плавающий убыток», который съест их locked прибыль!
-        total_inv_new = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
-        total_wd_new = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
-        start = snap.real_start_balance if snap.real_start_balance > 0 else snap.hwm
-        ref_new = start + total_inv_new - total_wd_new
-        if ref_new <= 0:
-            ref_new = snap.net_invested if snap.net_invested > 0 else start
-        pool_total_new = snap.balance_usdt + sum(
-            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
-        )
-        post_deposit_pct = round((pool_total_new - ref_new) / ref_new * 100, 4) if ref_new > 0 else 0.0
-        
-        from sqlalchemy import text
-        await db.execute(text(f"UPDATE user_financials SET entry_pool_pnl_pct = {post_deposit_pct} WHERE investment_usdt > 0"))
-        await db.commit()
-    else:
-        await db.commit()
+
+    await db.commit()
 
     return {
         "status": "success",
         "user_id": payload.user_id,
         "amount": payload.amount,
-        "entry_pct": current_pnl_pct,
+        "entry_pct": post_deposit_pct,
         "note": "Депозит зарегистрирован. balance_usdt пула не изменён (деньги уже в пуле)."
     }
 
@@ -1646,54 +1655,49 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
         fx_ref = forex_snap.net_invested if forex_snap.net_invested > 0 else (
             forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
         )
-        # Вычитаем сумму депозита: эти деньги уже в пуле, но принадлежат инвестору,
-        # а не являются прибылью. Без вычитания они ложно фиксируются как прибыль пула.
+        # Истинный PnL ДО депозита: вычитаем уже физически внесённые деньги.
         adjusted_forex_balance = forex_snap.balance_usdt - payload.amount
         current_forex_pct = round((adjusted_forex_balance - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
+
+        # PnL ПОСЛЕ регистрации: fx_ref вырастет на payload.amount, баланс не изменится.
+        fx_ref_post = fx_ref + payload.amount
+        post_deposit_forex_pct = round((forex_snap.balance_usdt - fx_ref_post) / fx_ref_post * 100, 4) if fx_ref_post > 0 else 0.0
     else:
         current_forex_pct = 0.0
+        post_deposit_forex_pct = 0.0
 
-    # Фиксируем прибыль всех инвесторов
-    await _migrate_pnl_internal(db, override_forex_pct=current_forex_pct)
+    # Фиксируем прибыль форекс-инвесторов.
+    # Только те у кого profit > 0 получат обновлённый entry_pct = post_deposit_forex_pct.
+    # Инвесторы с убытком не затрагиваются — формула дашборда отразит изменение сама.
+    await _migrate_pnl_internal(
+        db,
+        override_forex_pct=current_forex_pct,
+        final_forex_pct=post_deposit_forex_pct,
+    )
 
     # Добавляем форекс-депозит в UserFinancials (без изменения баланса в пуле!)
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == payload.user_id))).scalar_one_or_none()
     if fin:
         fin.forex_investment_usdt += payload.amount
-        fin.forex_entry_pool_pnl_pct = current_forex_pct
+        fin.forex_entry_pool_pnl_pct = post_deposit_forex_pct
         fin.updated_at = datetime.utcnow()
     else:
         db.add(UserFinancials(
             user_id=payload.user_id,
             forex_investment_usdt=payload.amount,
-            forex_entry_pool_pnl_pct=current_forex_pct,
+            forex_entry_pool_pnl_pct=post_deposit_forex_pct,
         ))
 
-    # Увеличиваем net_invested в форекс-снапшоте,
-    # но НЕ трогаем balance_usdt (деньги уже там физически)
     if forex_snap:
         forex_snap.net_invested += payload.amount
-        await db.commit()
-        
-        # КРИТИЧНО: после увеличения net_invested PnL% пула изменился.
-        # Обновляем entry_pct всех форекс-инвесторов на новое значение,
-        # иначе у них появится ложный «плавающий убыток»!
-        fx_ref_new = forex_snap.net_invested if forex_snap.net_invested > 0 else (
-            forex_snap.real_start_balance if forex_snap.real_start_balance > 0 else forex_snap.hwm
-        )
-        post_deposit_forex_pct = round((forex_snap.balance_usdt - fx_ref_new) / fx_ref_new * 100, 4) if fx_ref_new > 0 else 0.0
-        
-        from sqlalchemy import text
-        await db.execute(text(f"UPDATE user_financials SET forex_entry_pool_pnl_pct = {post_deposit_forex_pct} WHERE forex_investment_usdt > 0"))
-        await db.commit()
-    else:
-        await db.commit()
+
+    await db.commit()
 
     return {
         "status": "success",
         "user_id": payload.user_id,
         "amount": payload.amount,
-        "entry_pct": current_forex_pct,
+        "entry_pct": post_deposit_forex_pct,
         "note": "Форекс-депозит зарегистрирован. balance_usdt пула не изменён (деньги уже в пуле)."
     }
 
