@@ -1612,8 +1612,17 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
     # Добавляем депозит в UserFinancials (без изменения balance в пуле!)
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == payload.user_id))).scalar_one_or_none()
     if fin:
-        fin.investment_usdt += payload.amount
+        if fin.investment_usdt > 0:
+            incr = post_deposit_pct - fin.entry_pool_pnl_pct
+            if incr > 0:
+                from constants import get_investor_share
+                gross = fin.investment_usdt * (incr / 100)
+                user_profit = round(gross * get_investor_share(fin), 2)
+                if user_profit > 0:
+                    fin.locked_crypto_pnl += user_profit
         fin.entry_pool_pnl_pct = post_deposit_pct
+
+        fin.investment_usdt += payload.amount
         fin.updated_at = datetime.utcnow()
     else:
         db.add(UserFinancials(
@@ -1678,8 +1687,20 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
     # Добавляем форекс-депозит в UserFinancials (без изменения баланса в пуле!)
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == payload.user_id))).scalar_one_or_none()
     if fin:
-        fin.forex_investment_usdt += payload.amount
+        # ПЕРЕД увеличением инвестиции мы обязаны зафиксировать старую плавающую прибыль,
+        # иначе новый увеличенный депозит умножится на старый процент, дав ложную прибыль!
+        if fin.forex_investment_usdt > 0:
+            fx_incr = post_deposit_forex_pct - fin.forex_entry_pool_pnl_pct
+            if fx_incr > 0:
+                from constants import get_investor_share
+                gross = fin.forex_investment_usdt * (fx_incr / 100)
+                user_profit = round(gross * get_investor_share(fin), 2)
+                if user_profit > 0:
+                    fin.locked_forex_pnl += user_profit
+        # Сбрасываем его entry_pct до текущего, чтобы новые инвестиции начали с нуля
         fin.forex_entry_pool_pnl_pct = post_deposit_forex_pct
+
+        fin.forex_investment_usdt += payload.amount
         fin.updated_at = datetime.utcnow()
     else:
         db.add(UserFinancials(
