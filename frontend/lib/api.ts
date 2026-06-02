@@ -420,6 +420,11 @@ export async function diagEntryPoints() {
   return res.data;
 }
 
+export async function fixBrokenEntryPoints() {
+  const res = await api.post("/auth/admin/fix-broken-entry-points");
+  return res.data;
+}
+
 export async function setStatusOverride(userId: string, status: string | null) {
   const res = await api.patch(`/auth/admin/status-override/${userId}`, null, {
     params: { status: status || "NONE" }

@@ -14,7 +14,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
+  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool,
@@ -216,6 +216,8 @@ export default function AdminPage() {
   const [migrateMsg, setMigrateMsg] = useState<string | null>(null);
   const [diagLoading, setDiagLoading] = useState(false);
   const [diagResult, setDiagResult] = useState<any>(null);
+  const [fixLoading, setFixLoading] = useState(false);
+  const [fixResult, setFixResult] = useState<any>(null);
 
   const [silentWAmount, setSilentWAmount] = useState("");
   const [silentWLoading, setSilentWLoading] = useState(false);
@@ -504,6 +506,20 @@ export default function AdminPage() {
       setDiagResult({ error: "Ошибка запроса" });
     } finally {
       setDiagLoading(false);
+    }
+  }
+
+  async function handleFixEntryPoints() {
+    if (!confirm("Сбросить завышенные точки входа? locked_pnl не будет тронут — накопленная прибыль сохранится.")) return;
+    setFixLoading(true); setFixResult(null);
+    try {
+      const r = await fixBrokenEntryPoints();
+      setFixResult(r);
+      setDiagResult(null);
+    } catch {
+      setFixResult({ error: "Ошибка" });
+    } finally {
+      setFixLoading(false);
     }
   }
 
@@ -1095,8 +1111,22 @@ export default function AdminPage() {
                               ))}
                             </div>
                           )}
+                          <button onClick={handleFixEntryPoints} disabled={fixLoading}
+                            style={{ marginTop: 12, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                              background: "rgba(60,13,13,0.9)", color: "#ff6b6b", cursor: "pointer",
+                              border: "1px solid rgba(255,107,107,0.4)", opacity: fixLoading ? 0.5 : 1 }}>
+                            {fixLoading ? "Исправляю..." : "⚡ Исправить точки входа (locked_pnl не трогать)"}
+                          </button>
                         </>
                       )}
+                    </div>
+                  )}
+                  {fixResult && (
+                    <div style={{ marginTop: 10, fontSize: 12 }}>
+                      {fixResult.error
+                        ? <p style={{ color: "#ff6b6b" }}>Ошибка: {fixResult.error}</p>
+                        : <p style={{ color: "#22c97a" }}>✅ Исправлено инвесторов: {fixResult.fixed_count}. Нажми «Проверить» чтобы убедиться.</p>
+                      }
                     </div>
                   )}
                 </div>

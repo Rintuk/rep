@@ -1057,6 +1057,53 @@ async def diag_entry_points(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/admin/fix-broken-entry-points", dependencies=[Depends(get_admin_user)])
+async def fix_broken_entry_points(db: AsyncSession = Depends(get_db)):
+    """
+    Сбрасывает forex_entry_pool_pnl_pct до текущего pct пула для инвесторов
+    у которых entry > current_pct (баг старого кода при пополнении).
+    locked_forex_pnl НЕ трогается — накопленная прибыль сохраняется полностью.
+    """
+    from routers.forex import _get_forex_pool_pnl_pct
+
+    crypto_pct = await _get_pool_pnl_pct(db)
+    forex_pct  = await _get_forex_pool_pnl_pct(db)
+
+    all_fins  = (await db.execute(select(UserFinancials))).scalars().all()
+    all_users = (await db.execute(select(User))).scalars().all()
+    user_map  = {u.id: u.email for u in all_users}
+
+    fixed = []
+
+    for f in all_fins:
+        email = user_map.get(f.user_id, f.user_id)
+        if f.forex_investment_usdt > 0 and f.forex_entry_pool_pnl_pct > forex_pct:
+            old_entry = f.forex_entry_pool_pnl_pct
+            f.forex_entry_pool_pnl_pct = forex_pct
+            fixed.append({
+                "email": email,
+                "old_entry_pct": old_entry,
+                "new_entry_pct": forex_pct,
+                "locked_forex_pnl_preserved": f.locked_forex_pnl,
+            })
+        if f.investment_usdt > 0 and f.entry_pool_pnl_pct > crypto_pct:
+            old_entry = f.entry_pool_pnl_pct
+            f.entry_pool_pnl_pct = crypto_pct
+            fixed.append({
+                "email": email,
+                "old_entry_pct": old_entry,
+                "new_entry_pct": crypto_pct,
+                "locked_crypto_pnl_preserved": f.locked_crypto_pnl,
+            })
+
+    await db.commit()
+    return {
+        "status": "success",
+        "fixed_count": len(fixed),
+        "fixed": fixed,
+    }
+
+
 class SetProfitPayload(BaseModel):
     email: str
     exact_profit: float
