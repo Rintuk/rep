@@ -1069,7 +1069,35 @@ async def backup_db(db: AsyncSession = Depends(get_db)):
                 "locked_forex_pnl": f.locked_forex_pnl if f else 0
             } if f else None
         })
-    return {"timestamp": datetime.utcnow().isoformat(), "users_count": len(users), "data": backup_data}
+    pool_crypto_data = None
+    if crypto_snap:
+        pool_crypto_data = {
+            "balance_usdt": crypto_snap.balance_usdt,
+            "net_invested": crypto_snap.net_invested,
+            "hwm": crypto_snap.hwm,
+            "real_start_balance": crypto_snap.real_start_balance,
+            "timestamp": str(crypto_snap.timestamp),
+            "positions": crypto_positions
+        }
+        
+    pool_forex_data = None
+    if forex_snap:
+        pool_forex_data = {
+            "balance_usdt": forex_snap.balance_usdt,
+            "net_invested": forex_snap.net_invested,
+            "hwm": forex_snap.hwm,
+            "real_start_balance": forex_snap.real_start_balance,
+            "timestamp": str(forex_snap.timestamp),
+            "positions": forex_positions
+        }
+
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "users_count": len(users),
+        "pool_crypto": pool_crypto_data,
+        "pool_forex": pool_forex_data,
+        "data": backup_data
+    }
 
 
 @router.post("/admin/migrate-pnl", dependencies=[Depends(get_admin_user)])
