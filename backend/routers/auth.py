@@ -1188,30 +1188,20 @@ async def _migrate_pnl_internal(
     updated = 0
     total_crypto_locked = 0.0
 
+    crypto_delta = crypto_final_pct - crypto_pool_pct
+    forex_delta = forex_final_pct - forex_pool_pct
+
     for f in all_fins:
         # Crypto
         if f.investment_usdt > 0:
-            incr = crypto_pool_pct - f.entry_pool_pnl_pct
-            gross = f.investment_usdt * (incr / 100)
-            user_profit = round(gross * get_investor_share(f), 2)
-            if user_profit > 0:
-                f.locked_crypto_pnl += user_profit
-                total_crypto_locked += user_profit
-                f.entry_pool_pnl_pct = crypto_final_pct
-            # Инвесторов с убытком/нулём НЕ трогаем: entry_pct остаётся прежним,
-            # формула дашборда сама учтёт изменение pool_pnl_pct.
+            # Сдвигаем точку входа ровно на дельту изменения пула, чтобы сохранить (pool - entry) неизменным
+            f.entry_pool_pnl_pct += crypto_delta
         else:
             f.entry_pool_pnl_pct = crypto_final_pct
 
         # Forex
         if f.forex_investment_usdt > 0:
-            fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
-            fx_gross = f.forex_investment_usdt * (fx_incr / 100)
-            fx_user_profit = round(fx_gross * get_investor_share(f), 2)
-            if fx_user_profit > 0:
-                f.locked_forex_pnl += fx_user_profit
-                f.forex_entry_pool_pnl_pct = forex_final_pct
-            # Аналогично — убытки не скрываем
+            f.forex_entry_pool_pnl_pct += forex_delta
         else:
             f.forex_entry_pool_pnl_pct = forex_final_pct
 
