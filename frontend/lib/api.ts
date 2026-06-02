@@ -403,6 +403,13 @@ export async function backupDatabase() {
   return res.data;
 }
 
+export async function restoreFullBackup(file: File) {
+  const formData = new FormData();
+  formData.append("backup_file", file);
+  const res = await api.post("/auth/admin/restore-full", formData);
+  return res.data;
+}
+
 export async function migratePnL() {
   const res = await api.post("/auth/admin/migrate-pnl");
   return res.data;

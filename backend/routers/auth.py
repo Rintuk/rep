@@ -1308,6 +1308,95 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
     return {"status": "success", "updated": updated}
 
 
+@router.post("/admin/restore-full", dependencies=[Depends(get_admin_user)])
+async def restore_full(backup_file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+    """
+    Полное восстановление финансов инвесторов и снапшотов пулов из JSON-бэкапа.
+    Восстанавливает: investment_usdt, withdrawal_usdt, locked_*_pnl, locked_*_ref_bonus,
+    entry_pool_pnl_pct, custom_investor_share, note.
+    Также восстанавливает net_invested и balance_usdt из снапшотов пулов.
+    """
+    content = await backup_file.read()
+    try:
+        backup = json.loads(content)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Неверный JSON файл")
+
+    data = backup.get("data", [])
+    if not data:
+        raise HTTPException(status_code=400, detail="Бэкап пуст или неверный формат")
+
+    # ── 1. Восстановление финансов инвесторов ──
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    fins_map = {f.user_id: f for f in all_fins}
+    fins_updated = 0
+
+    for entry in data:
+        uid = entry.get("id")
+        bfin = entry.get("financials")
+        if not uid or not bfin:
+            continue
+        fin = fins_map.get(uid)
+        if not fin:
+            continue
+
+        fin.investment_usdt          = float(bfin.get("investment_usdt", fin.investment_usdt))
+        fin.withdrawal_usdt          = float(bfin.get("withdrawal_usdt", fin.withdrawal_usdt))
+        fin.entry_pool_pnl_pct       = float(bfin.get("entry_pool_pnl_pct", fin.entry_pool_pnl_pct))
+        fin.locked_crypto_pnl        = float(bfin.get("locked_crypto_pnl", fin.locked_crypto_pnl))
+        fin.locked_crypto_ref_bonus  = float(bfin.get("locked_crypto_ref_bonus", fin.locked_crypto_ref_bonus))
+        fin.forex_investment_usdt    = float(bfin.get("forex_investment_usdt", fin.forex_investment_usdt))
+        fin.forex_withdrawal_usdt    = float(bfin.get("forex_withdrawal_usdt", fin.forex_withdrawal_usdt))
+        fin.forex_entry_pool_pnl_pct = float(bfin.get("forex_entry_pool_pnl_pct", fin.forex_entry_pool_pnl_pct))
+        fin.locked_forex_pnl         = float(bfin.get("locked_forex_pnl", fin.locked_forex_pnl))
+        fin.locked_forex_ref_bonus   = float(bfin.get("locked_forex_ref_bonus", fin.locked_forex_ref_bonus))
+        cs = bfin.get("custom_investor_share")
+        fin.custom_investor_share    = float(cs) if cs is not None else None
+        fin.note                     = bfin.get("note", fin.note) or ""
+        fin.updated_at               = datetime.utcnow()
+        fins_updated += 1
+
+    await db.commit()
+
+    # ── 2. Восстановление снапшота крипто пула ──
+    pool_crypto = backup.get("pool_crypto")
+    snap_updated = False
+    if pool_crypto:
+        from models import BotSnapshot
+        snap = (await db.execute(
+            select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+        )).scalar_one_or_none()
+        if snap:
+            snap.balance_usdt       = float(pool_crypto.get("balance_usdt", snap.balance_usdt))
+            snap.net_invested       = float(pool_crypto.get("net_invested", snap.net_invested))
+            snap.hwm                = float(pool_crypto.get("hwm", snap.hwm))
+            snap.real_start_balance = float(pool_crypto.get("real_start_balance", snap.real_start_balance))
+            snap_updated = True
+
+    # ── 3. Восстановление снапшота форекс пула ──
+    pool_forex = backup.get("pool_forex")
+    if pool_forex:
+        from models import ForexBotSnapshot
+        fsnap = (await db.execute(
+            select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+        )).scalar_one_or_none()
+        if fsnap:
+            fsnap.balance_usdt       = float(pool_forex.get("balance_usdt", fsnap.balance_usdt))
+            fsnap.net_invested       = float(pool_forex.get("net_invested", fsnap.net_invested))
+            fsnap.hwm                = float(pool_forex.get("hwm", fsnap.hwm))
+            fsnap.real_start_balance = float(pool_forex.get("real_start_balance", fsnap.real_start_balance))
+            snap_updated = True
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "investors_restored": fins_updated,
+        "pool_snapshots_restored": snap_updated,
+        "backup_timestamp": backup.get("timestamp"),
+    }
+
+
 # ── Заявки на пополнение депозита ─────────────────────────────
 from security import get_current_user
 

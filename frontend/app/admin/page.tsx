@@ -14,7 +14,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, migratePnL, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
+  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool,
@@ -211,6 +211,7 @@ export default function AdminPage() {
 
   const [statusOverrideMsg, setStatusOverrideMsg] = useState<Record<string, string>>({});
   const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
   const [migrateLoading, setMigrateLoading] = useState(false);
   const [migrateMsg, setMigrateMsg] = useState<string | null>(null);
 
@@ -983,6 +984,36 @@ export default function AdminPage() {
                       background: "rgba(13,58,32,0.8)", color: "#22c97a", cursor: "pointer", border: "1px solid rgba(34,201,122,0.3)", opacity: backupLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
                     {backupLoading ? "..." : "Скачать"}
                   </button>
+                </div>
+
+                {/* Восстановление из бэкапа */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(220,38,38,0.4)" }}>
+                  <div>
+                    <p style={{ color: "#f87171", fontSize: 13, fontWeight: 600 }}>♻️ Восстановить из бэкапа (полный)</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Восстанавливает финансы всех инвесторов и данные пулов из JSON-бэкапа. Необратимо.</p>
+                  </div>
+                  <label style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    background: "rgba(80,20,20,0.8)", color: "#f87171", cursor: restoreLoading ? "not-allowed" : "pointer",
+                    border: "1px solid rgba(220,38,38,0.4)", opacity: restoreLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                    {restoreLoading ? "Загрузка..." : "Загрузить JSON"}
+                    <input type="file" accept=".json" style={{ display: "none" }} onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (!confirm("ВНИМАНИЕ: это перезапишет финансы ВСЕХ инвесторов и данные пулов. Продолжить?")) return;
+                      setRestoreLoading(true);
+                      try {
+                        const res = await restoreFullBackup(file);
+                        alert(`✅ Восстановлено!\nИнвесторов: ${res.investors_restored}\nПулы: ${res.pool_snapshots_restored ? "да" : "нет"}\nДата бэкапа: ${res.backup_timestamp}`);
+                        fetchData();
+                      } catch (err: any) {
+                        alert("Ошибка: " + (err?.response?.data?.detail || err.message));
+                      } finally {
+                        setRestoreLoading(false);
+                        e.target.value = "";
+                      }
+                    }} />
+                  </label>
                 </div>
 
                 {/* Миграция PnL */}
