@@ -611,7 +611,7 @@ export default function AdminPage() {
     try {
       await updateUserForexFinancials(id, parseFloat(f.forex_investment_usdt) || 0, parseFloat(f.forex_withdrawal_usdt) || 0, f.note);
       await setReferralLimit(id, parseInt(f.referral_limit) || 5);
-      await setCustomInvestorShare(id, f.custom_investor_share ? parseFloat(f.custom_investor_share) : null);
+      await setCustomInvestorShare(id, f.custom_investor_share ? parseFloat(f.custom_investor_share) / 100 : null);
       setForexSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
       setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
       fetchData();
