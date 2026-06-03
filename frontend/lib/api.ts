@@ -425,6 +425,11 @@ export async function fixBrokenEntryPoints() {
   return res.data;
 }
 
+export async function emergencyFixForexPnl(email: string) {
+  const res = await api.post(`/auth/admin/emergency-fix-user`, null, { params: { email } });
+  return res.data;
+}
+
 export async function lockReferralBaseline() {
   const res = await api.post("/auth/admin/lock-referral-baseline");
   return res.data;

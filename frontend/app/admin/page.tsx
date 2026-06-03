@@ -14,7 +14,7 @@ import {
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
-  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, lockReferralBaseline, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
+  cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, lockReferralBaseline, emergencyFixForexPnl, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool,
@@ -1530,6 +1530,20 @@ export default function AdminPage() {
                                             <Save size={13} />{forexSavingId === u.id ? "Сохранение..." : "Сохранить форекс"}
                                           </button>
                                           {forexSaveMsg[u.id] && <span style={{ fontSize: 13, fontWeight: 600, color: forexSaveMsg[u.id].startsWith("✓") ? "#22c97a" : "#ff4d4d" }}>{forexSaveMsg[u.id]}</span>}
+                                          <button onClick={async () => {
+                                            if (!confirm(`Сбросить locked_forex_pnl до 0 и установить entry на текущий pct для ${u.email}? Используй только при аномальных значениях прибыли.`)) return;
+                                            try {
+                                              await emergencyFixForexPnl(u.email);
+                                              alert("✅ Сброшено. Обнови страницу.");
+                                              fetchData();
+                                            } catch (e: any) {
+                                              alert("Ошибка: " + (e?.response?.data?.detail || e.message));
+                                            }
+                                          }} style={{ padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                                            background: "rgba(60,10,10,0.8)", color: "#ff6b6b", cursor: "pointer",
+                                            border: "1px solid rgba(255,107,107,0.3)" }}>
+                                            ⚠ Сбросить аномалию
+                                          </button>
                                         </div>
                                         {/* Пополнение из форекс-пула */}
                                         <div style={{ marginTop: 14, padding: 12, borderRadius: 8, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.2)" }}>
