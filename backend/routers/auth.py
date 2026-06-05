@@ -652,8 +652,7 @@ async def adjust_net_invested(add_amount: float, db: AsyncSession = Depends(get_
         if ref <= 0:
             ref = snap.net_invested if snap.net_invested > 0 else start
             
-        # ВРЕМЕННЫЙ ФИКС: так как баланс уже обновился, вычитаем add_amount для получения старого процента
-        current_pnl_pct = round(((pool_total - add_amount) - ref) / ref * 100, 4) if ref > 0 else 0.0
+        current_pnl_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
         ref_post = ref + add_amount
         post_adjust_pct = round((pool_total - ref) / ref_post * 100, 4) if ref_post > 0 else 0.0
         
