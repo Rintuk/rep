@@ -2293,7 +2293,7 @@ async def emergency_fix_forex(db: AsyncSession = Depends(get_db)):
             count += 1
             
     await db.commit()
-    return {"status": "SUCCESS", "message": f"Fixed {count} forex users! Added 900 to net_invested. True Pct set to {true_pct}%."} forex users! True Pct set to {true_pct}%."}
+    return {"status": "SUCCESS", "message": f"Fixed {count} forex users! Added 900 to net_invested. True Pct set to {true_pct}%."}
 
 @router.get("/debug-state-xyz")
 async def debug_state_xyz(db: AsyncSession = Depends(get_db)):
