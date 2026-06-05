@@ -566,7 +566,8 @@ async def adjust_forex_net_invested(add_amount: float, db: AsyncSession = Depend
         pool_total = snap.balance_usdt + forex_pool_positions
         
         ref = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm)
-        current_pnl_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+        # ВРЕМЕННЫЙ ФИКС: так как баланс уже обновился, вычитаем add_amount для получения старого процента
+        current_pnl_pct = round(((pool_total - add_amount) - ref) / ref * 100, 4) if ref > 0 else 0.0
         ref_post = ref + add_amount
         post_adjust_pct = round((pool_total - ref) / ref_post * 100, 4) if ref_post > 0 else 0.0
         
