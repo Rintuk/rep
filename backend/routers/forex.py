@@ -557,10 +557,23 @@ async def adjust_forex_net_invested(add_amount: float, db: AsyncSession = Depend
     if add_amount == 0:
         raise HTTPException(status_code=400, detail="add_amount не может быть 0")
         
-    # Баг 16 fix: обязательно фиксируем прибыль ДО изменения net_invested
     from routers.auth import _migrate_pnl_internal
-    await _migrate_pnl_internal(db)
-    
+    snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+    if snap:
+        from models import ForexPosition
+        fx_positions = (await db.execute(select(ForexPosition).where(ForexPosition.snapshot_id == snap.id))).scalars().all()
+        forex_pool_positions = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in fx_positions)
+        pool_total = snap.balance_usdt + forex_pool_positions
+        
+        ref = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm)
+        current_pnl_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+        ref_post = ref + add_amount
+        post_adjust_pct = round((pool_total - ref) / ref_post * 100, 4) if ref_post > 0 else 0.0
+        
+        await _migrate_pnl_internal(db, override_forex_pct=current_pnl_pct, final_forex_pct=post_adjust_pct)
+    else:
+        await _migrate_pnl_internal(db)
+        
     snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
     for s in snaps:
         s.net_invested = round(s.net_invested + add_amount, 4)
