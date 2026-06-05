@@ -2260,6 +2260,19 @@ async def get_user_referral_tree(user_id: str, db: AsyncSession = Depends(get_db
 @router.get("/admin/emergency-fix-forex", dependencies=[Depends(get_admin_user)])
 async def emergency_fix_forex(db: AsyncSession = Depends(get_db)):
     from models import UserFinancials, ForexBotSnapshot, ForexPosition
+    
+    # 1. Сначала добавляем недостающие 900 к капиталу во всех снимках
+    snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
+    for s in snaps:
+        if s.net_invested > 0:
+            s.net_invested = round(s.net_invested + 900, 4)
+        else:
+            ref_val = s.real_start_balance if s.real_start_balance != 0.0 else s.hwm
+            s.net_invested = round(ref_val + 900, 4)
+            
+    await db.commit() # Сохраняем увеличенный капитал
+    
+    # 2. Теперь берем последний снимок и считаем правильный процент
     snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
     if not snap:
         return {"error": "No forex snap"}
@@ -2271,6 +2284,7 @@ async def emergency_fix_forex(db: AsyncSession = Depends(get_db)):
     ref = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm)
     true_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
     
+    # 3. Применяем этот правильный процент всем инвесторам
     fins = (await db.execute(select(UserFinancials))).scalars().all()
     count = 0
     for fin in fins:
@@ -2279,7 +2293,7 @@ async def emergency_fix_forex(db: AsyncSession = Depends(get_db)):
             count += 1
             
     await db.commit()
-    return {"status": "SUCCESS", "message": f"Fixed {count} forex users! True Pct set to {true_pct}%."}
+    return {"status": "SUCCESS", "message": f"Fixed {count} forex users! Added 900 to net_invested. True Pct set to {true_pct}%."} forex users! True Pct set to {true_pct}%."}
 
 @router.get("/debug-state-xyz")
 async def debug_state_xyz(db: AsyncSession = Depends(get_db)):
