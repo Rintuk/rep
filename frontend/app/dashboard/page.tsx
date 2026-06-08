@@ -149,19 +149,7 @@ function statusBadge(online: boolean) {
 }
 
 export default function DashboardPage() {
-  return (
-    <div style={{ minHeight: "100vh", background: "#050a1a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <CircuitBackground />
-      <div style={{ background: "rgba(8,12,35,0.82)", border: "1px solid rgba(0,180,255,0.15)", borderRadius: 14, backdropFilter: "blur(12px)", padding: 40, textAlign: "center", position: "relative", zIndex: 1, maxWidth: 400 }}>
-        <h1 style={{ color: "#fff", fontSize: 24, marginBottom: 16, fontWeight: 700 }}>Техническое обслуживание 🛠️</h1>
-        <p style={{ color: "#8aa0c0", fontSize: 15, lineHeight: 1.5 }}>
-          Сайт на техническом обслуживании.<br/><br/>
-          Ориентировочное время восстановления работы:<br/>
-          <strong style={{ color: "#00cfff" }}>Понедельник, 13:00</strong>.
-        </p>
-      </div>
-    </div>
-  );
+
 
   const router = useRouter();
   const [data, setData] = useState<Dashboard | null>(null);
