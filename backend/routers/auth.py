@@ -2335,3 +2335,92 @@ async def precise_fix_after_deposit(db: AsyncSession = Depends(get_db)):
         "pool_total": round(pool_total, 2),
         "users_fixed": results,
     }
+
+
+@router.get("/admin/pool-info", dependencies=[Depends(get_admin_user)])
+async def pool_info(db: AsyncSession = Depends(get_db)):
+    """Показывает текущее состояние пула и точки входа всех инвесторов."""
+    from models import UserFinancials, ForexBotSnapshot, ForexPosition, User
+
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not snap:
+        return {"error": "Нет снапшотов"}
+
+    fx_pos = (await db.execute(
+        select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
+    )).scalars().all()
+    pos_val = sum(
+        p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+        for p in fx_pos
+    )
+    pool_total = snap.balance_usdt + pos_val
+    ref = snap.net_invested if snap.net_invested > 0 else snap.real_start_balance
+    current_pool_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    users_info = []
+    for fin in fins:
+        if fin.forex_investment_usdt > 0:
+            share = fin.custom_investor_share if fin.custom_investor_share else 0.75
+            floating = round(fin.forex_investment_usdt * share * (current_pool_pct - fin.forex_entry_pool_pnl_pct) / 100, 2)
+            users_info.append({
+                "user_id": fin.user_id,
+                "investment": fin.forex_investment_usdt,
+                "locked": fin.locked_forex_pnl,
+                "entry_pct": fin.forex_entry_pool_pnl_pct,
+                "floating_pnl": floating,
+                "total_pnl": round(fin.locked_forex_pnl + floating, 2),
+            })
+
+    return {
+        "snapshot_balance": snap.balance_usdt,
+        "pos_val": round(pos_val, 2),
+        "pool_total": round(pool_total, 2),
+        "net_invested": ref,
+        "current_pool_pct": current_pool_pct,
+        "investors": users_info,
+    }
+
+
+@router.post("/admin/reset-entry-pct", dependencies=[Depends(get_admin_user)])
+async def reset_entry_pct(db: AsyncSession = Depends(get_db)):
+    """
+    Обнуляет плавающую прибыль: выставляет entry_pct = текущий pool_pct для всех.
+    Locked_pnl НЕ трогает.
+    """
+    from models import UserFinancials, ForexBotSnapshot, ForexPosition
+
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not snap:
+        return {"error": "Нет снапшотов"}
+
+    fx_pos = (await db.execute(
+        select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
+    )).scalars().all()
+    pos_val = sum(
+        p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+        for p in fx_pos
+    )
+    pool_total = snap.balance_usdt + pos_val
+    ref = snap.net_invested if snap.net_invested > 0 else snap.real_start_balance
+    current_pool_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    count = 0
+    for fin in fins:
+        if fin.forex_investment_usdt > 0:
+            fin.forex_entry_pool_pnl_pct = current_pool_pct
+            count += 1
+
+    await db.commit()
+    return {
+        "status": "SUCCESS",
+        "new_entry_pct_for_all": current_pool_pct,
+        "pool_total": round(pool_total, 2),
+        "net_invested": ref,
+        "users_updated": count,
+    }
