@@ -2257,3 +2257,81 @@ async def get_user_referral_tree(user_id: str, db: AsyncSession = Depends(get_db
     _, _, _, _, _, refs_info = await _calc_referral_tree(user_id, db, crypto_pool_pct, forex_pool_pct, fin, user.manual_status_override)
     return {"referrals": refs_info}
 
+
+@router.post("/admin/precise-fix-after-deposit", dependencies=[Depends(get_admin_user)])
+async def precise_fix_after_deposit(db: AsyncSession = Depends(get_db)):
+    """
+    Точный фикс после пополнения пула на 2700.
+    Восстанавливает прибыль инвесторов до состояния ДО депозита,
+    корректно блокируя плавающий PnL на момент бэкапа (pool_pct=13.51%).
+    """
+    from models import UserFinancials, ForexBotSnapshot, ForexPosition
+
+    # pool_pct ДО депозита: (10685.98 - 9413.96) / 9413.96 * 100
+    BACKUP_POOL_PCT = (10685.98 - 9413.96) / 9413.96 * 100  # = 13.5113%
+
+    # Данные из бэкапа: id, вклад, доля инвестора, locked_pnl, entry_pct
+    USER_DATA = [
+        {"id": "5391d5b0-4483-45c8-b106-3061a869cf91", "inv": 990.0,  "share": 0.7,  "locked": 162.27, "entry": 25.0712},
+        {"id": "56f42e69-8213-4f4a-9cfd-a0205a31d199", "inv": 550.0,  "share": 0.75, "locked": 131.15, "entry": 25.0712},
+        {"id": "9b3d8aca-96ba-482b-a925-bbce375f012f", "inv": 800.0,  "share": 0.75, "locked": 190.77, "entry": 25.0712},
+        {"id": "b1780c66-98b2-4932-b24e-04c7df85ef7b", "inv": 714.0,  "share": 0.75, "locked": 48.88,  "entry": 13.2313},
+        {"id": "bc4f96cd-078a-4780-b53e-cd6c62397cd2", "inv": 1100.0, "share": 0.75, "locked": 0.0,    "entry": 13.4609},
+        {"id": "ffc4411b-61c6-434e-97d9-9a6dc50063f9", "inv": 990.0,  "share": 0.75, "locked": 45.73,  "entry": 17.3711},
+        {"id": "21403a7d-7c46-42ac-9337-340d3d7d46a4", "inv": 3000.0, "share": 0.6,  "locked": 452.59, "entry": 25.0712},
+    ]
+
+    # Получаем текущий pool_pct из последнего снапшота
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not snap:
+        return {"error": "Нет снапшотов"}
+
+    fx_pos = (await db.execute(
+        select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
+    )).scalars().all()
+    pos_val = sum(
+        p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+        for p in fx_pos
+    )
+    pool_total = snap.balance_usdt + pos_val
+    ref = snap.net_invested if snap.net_invested > 0 else snap.real_start_balance
+    current_pool_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    results = []
+    for u in USER_DATA:
+        fin = (await db.execute(
+            select(UserFinancials).where(UserFinancials.user_id == u["id"])
+        )).scalar_one_or_none()
+        if not fin:
+            results.append(f"SKIP {u['id']} - не найден в БД")
+            continue
+
+        # Плавающий PnL пользователя НА МОМЕНТ БЭКАПА (до депозита)
+        floating_at_backup = u["inv"] * u["share"] * (BACKUP_POOL_PCT - u["entry"]) / 100
+
+        # Правильный locked = backup_locked + floating_at_backup
+        # (это ровно то, что видел пользователь до депозита)
+        correct_locked = round(u["locked"] + floating_at_backup, 2)
+
+        fin.locked_forex_pnl = correct_locked
+        fin.forex_entry_pool_pnl_pct = current_pool_pct
+
+        results.append({
+            "id": u["id"],
+            "floating_at_backup": round(floating_at_backup, 2),
+            "new_locked": correct_locked,
+            "new_entry_pct": current_pool_pct,
+        })
+
+    await db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "backup_pool_pct": round(BACKUP_POOL_PCT, 4),
+        "current_pool_pct": current_pool_pct,
+        "net_invested": ref,
+        "pool_total": round(pool_total, 2),
+        "users_fixed": results,
+    }
