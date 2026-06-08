@@ -2657,3 +2657,48 @@ async def fix_spirit712_deposit(db: AsyncSession = Depends(get_db)):
         "entry_pct_updated_for": count,
         "note": "Статистика пула восстановлена. pool_pct временно отрицательный пока деньги spirit712 не поступят на биржу."
     }
+
+
+@router.post("/admin/fix-snapshot-balance", dependencies=[Depends(get_admin_user)])
+async def fix_snapshot_balance(db: AsyncSession = Depends(get_db)):
+    """
+    Добавляет 9375 к balance_usdt последнего снапшота (деньги spirit712 уже на бирже
+    но снапшот ещё не обновился).
+    Затем пересчитывает entry_pct для всех по новому pool_pct.
+    """
+    from models import UserFinancials, ForexBotSnapshot
+
+    SPIRIT712_DEPOSIT = 9375.0
+
+    # Обновляем balance_usdt в последнем снапшоте
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not snap:
+        return {"error": "Нет снапшотов"}
+
+    old_balance = snap.balance_usdt
+    snap.balance_usdt = round(old_balance + SPIRIT712_DEPOSIT, 2)
+    await db.commit()
+
+    # Новый pool_pct по формуле дашборда
+    ref = snap.net_invested if snap.net_invested > 0 else snap.real_start_balance
+    new_pool_pct = round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    # Обновляем entry_pct всем инвесторам → floating = 0
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    count = 0
+    for fin in fins:
+        if fin.forex_investment_usdt > 0:
+            fin.forex_entry_pool_pnl_pct = new_pool_pct
+            count += 1
+    await db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "old_balance_usdt": old_balance,
+        "new_balance_usdt": snap.balance_usdt,
+        "net_invested": ref,
+        "new_pool_pct": new_pool_pct,
+        "entry_pct_updated_for": count,
+    }
