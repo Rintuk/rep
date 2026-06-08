@@ -2424,3 +2424,51 @@ async def reset_entry_pct(db: AsyncSession = Depends(get_db)):
         "net_invested": ref,
         "users_updated": count,
     }
+
+
+@router.post("/admin/fix-entry-pct-now", dependencies=[Depends(get_admin_user)])
+async def fix_entry_pct_now(db: AsyncSession = Depends(get_db)):
+    """
+    Правильный расчёт pool_pct — по формуле дашборда:
+    pool_pct = (balance_usdt - net_invested) / net_invested * 100
+    Устанавливает entry_pct = текущему pool_pct для ВСЕХ инвесторов.
+    locked_pnl не трогает.
+    """
+    from models import UserFinancials, ForexBotSnapshot
+
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not snap:
+        return {"error": "Нет снапшотов"}
+
+    ref = snap.net_invested if snap.net_invested > 0 else snap.real_start_balance
+    # Используем ту же формулу что и дашборд — только balance_usdt
+    correct_pool_pct = round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    count = 0
+    details = []
+    for fin in fins:
+        if fin.forex_investment_usdt > 0:
+            old_entry = fin.forex_entry_pool_pnl_pct
+            fin.forex_entry_pool_pnl_pct = correct_pool_pct
+            details.append({
+                "user_id": fin.user_id,
+                "investment": fin.forex_investment_usdt,
+                "locked": fin.locked_forex_pnl,
+                "old_entry": old_entry,
+                "new_entry": correct_pool_pct,
+                "total_pnl_after": fin.locked_forex_pnl,
+            })
+            count += 1
+
+    await db.commit()
+    return {
+        "status": "SUCCESS",
+        "balance_usdt": snap.balance_usdt,
+        "net_invested": ref,
+        "correct_pool_pct": correct_pool_pct,
+        "users_updated": count,
+        "details": details,
+    }
