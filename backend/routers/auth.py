@@ -2702,3 +2702,48 @@ async def fix_snapshot_balance(db: AsyncSession = Depends(get_db)):
         "new_pool_pct": new_pool_pct,
         "entry_pct_updated_for": count,
     }
+
+
+class SetNetInvestedRequest(BaseModel):
+    amount: float
+
+
+@router.post("/admin/set-net-invested", dependencies=[Depends(get_admin_user)])
+async def set_net_invested(req: SetNetInvestedRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Устанавливает net_invested = указанной сумме во ВСЕХ снапшотах.
+    Затем пересчитывает entry_pct для всех инвесторов.
+    """
+    from models import UserFinancials, ForexBotSnapshot
+
+    new_net = req.amount
+
+    # Устанавливаем net_invested во всех снапшотах
+    snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
+    for s in snaps:
+        s.net_invested = new_net
+    await db.commit()
+
+    # Получаем последний снапшот для расчёта pool_pct
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    new_pool_pct = round((snap.balance_usdt - new_net) / new_net * 100, 4) if new_net > 0 else 0.0
+
+    # Обновляем entry_pct всем инвесторам → floating = 0
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    count = 0
+    for fin in fins:
+        if fin.forex_investment_usdt > 0:
+            fin.forex_entry_pool_pnl_pct = new_pool_pct
+            count += 1
+    await db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "new_net_invested": new_net,
+        "balance_usdt": snap.balance_usdt,
+        "new_pool_pct": new_pool_pct,
+        "entry_pct_updated_for": count,
+    }
