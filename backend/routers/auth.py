@@ -2472,3 +2472,59 @@ async def fix_entry_pct_now(db: AsyncSession = Depends(get_db)):
         "users_updated": count,
         "details": details,
     }
+
+
+@router.post("/admin/boost-pnl-30", dependencies=[Depends(get_admin_user)])
+async def boost_pnl_30(db: AsyncSession = Depends(get_db)):
+    """
+    1. Устанавливает entry_pct = текущий pool_pct (по формуле дашборда) для всех
+    2. Увеличивает locked_forex_pnl на 30% для всех КРОМЕ spirit712@mail.ru
+    3. spirit712 остаётся с 0 прибылью
+    """
+    from models import UserFinancials, ForexBotSnapshot
+
+    SPIRIT712_ID = "b6556c92-3405-4a00-b739-a81122bb6834"
+    BOOST = 1.30
+
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not snap:
+        return {"error": "Нет снапшотов"}
+
+    ref = snap.net_invested if snap.net_invested > 0 else snap.real_start_balance
+    correct_pool_pct = round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    results = []
+    for fin in fins:
+        if fin.forex_investment_usdt <= 0:
+            continue
+
+        # Всем выставляем правильный entry_pct
+        fin.forex_entry_pool_pnl_pct = correct_pool_pct
+
+        if fin.user_id == SPIRIT712_ID:
+            # spirit712: прибыль = 0
+            fin.locked_forex_pnl = 0.0
+            results.append({"user_id": fin.user_id, "locked": 0.0, "action": "ZERO (spirit712)"})
+        else:
+            # Остальные: +30% к locked_pnl
+            old = fin.locked_forex_pnl
+            fin.locked_forex_pnl = round(old * BOOST, 2)
+            results.append({
+                "user_id": fin.user_id,
+                "investment": fin.forex_investment_usdt,
+                "old_locked": old,
+                "new_locked": fin.locked_forex_pnl,
+                "action": f"+30% ({old} → {fin.locked_forex_pnl})",
+            })
+
+    await db.commit()
+    return {
+        "status": "SUCCESS",
+        "correct_pool_pct": correct_pool_pct,
+        "balance_usdt": snap.balance_usdt,
+        "net_invested": ref,
+        "results": results,
+    }
