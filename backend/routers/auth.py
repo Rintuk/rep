@@ -2528,3 +2528,86 @@ async def boost_pnl_30(db: AsyncSession = Depends(get_db)):
         "net_invested": ref,
         "results": results,
     }
+
+
+@router.post("/admin/capitalize-all", dependencies=[Depends(get_admin_user)])
+async def capitalize_all(db: AsyncSession = Depends(get_db)):
+    """
+    Капитализация прибыли:
+    1. locked_pnl + ref_bonus → прибавляются к депозиту каждого инвестора
+    2. locked_pnl и ref_bonus обнуляются
+    3. entry_pct = текущий pool_pct (цикл начинается сначала)
+    4. net_invested во всех снапшотах увеличивается на сумму реинвестирования
+    spirit712 — остаётся с депозитом 9375$ без изменений (только entry_pct обновляется)
+    """
+    from models import UserFinancials, ForexBotSnapshot
+
+    SPIRIT712_ID = "b6556c92-3405-4a00-b739-a81122bb6834"
+
+    # Текущий pool_pct по формуле дашборда
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not snap:
+        return {"error": "Нет снапшотов"}
+
+    ref = snap.net_invested if snap.net_invested > 0 else snap.real_start_balance
+    current_pool_pct = round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    total_reinvested = 0.0
+    results = []
+
+    for fin in fins:
+        if fin.forex_investment_usdt <= 0 and fin.user_id != SPIRIT712_ID:
+            continue
+
+        if fin.user_id == SPIRIT712_ID:
+            # spirit712: только обновляем entry_pct, остальное не трогаем
+            fin.forex_entry_pool_pnl_pct = current_pool_pct
+            results.append({
+                "user_id": fin.user_id,
+                "action": "entry_pct updated only (spirit712)",
+                "investment": fin.forex_investment_usdt,
+                "new_entry_pct": current_pool_pct,
+            })
+            continue
+
+        gain = round((fin.locked_forex_pnl or 0) + (fin.locked_forex_ref_bonus or 0), 2)
+        old_inv = fin.forex_investment_usdt
+        new_inv = round(old_inv + gain, 2)
+
+        results.append({
+            "user_id": fin.user_id,
+            "old_investment": old_inv,
+            "locked_pnl": fin.locked_forex_pnl,
+            "ref_bonus": fin.locked_forex_ref_bonus,
+            "gain_added": gain,
+            "new_investment": new_inv,
+            "new_entry_pct": current_pool_pct,
+        })
+
+        fin.forex_investment_usdt = new_inv
+        fin.locked_forex_pnl = 0.0
+        fin.locked_forex_ref_bonus = 0.0
+        fin.forex_entry_pool_pnl_pct = current_pool_pct
+        total_reinvested += gain
+
+    await db.commit()
+
+    # Обновляем net_invested во ВСЕХ снапшотах на сумму реинвестированного
+    if total_reinvested > 0:
+        snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
+        for s in snaps:
+            s.net_invested = round(s.net_invested + total_reinvested, 4)
+        await db.commit()
+
+    return {
+        "status": "SUCCESS",
+        "current_pool_pct": current_pool_pct,
+        "balance_usdt": snap.balance_usdt,
+        "old_net_invested": ref,
+        "new_net_invested": round(ref + total_reinvested, 4),
+        "total_reinvested": round(total_reinvested, 2),
+        "results": results,
+    }
