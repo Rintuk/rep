@@ -658,13 +658,17 @@ export default function DashboardPage() {
                 const cur = p.current_price || p.avg_price;
                 const value = p.amount * cur;
                 const pnl = p.amount * (cur - p.avg_price);
-                const pnlPct = ((cur - p.avg_price) / p.avg_price) * 100;
+                const entryValue = Math.abs(p.amount * p.avg_price);
+                const pnlPct = entryValue > 0 ? (pnl / entryValue) * 100 : 0;
                 const c = pnl >= 0 ? "#22c97a" : "#ff4d4d";
                 return (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
-                    <span style={{ color: "#00cfff", fontWeight: 600, fontSize: 14 }}>{p.symbol}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ color: "#00cfff", fontWeight: 600, fontSize: 14 }}>{p.symbol}</span>
+                      <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: p.amount > 0 ? "rgba(34,201,122,0.15)" : "rgba(255,77,77,0.15)", color: p.amount > 0 ? "#22c97a" : "#ff4d4d", alignSelf: "flex-start", lineHeight: 1 }}>{p.amount > 0 ? "LONG" : "SHORT"}</span>
+                    </div>
                     <div style={{ textAlign: "right" }}>
-                      <p style={{ color: "#fff", fontSize: 13 }}>{value.toFixed(2)} $</p>
+                      <p style={{ color: "#fff", fontSize: 13 }}>{Math.abs(value).toFixed(2)} $</p>
                       <p style={{ color: "#4a6a9a", fontSize: 11 }}>avg ${p.avg_price.toFixed(4)} · тек. ${cur.toFixed(4)}</p>
                       <p style={{ color: c, fontSize: 11, fontWeight: 600 }}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} $ ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)</p>
                     </div>
