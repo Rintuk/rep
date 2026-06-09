@@ -472,16 +472,15 @@ export default function DashboardPage() {
 
           {[
             { icon: <Wallet size={18}/>, label: "Общий пул", value: `${poolTotal.toFixed(2)} $`, sub: `свободно: ${poolBalance.toFixed(2)} $`, color: "#4488dd" },
-            { icon: <Activity size={18}/>, label: "Пул в позициях", value: `${poolPositionsUsdt.toFixed(2)} $`, sub: null, color: "#9966ee" },
+            { icon: <Activity size={18}/>, label: "Пул в позициях", value: `${Math.abs(poolPositionsUsdt).toFixed(2)} $`, sub: null, color: "#9966ee" },
             { icon: <Wallet size={18}/>, label: "Инвестировано", value: poolInvestment > 0 ? `${poolInvestment.toFixed(2)} $` : "—", sub: poolInvestment > 0 ? "ваш вклад в пул" : "нет данных", color: "#22c97a" },
-            { icon: poolPnl >= 0 ? <TrendingUp size={18}/> : <TrendingDown size={18}/>, label: "Чистый доход", value: poolInvestment > 0 ? `${poolPnl >= 0 ? "+" : ""}${poolPnl.toFixed(2)} $` : "—", sub: poolInvestment > 0 ? `${poolPnlPct >= 0 ? "+" : ""}${poolPnlPct.toFixed(2)}%` : "нет вложений", color: pnlColor },
+            { icon: <TrendingUp size={18}/>, label: "Чистый доход", value: poolInvestment > 0 ? `+${Math.max(0, poolPnl).toFixed(2)} $` : "—", sub: poolInvestment > 0 ? `+${Math.max(0, poolPnlPct).toFixed(2)}%` : "нет вложений", color: "#22c97a" },
             ...(isCrypto && data.ref_bonus > 0 ? [{ icon: <TrendingUp size={18}/>, label: "Реф. доход", value: `+${data.ref_bonus.toFixed(2)} $`, sub: "3% от прибыли", color: "#f59e0b" }] : []),
             ...(!isCrypto && (data.forex_ref_bonus ?? 0) > 0 ? [{ icon: <TrendingUp size={18}/>, label: "Реф. доход", value: `+${data.forex_ref_bonus.toFixed(2)} $`, sub: "3% от прибыли", color: "#f59e0b" }] : []),
             ...( poolInvestment > 0 ? (() => {
               const refBonus = isCrypto ? data.ref_bonus : (data.forex_ref_bonus ?? 0);
-              const currentBalance = poolInvestment + poolPnl + refBonus;
-              const balColor = currentBalance >= poolInvestment ? "#22c97a" : "#ef4444";
-              return [{ icon: <TrendingUp size={18}/>, label: "Текущий баланс", value: `${currentBalance.toFixed(2)} $`, sub: `вклад + доход + реф.`, color: balColor }];
+              const currentBalance = poolInvestment + Math.max(0, poolPnl) + refBonus;
+              return [{ icon: <TrendingUp size={18}/>, label: "Текущий баланс", value: `${currentBalance.toFixed(2)} $`, sub: `вклад + доход + реф.`, color: "#22c97a" }];
             })() : []),
           ].map((c, i) => (
             <div key={i} style={{ ...card, padding: "16px" }}>
