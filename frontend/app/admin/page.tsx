@@ -148,7 +148,7 @@ export default function AdminPage() {
   const [withdrawals, setWithdrawals] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
 
-  const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: "asc" | "desc" }>({ key: "created_at", direction: "desc" });
+  const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: "asc" | "desc" }>({ key: "investment", direction: "desc" });
 
   const sortedInvestors = React.useMemo(() => {
     if (!data?.investors) return [];
