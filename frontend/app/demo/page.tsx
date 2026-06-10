@@ -167,6 +167,20 @@ export default function DemoPage() {
     } finally { setResetting(false); }
   }
 
+  const MAINTENANCE_MODE = true;
+  if (MAINTENANCE_MODE) return (
+    <div style={{ minHeight: "100vh", background: "rgba(3,5,20,1)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <CircuitBackground />
+      <div style={{ background: "rgba(8,12,35,0.85)", border: "1px solid rgba(0,180,255,0.12)", borderRadius: 14, backdropFilter: "blur(12px)", padding: 32, textAlign: "center", maxWidth: 450, position: "relative", zIndex: 1 }}>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>⏳</div>
+        <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Идет приходование депозита клиента</h2>
+        <p style={{ color: "#6b7bb0", fontSize: 15, lineHeight: 1.5 }}>
+          Бот делает апгрейт счета. Сайт заработает сегодня в ближайшее время.
+        </p>
+      </div>
+    </div>
+  );
+
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "rgba(3,5,20,1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <CircuitBackground />
