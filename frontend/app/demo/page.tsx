@@ -167,7 +167,7 @@ export default function DemoPage() {
     } finally { setResetting(false); }
   }
 
-  const MAINTENANCE_MODE = true;
+  const MAINTENANCE_MODE = false;
   if (MAINTENANCE_MODE) return (
     <div style={{ minHeight: "100vh", background: "rgba(3,5,20,1)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <CircuitBackground />
