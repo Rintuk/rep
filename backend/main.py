@@ -53,6 +53,7 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE users ADD COLUMN nickname VARCHAR DEFAULT NULL",
             "UPDATE users SET nickname = email WHERE nickname IS NULL",
             "ALTER TABLE users ADD CONSTRAINT users_nickname_key UNIQUE (nickname)",
+            "CREATE TABLE IF NOT EXISTS global_settings (id SERIAL PRIMARY KEY, maintenance_enabled BOOLEAN DEFAULT FALSE, maintenance_message TEXT DEFAULT 'Техобслуживание сайта. Скоро вернемся.')",
             """CREATE TABLE IF NOT EXISTS deposit_requests (
                 id TEXT PRIMARY KEY,
                 user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
