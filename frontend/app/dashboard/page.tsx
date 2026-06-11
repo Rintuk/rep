@@ -217,7 +217,6 @@ export default function DashboardPage() {
   }
 
   async function fetchData(showLoading = false) {
-    if (showLoading) setLoading(true);
     setError("");
     fetchSettings();
     try { 
@@ -237,8 +236,6 @@ export default function DashboardPage() {
         // При фоновом рефреше — только маленький баннер, страницу не заменяем
         setRefreshWarn(true);
       }
-    } finally {
-      if (showLoading) setLoading(false);
     }
   }
 
