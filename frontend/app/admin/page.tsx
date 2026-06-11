@@ -1001,8 +1001,8 @@ export default function AdminPage() {
 
             {/* NOTEBOOK BLOCK */}
             {notebookData && (
-              <div style={{ padding: 20, background: "rgba(30, 41, 59, 0.5)", borderRadius: 12, border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                <h2 style={{ color: "#a78bfa", fontWeight: 600, fontSize: 14, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ ...card, padding: 20 }}>
+                <h2 style={{ color: "#fff", fontWeight: 600, fontSize: 14, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
                   <span>📓</span> Записная книжка дохода
                 </h2>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1014,7 +1014,7 @@ export default function AdminPage() {
                     { label: "Всего", value: notebookData[activePool]?.total || 0 },
                   ].map((r, i) => (
                     <div key={`nb-${i}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{r.label}</span>
+                      <span style={{ fontSize: 13, color: muted }}>{r.label}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: r.value >= 0 ? "#22c97a" : "#ff4d4d" }}>
                         {r.value >= 0 ? "+" : ""}{Number(r.value).toFixed(2)} $
                       </span>
