@@ -474,5 +474,5 @@ export async function depositForexFromPool(user_id: string, amount: number) {
 
 export const getPublicSettings = async () => (await api.get('/auth/public/settings')).data;
 export const updateAdminSettings = async (maintenance_enabled: boolean, maintenance_message: string) => (await api.post('/auth/admin/settings', { maintenance_enabled, maintenance_message })).data;
-export async function getAdminNotebook() { const res = await api.get('/admin/notebook'); return res.data; }
+export async function getAdminNotebook() { const res = await api.get('/auth/admin/notebook'); return res.data; }
 
