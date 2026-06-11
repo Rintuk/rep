@@ -617,7 +617,7 @@ export default function DashboardPage() {
                     <th style={{ textAlign: "left", paddingBottom: 8, fontWeight: 400 }}>Email</th>
                     <th style={{ textAlign: "center", paddingBottom: 8, fontWeight: 400 }}>Уровень</th>
                     <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Оборот</th>
-                    <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Ваш бонус (Крипто+Форекс)</th>
+                    <th style={{ textAlign: "right", paddingBottom: 8, fontWeight: 400 }}>Бонус</th>
                   </tr>
                 </thead>
                 <tbody>
