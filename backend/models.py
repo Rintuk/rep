@@ -314,9 +314,10 @@ class NewsItem(Base):
     created_at: Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)
 
 class AdminProfitLog(Base):
-    __tablename__ = "admin_profit_log"
+    __tablename__ = "admin_profit_stats"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     date: Mapped[str] = mapped_column(String, unique=True) # YYYY-MM-DD
-    profit_usdt: Mapped[float] = mapped_column(Float, default=0.0)
+    crypto_profit: Mapped[float] = mapped_column(Float, default=0.0)
+    forex_profit: Mapped[float] = mapped_column(Float, default=0.0)
 
