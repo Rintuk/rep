@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import React from "react";
 import {
   api,
-  getAdminOverview, getAdminForexOverview,
+  getAdminOverview, getAdminForexOverview, getAdminNotebook,
   approveUser, rejectUser,
   updateUserFinancials, updateUserForexFinancials, setReferralLimit,
   deleteUser, getUserDetail, resetUserPassword,
@@ -144,6 +144,7 @@ export default function AdminPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notebookData, setNotebookData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits" | "withdrawals" | "news" | "support">("overview");
   const [deposits, setDeposits] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [withdrawals, setWithdrawals] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
@@ -399,14 +400,16 @@ export default function AdminPage() {
   async function fetchData() {
     try {
       const isForex = activePool === "forex";
-      const [d, dep, wdr] = await Promise.all([
+      const [d, dep, wdr, nb] = await Promise.all([
         isForex ? getAdminForexOverview() : getAdminOverview(),
         isForex ? getAdminForexDeposits() : getAdminDeposits(),
         isForex ? getAdminForexWithdrawals() : getAdminWithdrawals(),
+        getAdminNotebook(),
       ]);
       setData(d);
       setDeposits(dep);
       setWithdrawals(wdr);
+        setNotebookData(nb);
     } catch {
       setError("Нет доступа или ошибка загрузки");
     } finally {

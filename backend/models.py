@@ -312,3 +312,11 @@ class NewsItem(Base):
     pool_type:  Mapped[str]           = mapped_column(String, default="all")  # "all", "crypto", "forex"
     image_url:  Mapped[Optional[str]]    = mapped_column(Text, nullable=True, default=None)
     created_at: Mapped[datetime]      = mapped_column(DateTime, default=datetime.utcnow)
+
+class AdminProfitLog(Base):
+    __tablename__ = "admin_profit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    date: Mapped[str] = mapped_column(String, unique=True) # YYYY-MM-DD
+    profit_usdt: Mapped[float] = mapped_column(Float, default=0.0)
+

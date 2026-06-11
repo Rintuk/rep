@@ -6,7 +6,7 @@ from config import settings
 from database import get_db
 from models import (BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade,
                     ForexBotSnapshot, ForexPosition, ForexTrade, ForexAIFeedEntry,
-                    ForexVirtualAccount, ForexVirtualTrade, UserFinancials, User, DEMO_START_BALANCE)
+                    ForexVirtualAccount, ForexVirtualTrade, UserFinancials, User, DEMO_START_BALANCE, AdminProfitLog)
 from schemas import BotUpdateIn
 
 router = APIRouter(prefix="/api", tags=["bot"])
@@ -81,6 +81,35 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         db.add(Trade(snapshot_id=snapshot.id, symbol=t.symbol, action=t.action,
                      amount=t.amount, price=t.price, pnl=t.pnl, timestamp=t.timestamp))
         new_real_trades.append(t)
+
+    
+    # Calculate admin profit for new trades
+    if new_real_trades and balance_usd > 0:
+        all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+        # total_invested differs for crypto vs forex
+        # Let's just calculate it dynamically below
+        
+        today_str = datetime.utcnow().strftime("%Y-%m-%d")
+        stat = (await db.execute(select(AdminProfitLog).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
+        if not stat:
+            stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
+            db.add(stat)
+
+        total_invested = sum(fin.investment_usdt for fin in all_fins)
+        admin_own_cap = snapshot.real_start_balance
+        pool_total = balance_usd
+        
+        for t in new_real_trades:
+            if t.pnl is not None:
+                pnl = t.pnl
+                admin_share = admin_own_cap / pool_total if pool_total > 0 else 0
+                inv_share = total_invested / pool_total if pool_total > 0 else 0
+                
+                admin_trade_profit = pnl * admin_share
+                if pnl > 0:
+                    admin_trade_profit += pnl * inv_share * 0.20
+                    
+                stat.crypto_profit += admin_trade_profit
 
     for entry in payload.ai_feed:
         db.add(AIFeedEntry(snapshot_id=snapshot.id, timestamp=entry.timestamp,
@@ -203,6 +232,35 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                           pnl=t.pnl,
                           timestamp=t.timestamp))
         new_real_trades.append(t)
+
+    
+    # Calculate admin profit for new trades
+    if new_real_trades and balance_usd > 0:
+        all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+        # total_invested differs for crypto vs forex
+        # Let's just calculate it dynamically below
+        
+        today_str = datetime.utcnow().strftime("%Y-%m-%d")
+        stat = (await db.execute(select(AdminProfitLog).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
+        if not stat:
+            stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
+            db.add(stat)
+
+        total_invested = sum(fin.forex_investment_usdt for fin in all_fins)
+        admin_own_cap = snapshot.real_start_balance
+        pool_total = balance_usd
+        
+        for t in new_real_trades:
+            if t.pnl is not None:
+                pnl = t.pnl
+                admin_share = admin_own_cap / pool_total if pool_total > 0 else 0
+                inv_share = total_invested / pool_total if pool_total > 0 else 0
+                
+                admin_trade_profit = pnl * admin_share
+                if pnl > 0:
+                    admin_trade_profit += pnl * inv_share * 0.20
+                    
+                stat.forex_profit += admin_trade_profit
 
     for entry in payload.ai_feed:
         db.add(ForexAIFeedEntry(snapshot_id=snapshot.id, timestamp=entry.timestamp,
