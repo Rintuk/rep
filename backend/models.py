@@ -9,6 +9,12 @@ from database import Base
 def gen_uuid() -> str:
     return str(uuid.uuid4())
 
+class GlobalSettings(Base):
+    __tablename__ = "global_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    maintenance_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    maintenance_message: Mapped[str] = mapped_column(Text, default="Техобслуживание сайта. Скоро вернемся.")
 
 class User(Base):
     __tablename__ = "users"

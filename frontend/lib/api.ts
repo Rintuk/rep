@@ -471,3 +471,6 @@ export async function depositForexFromPool(user_id: string, amount: number) {
   const res = await api.post("/auth/admin/forex-deposit-from-pool", { user_id, amount });
   return res.data;
 }
+e x p o r t   c o n s t   g e t P u b l i c S e t t i n g s   =   a s y n c   ( )   = >   ( a w a i t   a p i . g e t ( ' / a u t h / p u b l i c / s e t t i n g s ' ) ) . d a t a ;  
+ e x p o r t   c o n s t   u p d a t e A d m i n S e t t i n g s   =   a s y n c   ( m a i n t e n a n c e _ e n a b l e d :   b o o l e a n ,   m a i n t e n a n c e _ m e s s a g e :   s t r i n g )   = >   ( a w a i t   a p i . p o s t ( ' / a u t h / a d m i n / s e t t i n g s ' ,   {   m a i n t e n a n c e _ e n a b l e d ,   m a i n t e n a n c e _ m e s s a g e   } ) ) . d a t a ;  
+ 

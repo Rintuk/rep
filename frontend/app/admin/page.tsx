@@ -18,6 +18,7 @@ import {
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
   silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool,
+  getPublicSettings, updateAdminSettings,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -256,14 +257,28 @@ export default function AdminPage() {
   const [clearTicketsMsg, setClearTicketsMsg] = useState<string | null>(null);
   const [selectedSupportUser, setSelectedSupportUser] = useState<string | null>(null);
 
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("Техобслуживание сайта. Скоро вернемся.");
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
     fetchData();
     fetchTickets();
+    fetchSettings();
     const interval = setInterval(() => { fetchData(); fetchTickets(); }, 60000);
     return () => clearInterval(interval);
   }, [activePool]);
+
+  async function fetchSettings() {
+    try {
+      const st = await getPublicSettings();
+      setMaintenanceEnabled(st.maintenance_enabled);
+      setMaintenanceMessage(st.maintenance_message);
+    } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     if (activeTab === "news") fetchNews();
@@ -531,6 +546,20 @@ export default function AdminPage() {
       setBaselineResult({ error: "Ошибка" });
     } finally {
       setBaselineLoading(false);
+    }
+  }
+
+  async function handleSaveSettings() {
+    setSettingsSaving(true);
+    setSettingsMsg(null);
+    try {
+      await updateAdminSettings(maintenanceEnabled, maintenanceMessage);
+      setSettingsMsg("Настройки сохранены");
+    } catch {
+      setSettingsMsg("Ошибка сохранения");
+    } finally {
+      setSettingsSaving(false);
+      setTimeout(() => setSettingsMsg(null), 3000);
     }
   }
 
@@ -1355,6 +1384,50 @@ export default function AdminPage() {
                     </button>
                   </div>
                   {adjustMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 8 }}>{adjustMsg}</p>}
+                </div>
+
+                {/* Заглушки */}
+                <div style={{ marginTop: 24, borderTop: `1px solid rgba(0,180,255,0.2)`, paddingTop: 24 }}>
+                  <details style={{ background: "rgba(3,5,20,0.5)", borderRadius: 8, border: "1px solid rgba(0,180,255,0.12)", overflow: "hidden" }}>
+                    <summary style={{ padding: "16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, fontWeight: 600, color: "#00b4ff", userSelect: "none" }}>
+                      <span style={{ fontSize: 18 }}>🚧</span>
+                      Управление заглушками для инвесторов
+                    </summary>
+                    <div style={{ padding: "0 16px 16px 16px" }}>
+                      <p style={{ color: muted, fontSize: 13, marginBottom: 16 }}>
+                        Включите заглушку, чтобы закрыть доступ к дашборду и демо-счету для инвесторов.
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                          <input type="checkbox" checked={maintenanceEnabled} onChange={e => setMaintenanceEnabled(e.target.checked)} />
+                          <span style={{ color: "#fff", fontWeight: 500 }}>Включить заглушку</span>
+                        </label>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                        <button onClick={() => setMaintenanceMessage("Техобслуживание сайта. Скоро вернемся.")}
+                          style={{ padding: "6px 12px", borderRadius: 6, fontSize: 12, background: "rgba(255,255,255,0.05)", color: "#aaa", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}>
+                          Техобслуживание
+                        </button>
+                        <button onClick={() => setMaintenanceMessage("Идет приходование депозита клиента. Бот делает апгрейт счета. Сайт заработает сегодня в ближайшее время.")}
+                          style={{ padding: "6px 12px", borderRadius: 6, fontSize: 12, background: "rgba(255,255,255,0.05)", color: "#aaa", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}>
+                          Апгрейт счета
+                        </button>
+                      </div>
+                      <textarea
+                        value={maintenanceMessage}
+                        onChange={e => setMaintenanceMessage(e.target.value)}
+                        placeholder="Текст заглушки..."
+                        style={{ width: "100%", height: 80, padding: 12, borderRadius: 8, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", outline: "none", resize: "vertical", fontSize: 13, marginBottom: 12 }}
+                      />
+                      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                        <button onClick={handleSaveSettings} disabled={settingsSaving}
+                          style={{ padding: "8px 24px", borderRadius: 8, background: "rgba(0,180,255,0.1)", border: "1px solid rgba(0,180,255,0.3)", color: "#00b4ff", fontWeight: 600, cursor: "pointer", opacity: settingsSaving ? 0.5 : 1 }}>
+                          {settingsSaving ? "Сохранение..." : "💾 Сохранить настройки"}
+                        </button>
+                        {settingsMsg && <span style={{ color: "#22c97a", fontSize: 13 }}>{settingsMsg}</span>}
+                      </div>
+                    </div>
+                  </details>
                 </div>
 
               </div>

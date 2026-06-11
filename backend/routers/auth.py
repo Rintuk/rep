@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
-from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade, DepositRequest, WithdrawalRequest, NewsItem, ForexBotSnapshot
+from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade, DepositRequest, WithdrawalRequest, NewsItem, ForexBotSnapshot, GlobalSettings
 from schemas import RegisterIn, LoginIn, TokenOut, NewsItemCreate, NewsItemOut
 from security import hash_password, verify_password, create_access_token, get_admin_user, get_current_user
 from datetime import datetime, timedelta
@@ -2747,3 +2747,27 @@ async def set_net_invested(req: SetNetInvestedRequest, db: AsyncSession = Depend
         "new_pool_pct": new_pool_pct,
         "entry_pct_updated_for": count,
     }
+
+class GlobalSettingsSchema(BaseModel):
+    maintenance_enabled: bool
+    maintenance_message: str
+
+@router.get("/public/settings")
+async def get_public_settings(db: AsyncSession = Depends(get_db)):
+    gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+    if not gs:
+        gs = GlobalSettings()
+        db.add(gs)
+        await db.commit()
+    return {"maintenance_enabled": gs.maintenance_enabled, "maintenance_message": gs.maintenance_message}
+
+@router.post("/admin/settings", dependencies=[Depends(get_admin_user)])
+async def update_admin_settings(data: GlobalSettingsSchema, db: AsyncSession = Depends(get_db)):
+    gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+    if not gs:
+        gs = GlobalSettings()
+        db.add(gs)
+    gs.maintenance_enabled = data.maintenance_enabled
+    gs.maintenance_message = data.maintenance_message
+    await db.commit()
+    return {"status": "ok"}

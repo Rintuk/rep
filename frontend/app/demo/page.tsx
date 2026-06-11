@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   getDemoAccount, startDemoAccount, resetDemoAccount,
   getForexDemoAccount, startForexDemoAccount, resetForexDemoAccount,
+  getPublicSettings,
 } from "@/lib/api";
 import { TrendingUp, TrendingDown, Wallet, Activity, RotateCcw, Settings } from "lucide-react";
 
@@ -119,6 +120,9 @@ export default function DemoPage() {
   const [activePool, setActivePool] = useState<"crypto" | "forex">("crypto");
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+
   const card: React.CSSProperties = {
     background: "rgba(8,12,35,0.85)",
     border: "1px solid rgba(0,180,255,0.15)",
@@ -136,13 +140,22 @@ export default function DemoPage() {
     }
   }
 
+  async function fetchSettings() {
+    try {
+      const st = await getPublicSettings();
+      setMaintenanceEnabled(st.maintenance_enabled);
+      setMaintenanceMessage(st.maintenance_message);
+    } catch { /* ignore */ }
+  }
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
     setLoading(true);
     setData(null);
+    fetchSettings();
     fetchData(activePool);
-    const interval = setInterval(() => fetchData(activePool), 60000);
+    const interval = setInterval(() => { fetchSettings(); fetchData(activePool); }, 30000);
     return () => clearInterval(interval);
   }, [activePool]);
 
@@ -167,15 +180,14 @@ export default function DemoPage() {
     } finally { setResetting(false); }
   }
 
-  const MAINTENANCE_MODE = false;
-  if (MAINTENANCE_MODE) return (
+  if (maintenanceEnabled) return (
     <div style={{ minHeight: "100vh", background: "rgba(3,5,20,1)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <CircuitBackground />
       <div style={{ background: "rgba(8,12,35,0.85)", border: "1px solid rgba(0,180,255,0.12)", borderRadius: 14, backdropFilter: "blur(12px)", padding: 32, textAlign: "center", maxWidth: 450, position: "relative", zIndex: 1 }}>
         <div style={{ fontSize: 40, marginBottom: 16 }}>⏳</div>
-        <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Идет приходование депозита клиента</h2>
+        <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Обслуживание</h2>
         <p style={{ color: "#6b7bb0", fontSize: 15, lineHeight: 1.5 }}>
-          Бот делает апгрейт счета. Сайт заработает сегодня в ближайшее время.
+          {maintenanceMessage}
         </p>
       </div>
     </div>

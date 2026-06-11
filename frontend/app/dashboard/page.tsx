@@ -6,7 +6,7 @@ import {
   getDashboard,
   createDepositRequest, getMyDeposits, createWithdrawalRequest, getMyWithdrawals,
   createForexDepositRequest, getMyForexDeposits, createForexWithdrawalRequest, getMyForexWithdrawals,
-  changePassword, getNews, NewsItem as NewsItemType, getMyTickets, markTicketsRead, updateNickname,
+  changePassword, getNews, NewsItem as NewsItemType, getMyTickets, markTicketsRead, updateNickname, getPublicSettings,
 } from "@/lib/api";
 import { Wallet, ArrowRight, ArrowDownLeft, ArrowUpRight, Copy, LogOut, Loader2, CheckCircle2, TrendingUp, Info, TrendingDown, Activity, PlusCircle, X, CheckCheck, Settings, Headphones } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
@@ -190,6 +190,9 @@ export default function DashboardPage() {
   const [nicknameLoading, setNicknameLoading] = useState(false);
   const [nicknameMsg, setNicknameMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
@@ -201,19 +204,29 @@ export default function DashboardPage() {
     getNews().then(setNewsFeed).catch(() => {});
     const refreshBadge = () => getMyTickets().then(t => setSupportBadge(t.filter(x => x.has_unread).length)).catch(() => {});
     refreshBadge();
-    const interval = setInterval(() => { fetchData(false); refreshBadge(); }, 60000);
+    const interval = setInterval(() => fetchData(false), 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [activePool]);
 
-  async function fetchData(initial = false) {
+  async function fetchSettings() {
     try {
+      const st = await getPublicSettings();
+      setMaintenanceEnabled(st.maintenance_enabled);
+      setMaintenanceMessage(st.maintenance_message);
+    } catch { /* ignore */ }
+  }
+
+  async function fetchData(showLoading = false) {
+    if (showLoading) setLoading(true);
+    setError("");
+    fetchSettings();
+    try { 
       const d = await getDashboard();
       setData(d);
       setRefreshWarn(false);
       if (d.referral_code) setReferralCode(d.referral_code);
     } catch (e: any) {
-      if (initial) {
-        // При первичной загрузке — показываем полный экран ошибки только если 401/403
+      if (showLoading) {
         const status = e?.response?.status;
         if (status === 401 || status === 403) {
           setError("Сессия истекла. Войдите снова.");
@@ -269,15 +282,14 @@ export default function DashboardPage() {
   function openDeposit() { setMenuOpen(false); setShowDeposit(true); setDepositDone(false); setDepositAmount(""); setDepositComment(""); }
   function openWithdraw() { setMenuOpen(false); setShowWithdraw(true); setWithdrawDone(false); setWithdrawAmount(""); setWithdrawComment(""); }
 
-  const MAINTENANCE_MODE = false;
-  if (MAINTENANCE_MODE) return (
+  if (maintenanceEnabled) return (
     <div style={{ minHeight: "100vh", background: "rgba(3,5,20,1)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <CircuitBackground />
       <div style={{ background: "rgba(8,12,35,0.85)", border: "1px solid rgba(0,180,255,0.12)", borderRadius: 14, backdropFilter: "blur(12px)", padding: 32, textAlign: "center", maxWidth: 450, position: "relative", zIndex: 1 }}>
         <div style={{ fontSize: 40, marginBottom: 16 }}>⏳</div>
-        <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Идет приходование депозита клиента</h2>
+        <h2 style={{ color: "#fff", fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Обслуживание</h2>
         <p style={{ color: "#6b7bb0", fontSize: 15, lineHeight: 1.5 }}>
-          Бот делает апгрейт счета. Сайт заработает сегодня в ближайшее время.
+          {maintenanceMessage}
         </p>
       </div>
     </div>
