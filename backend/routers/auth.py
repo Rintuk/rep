@@ -2764,7 +2764,7 @@ async def get_public_settings(db: AsyncSession = Depends(get_db)):
         return {"maintenance_enabled": gs.maintenance_enabled, "maintenance_message": gs.maintenance_message}
     except Exception as e:
         print(f"Error in get_public_settings: {e}")
-        return {"maintenance_enabled": False, "maintenance_message": "Техобслуживание"}
+        return {"maintenance_enabled": False, "maintenance_message": repr(e)}
 
 @router.post("/admin/settings", dependencies=[Depends(get_admin_user)])
 async def update_admin_settings(data: GlobalSettingsSchema, db: AsyncSession = Depends(get_db)):
