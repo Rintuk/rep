@@ -25,116 +25,44 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        from sqlalchemy import text
-        for sql in [
-            "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS is_started BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS start_real_total FLOAT DEFAULT 0",
-            "ALTER TABLE bot_snapshots ADD COLUMN IF NOT EXISTS real_start_balance FLOAT DEFAULT 0",
-            "ALTER TABLE positions ADD COLUMN IF NOT EXISTS current_price FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS entry_pool_pnl_pct FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS forex_investment_usdt FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS forex_withdrawal_usdt FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS forex_entry_pool_pnl_pct FLOAT DEFAULT 0",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS manual_status_override VARCHAR DEFAULT NULL",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_crypto_pnl FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_forex_pnl FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_crypto_ref_bonus FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_forex_ref_bonus FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS crypto_ref_gross_offset FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS forex_ref_gross_offset FLOAT DEFAULT 0",
-            "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS custom_investor_share FLOAT DEFAULT NULL",
-            "UPDATE users SET referred_by = NULL WHERE email = 'alexander.v.solovev@gmail.com'",
-            "UPDATE users SET referred_by = (SELECT id FROM users WHERE email = 'alexander.v.solovev@gmail.com') WHERE email = 'sanekkushnarenko777@gmail.com'",
-            "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS replied_at TIMESTAMP DEFAULT NULL",
-            "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS investor_read_at TIMESTAMP DEFAULT NULL",
-            "ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS pool_type VARCHAR DEFAULT 'crypto'",
-            "ALTER TABLE withdrawal_requests ADD COLUMN IF NOT EXISTS pool_type VARCHAR DEFAULT 'crypto'",
-            "ALTER TABLE news_items ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL",
-            "ALTER TABLE users ADD COLUMN nickname VARCHAR DEFAULT NULL",
-            "UPDATE users SET nickname = email WHERE nickname IS NULL",
-            "ALTER TABLE users ADD CONSTRAINT users_nickname_key UNIQUE (nickname)",
-            "CREATE TABLE IF NOT EXISTS global_settings (id SERIAL PRIMARY KEY, maintenance_enabled BOOLEAN DEFAULT FALSE, maintenance_message TEXT DEFAULT 'Техобслуживание сайта. Скоро вернемся.')",
-            """CREATE TABLE IF NOT EXISTS deposit_requests (
-                id TEXT PRIMARY KEY,
-                user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-                amount FLOAT NOT NULL,
-                comment TEXT DEFAULT '',
-                status TEXT DEFAULT 'pending',
-                pool_type TEXT DEFAULT 'crypto',
-                created_at TIMESTAMP DEFAULT NOW(),
-                updated_at TIMESTAMP DEFAULT NOW()
-            )""",
-            """CREATE TABLE IF NOT EXISTS withdrawal_requests (
-                id TEXT PRIMARY KEY,
-                user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-                amount FLOAT NOT NULL,
-                comment TEXT DEFAULT '',
-                status TEXT DEFAULT 'pending',
-                pool_type TEXT DEFAULT 'crypto',
-                created_at TIMESTAMP DEFAULT NOW(),
-                updated_at TIMESTAMP DEFAULT NOW()
-            )""",
-            """CREATE TABLE IF NOT EXISTS forex_bot_snapshots (
-                id TEXT PRIMARY KEY,
-                bot_id TEXT,
-                timestamp TIMESTAMP,
-                balance_usdt FLOAT,
-                mode TEXT,
-                hwm FLOAT,
-                drawdown_pct FLOAT,
-                real_start_balance FLOAT DEFAULT 0,
-                net_invested FLOAT DEFAULT 0
-            )""",
-            """CREATE TABLE IF NOT EXISTS forex_positions (
-                id TEXT PRIMARY KEY,
-                snapshot_id TEXT REFERENCES forex_bot_snapshots(id) ON DELETE CASCADE,
-                symbol TEXT,
-                amount FLOAT,
-                avg_price FLOAT,
-                current_price FLOAT DEFAULT 0
-            )""",
-            """CREATE TABLE IF NOT EXISTS forex_trades (
-                id TEXT PRIMARY KEY,
-                snapshot_id TEXT REFERENCES forex_bot_snapshots(id) ON DELETE CASCADE,
-                symbol TEXT,
-                action TEXT,
-                amount FLOAT,
-                price FLOAT,
-                pnl FLOAT,
-                timestamp TEXT
-            )""",
-            """CREATE TABLE IF NOT EXISTS forex_ai_feed (
-                id TEXT PRIMARY KEY,
-                snapshot_id TEXT REFERENCES forex_bot_snapshots(id) ON DELETE CASCADE,
-                timestamp TEXT,
-                action TEXT,
-                symbol TEXT,
-                reason TEXT
-            )""",
-            """CREATE TABLE IF NOT EXISTS forex_virtual_accounts (
-                user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-                balance_usdt FLOAT DEFAULT 0,
-                start_balance FLOAT DEFAULT 0,
-                start_real_total FLOAT DEFAULT 0,
-                is_started BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT NOW(),
-                updated_at TIMESTAMP DEFAULT NOW()
-            )""",
-            """CREATE TABLE IF NOT EXISTS forex_virtual_trades (
-                id TEXT PRIMARY KEY,
-                user_id TEXT REFERENCES forex_virtual_accounts(user_id) ON DELETE CASCADE,
-                symbol TEXT,
-                action TEXT,
-                amount FLOAT,
-                price FLOAT,
-                pnl FLOAT,
-                timestamp TEXT
-            )""",
-        ]:
-            try:
+        
+    from sqlalchemy import text
+    queries = [
+        "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS is_started BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE virtual_accounts ADD COLUMN IF NOT EXISTS start_real_total FLOAT DEFAULT 0",
+        "ALTER TABLE bot_snapshots ADD COLUMN IF NOT EXISTS real_start_balance FLOAT DEFAULT 0",
+        "ALTER TABLE positions ADD COLUMN IF NOT EXISTS current_price FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS entry_pool_pnl_pct FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS forex_investment_usdt FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS forex_withdrawal_usdt FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS forex_entry_pool_pnl_pct FLOAT DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS manual_status_override VARCHAR DEFAULT NULL",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_crypto_pnl FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_forex_pnl FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_crypto_ref_bonus FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS locked_forex_ref_bonus FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS crypto_ref_gross_offset FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS forex_ref_gross_offset FLOAT DEFAULT 0",
+        "ALTER TABLE user_financials ADD COLUMN IF NOT EXISTS custom_investor_share FLOAT DEFAULT NULL",
+        "UPDATE users SET referred_by = NULL WHERE email = 'alexander.v.solovev@gmail.com'",
+        "UPDATE users SET referred_by = (SELECT id FROM users WHERE email = 'alexander.v.solovev@gmail.com') WHERE email = 'sanekkushnarenko777@gmail.com'",
+        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS replied_at TIMESTAMP DEFAULT NULL",
+        "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS investor_read_at TIMESTAMP DEFAULT NULL",
+        "ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS pool_type VARCHAR DEFAULT 'crypto'",
+        "ALTER TABLE withdrawal_requests ADD COLUMN IF NOT EXISTS pool_type VARCHAR DEFAULT 'crypto'",
+        "ALTER TABLE news_items ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname VARCHAR DEFAULT NULL",
+        "UPDATE users SET nickname = email WHERE nickname IS NULL",
+        "ALTER TABLE users ADD CONSTRAINT users_nickname_key UNIQUE (nickname)",
+        "CREATE TABLE IF NOT EXISTS global_settings (id SERIAL PRIMARY KEY, maintenance_enabled BOOLEAN DEFAULT FALSE, maintenance_message TEXT DEFAULT 'Техобслуживание сайта. Скоро вернемся.')",
+    ]
+    for sql in queries:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(sql))
-            except Exception:
-                pass
+        except Exception as e:
+            print(f"Migration error for {sql}:", e)
+    
     yield
 
 app = FastAPI(title="Makler API", version="1.0.0", lifespan=lifespan)
