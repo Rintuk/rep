@@ -149,10 +149,20 @@ export default function AdminPage() {
   const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
 
   const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: "asc" | "desc" }>({ key: "investment", direction: "desc" });
+  const [hideInactiveInvestors, setHideInactiveInvestors] = useState(true);
 
   const sortedInvestors = React.useMemo(() => {
     if (!data?.investors) return [];
     let sortableItems = [...data.investors];
+    if (hideInactiveInvestors) {
+      sortableItems = sortableItems.filter(i => 
+        (i.investment && i.investment > 0) || 
+        (i.referrals_count && i.referrals_count > 0) ||
+        (i.pnl && Math.abs(i.pnl) > 0) ||
+        (i.withdrawal && i.withdrawal > 0) ||
+        (i.ref_income && i.ref_income > 0)
+      );
+    }
     if (sortConfig.key !== null) {
       sortableItems.sort((a: any, b: any) => {
         let aValue = a[sortConfig.key!];
@@ -1355,6 +1365,12 @@ export default function AdminPage() {
         {/* Инвесторы */}
         {activeTab === "investors" && (
           <div style={{ ...card, overflow: "hidden" }}>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${border}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" id="hideInactive" checked={hideInactiveInvestors} onChange={e => setHideInactiveInvestors(e.target.checked)} style={{ cursor: "pointer" }} />
+              <label htmlFor="hideInactive" style={{ color: muted, fontSize: 13, cursor: "pointer", userSelect: "none" }}>
+                Скрыть неактивных (с нулевым балансом)
+              </label>
+            </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640, fontSize: 13 }}>
                 <thead>
