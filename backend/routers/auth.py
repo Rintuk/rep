@@ -2754,20 +2754,30 @@ class GlobalSettingsSchema(BaseModel):
 
 @router.get("/public/settings")
 async def get_public_settings(db: AsyncSession = Depends(get_db)):
-    gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
-    if not gs:
-        gs = GlobalSettings()
-        db.add(gs)
-        await db.commit()
-    return {"maintenance_enabled": gs.maintenance_enabled, "maintenance_message": gs.maintenance_message}
+    try:
+        gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+        if not gs:
+            gs = GlobalSettings()
+            db.add(gs)
+            await db.commit()
+            await db.refresh(gs)
+        return {"maintenance_enabled": gs.maintenance_enabled, "maintenance_message": gs.maintenance_message}
+    except Exception as e:
+        print(f"Error in get_public_settings: {e}")
+        return {"maintenance_enabled": False, "maintenance_message": "Техобслуживание"}
 
 @router.post("/admin/settings", dependencies=[Depends(get_admin_user)])
 async def update_admin_settings(data: GlobalSettingsSchema, db: AsyncSession = Depends(get_db)):
-    gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
-    if not gs:
-        gs = GlobalSettings()
-        db.add(gs)
-    gs.maintenance_enabled = data.maintenance_enabled
-    gs.maintenance_message = data.maintenance_message
-    await db.commit()
-    return {"status": "ok"}
+    try:
+        gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+        if not gs:
+            gs = GlobalSettings()
+            db.add(gs)
+        gs.maintenance_enabled = data.maintenance_enabled
+        gs.maintenance_message = data.maintenance_message
+        await db.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"Error in update_admin_settings: {e}")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))
