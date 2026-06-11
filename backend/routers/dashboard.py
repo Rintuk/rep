@@ -55,28 +55,28 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
     total_volume = my_inv + my_fx
     
     queue = [(user_id, 1)]
-    crypto_bonus = 0.0
-    forex_bonus = 0.0
-    refs_info = []
-    
     # BFS для подсчета total_volume
     q = [user_id]
+    visited = {user_id}
     while q:
         curr = q.pop(0)
         for child in children_map.get(curr, []):
-            if child.is_active:
-                f = fins_map.get(child.id)
-                if f:
-                    total_volume += f.investment_usdt + f.forex_investment_usdt
-            q.append(child.id)
+            if child.id not in visited:
+                visited.add(child.id)
+                if child.is_active:
+                    f = fins_map.get(child.id)
+                    if f:
+                        total_volume += f.investment_usdt + f.forex_investment_usdt
+                q.append(child.id)
                 
     status, next_vol, levels_allowed = _get_status_and_limits(total_volume, manual_override)
     
-    # BFS для подсчета бонусов до 5 уровней
+    # BFS для подсчета реферальных до 5 уровней
     queue = [(user_id, 1)]
     crypto_bonus = 0.0
     forex_bonus = 0.0
     refs_info = []
+    visited_queue = {user_id}
 
     while queue:
         curr, depth = queue.pop(0)
@@ -84,6 +84,9 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             continue
             
         for child in children_map.get(curr, []):
+            if child.id in visited_queue:
+                continue
+            visited_queue.add(child.id)
             # Always traverse children
             queue.append((child.id, depth + 1))
             

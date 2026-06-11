@@ -104,13 +104,16 @@ async def _register(data: RegisterIn, db: AsyncSession):
         total_vol = (my_f.investment_usdt + my_f.forex_investment_usdt) if my_f else 0.0
         
         q = [ref_user.id]
+        visited = {ref_user.id}
         while q:
             curr = q.pop(0)
             for child in c_map.get(curr, []):
-                if child.is_active:
-                    cf = f_map.get(child.id)
-                    if cf:
-                        total_vol += cf.investment_usdt + cf.forex_investment_usdt
+                if child.id not in visited:
+                    visited.add(child.id)
+                    if child.is_active:
+                        cf = f_map.get(child.id)
+                        if cf:
+                            total_vol += cf.investment_usdt + cf.forex_investment_usdt
                     q.append(child.id)
                     
         from routers.dashboard import _get_status_and_limits
@@ -1472,12 +1475,15 @@ async def restore_ref_bonus(backup_file: UploadFile = File(...), db: AsyncSessio
         total_volume = my_inv + my_fx
         
         q = [u.id]
+        visited = {u.id}
         while q:
             curr = q.pop(0)
             for child in children_map.get(curr, []):
-                if child.is_active:
-                    child_f = backup_fins.get(child.id, {})
-                    total_volume += child_f.get("investment_usdt", 0.0) + child_f.get("forex_investment_usdt", 0.0)
+                if child.id not in visited:
+                    visited.add(child.id)
+                    if child.is_active:
+                        child_f = backup_fins.get(child.id, {})
+                        total_volume += child_f.get("investment_usdt", 0.0) + child_f.get("forex_investment_usdt", 0.0)
                     q.append(child.id)
                     
         status, next_vol, levels_allowed = _get_status_and_limits(total_volume, u.manual_status_override)
