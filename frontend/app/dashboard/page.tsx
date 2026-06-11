@@ -237,6 +237,8 @@ export default function DashboardPage() {
         // При фоновом рефреше — только маленький баннер, страницу не заменяем
         setRefreshWarn(true);
       }
+    } finally {
+      if (showLoading) setLoading(false);
     }
   }
 
