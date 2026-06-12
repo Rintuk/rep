@@ -7,7 +7,7 @@ from database import get_db
 from constants import get_investor_share
 from models import (BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade,
                     ForexBotSnapshot, ForexPosition, ForexTrade, ForexAIFeedEntry,
-                    ForexVirtualAccount, ForexVirtualTrade, UserFinancials, User, DEMO_START_BALANCE, AdminProfitLog, GlobalSettings)
+                    ForexVirtualAccount, ForexVirtualTrade, UserFinancials, User, DEMO_START_BALANCE, AdminProfitLog)
 from schemas import BotUpdateIn
 
 router = APIRouter(prefix="/api", tags=["bot"])
@@ -96,8 +96,7 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
             stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
             db.add(stat)
 
-        gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
-        net_invested_pool = gs.net_invested_pool if gs else 0.0
+        net_invested_pool = sum(fin.investment_usdt for fin in all_fins)
 
         for t in new_real_trades:
             if t.pnl is not None:
@@ -248,8 +247,7 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
             stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
             db.add(stat)
 
-        gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
-        fx_net_invested_pool = gs.forex_net_invested_pool if gs else 0.0
+        fx_net_invested_pool = sum(fin.forex_investment_usdt for fin in all_fins)
 
         for t in new_real_trades:
             if t.pnl is not None:
