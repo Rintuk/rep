@@ -4,9 +4,10 @@ from sqlalchemy import select, and_, func
 from datetime import datetime
 from config import settings
 from database import get_db
+from constants import get_investor_share
 from models import (BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade,
                     ForexBotSnapshot, ForexPosition, ForexTrade, ForexAIFeedEntry,
-                    ForexVirtualAccount, ForexVirtualTrade, UserFinancials, User, DEMO_START_BALANCE, AdminProfitLog)
+                    ForexVirtualAccount, ForexVirtualTrade, UserFinancials, User, DEMO_START_BALANCE, AdminProfitLog, GlobalSettings)
 from schemas import BotUpdateIn
 
 router = APIRouter(prefix="/api", tags=["bot"])
@@ -90,25 +91,26 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         # Let's just calculate it dynamically below
         
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
-        stat = (await db.execute(select(AdminProfitLog).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
+        stat = (await db.execute(select(AdminProfitLog, GlobalSettings).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
         if not stat:
             stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
             db.add(stat)
 
-        total_invested = sum(fin.investment_usdt for fin in all_fins)
-        admin_own_cap = snapshot.real_start_balance
-        pool_total = balance_usd
-        
+        gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+        net_invested_pool = gs.net_invested_pool if gs else 0.0
+
         for t in new_real_trades:
             if t.pnl is not None:
                 pnl = t.pnl
-                admin_share = admin_own_cap / pool_total if pool_total > 0 else 0
-                inv_share = total_invested / pool_total if pool_total > 0 else 0
+                total_investor_profit = 0.0
+                if net_invested_pool > 0:
+                    for fin in all_fins:
+                        share_of_pool = fin.investment_usdt / net_invested_pool
+                        inv_gross = pnl * share_of_pool
+                        inv_net = inv_gross * get_investor_share(fin) if pnl > 0 else inv_gross
+                        total_investor_profit += inv_net
                 
-                admin_trade_profit = pnl * admin_share
-                if pnl > 0:
-                    admin_trade_profit += pnl * inv_share * 0.20
-                    
+                admin_trade_profit = pnl - total_investor_profit
                 stat.crypto_profit += admin_trade_profit
 
     for entry in payload.ai_feed:
@@ -241,25 +243,26 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         # Let's just calculate it dynamically below
         
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
-        stat = (await db.execute(select(AdminProfitLog).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
+        stat = (await db.execute(select(AdminProfitLog, GlobalSettings).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
         if not stat:
             stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
             db.add(stat)
 
-        total_invested = sum(fin.forex_investment_usdt for fin in all_fins)
-        admin_own_cap = snapshot.real_start_balance
-        pool_total = balance_usd
-        
+        gs = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+        fx_net_invested_pool = gs.forex_net_invested_pool if gs else 0.0
+
         for t in new_real_trades:
             if t.pnl is not None:
                 pnl = t.pnl
-                admin_share = admin_own_cap / pool_total if pool_total > 0 else 0
-                inv_share = total_invested / pool_total if pool_total > 0 else 0
+                total_investor_profit = 0.0
+                if fx_net_invested_pool > 0:
+                    for fin in all_fins:
+                        share_of_pool = fin.forex_investment_usdt / fx_net_invested_pool
+                        inv_gross = pnl * share_of_pool
+                        inv_net = inv_gross * get_investor_share(fin) if pnl > 0 else inv_gross
+                        total_investor_profit += inv_net
                 
-                admin_trade_profit = pnl * admin_share
-                if pnl > 0:
-                    admin_trade_profit += pnl * inv_share * 0.20
-                    
+                admin_trade_profit = pnl - total_investor_profit
                 stat.forex_profit += admin_trade_profit
 
     for entry in payload.ai_feed:
