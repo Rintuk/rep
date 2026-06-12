@@ -91,7 +91,7 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         # Let's just calculate it dynamically below
         
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
-        stat = (await db.execute(select(AdminProfitLog, GlobalSettings).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
+        stat = (await db.execute(select(AdminProfitLog).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
         if not stat:
             stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
             db.add(stat)
@@ -243,7 +243,7 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         # Let's just calculate it dynamically below
         
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
-        stat = (await db.execute(select(AdminProfitLog, GlobalSettings).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
+        stat = (await db.execute(select(AdminProfitLog).where(AdminProfitLog.date == today_str))).scalar_one_or_none()
         if not stat:
             stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
             db.add(stat)
