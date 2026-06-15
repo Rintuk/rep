@@ -1827,6 +1827,66 @@ async def external_deposit(payload: ExternalDepositPayload, db: AsyncSession = D
         "note": "Внешний депозит зарегистрирован. balance_usdt и net_invested увеличены."
     }
 
+@router.post("/admin/forex-external-deposit", dependencies=[Depends(get_admin_user)])
+async def forex_external_deposit(payload: ExternalDepositPayload, db: AsyncSession = Depends(get_db)):
+    """
+    Регистрация внешнего пополнения в Форекс пул: деньги пришли снаружи и уже на счёте.
+    Корректно увеличивает balance_usdt и net_invested форекс-снапшота,
+    добавляет сумму к forex_investment_usdt инвестора,
+    устанавливает его forex_entry_pool_pnl_pct на текущий PnL форекс пула.
+    Не трогает forex_entry_pool_pnl_pct других инвесторов.
+    """
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+
+    forex_snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    current_forex_pct = 0.0
+    if forex_snap:
+        fx_ref = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+            forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
+        )
+        current_forex_pct = round((forex_snap.balance_usdt - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
+
+    fin = (await db.execute(
+        select(UserFinancials).where(UserFinancials.user_id == payload.user_id)
+    )).scalar_one_or_none()
+
+    if fin:
+        if fin.forex_investment_usdt > 0:
+            incr = current_forex_pct - fin.forex_entry_pool_pnl_pct
+            if incr > 0:
+                from constants import get_investor_share
+                gross = fin.forex_investment_usdt * (incr / 100)
+                user_profit = round(gross * get_investor_share(fin), 2)
+                if user_profit > 0:
+                    fin.locked_forex_pnl += user_profit
+        fin.forex_entry_pool_pnl_pct = current_forex_pct
+        fin.forex_investment_usdt += payload.amount
+        fin.updated_at = datetime.utcnow()
+    else:
+        db.add(UserFinancials(
+            user_id=payload.user_id,
+            forex_investment_usdt=payload.amount,
+            forex_entry_pool_pnl_pct=current_forex_pct,
+        ))
+
+    if forex_snap:
+        forex_snap.balance_usdt += payload.amount
+        forex_snap.net_invested += payload.amount
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "user_id": payload.user_id,
+        "amount": payload.amount,
+        "entry_pct": current_forex_pct,
+        "note": "Внешний Форекс депозит зарегистрирован. balance_usdt и net_invested форекс пула увеличены."
+    }
+
 @router.post("/admin/emergency-fix-pnl")
 async def emergency_fix_pnl(db: AsyncSession = Depends(get_db)):
     pool_pnl_pct = await _get_pool_pnl_pct(db)

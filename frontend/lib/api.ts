@@ -477,6 +477,11 @@ export async function externalDeposit(user_id: string, amount: number) {
   return res.data;
 }
 
+export async function forexExternalDeposit(user_id: string, amount: number) {
+  const res = await api.post("/auth/admin/forex-external-deposit", { user_id, amount });
+  return res.data;
+}
+
 export const getPublicSettings = async () => (await api.get('/auth/public/settings')).data;
 export const updateAdminSettings = async (maintenance_enabled: boolean, maintenance_message: string) => (await api.post('/auth/admin/settings', { maintenance_enabled, maintenance_message })).data;
 export async function getAdminNotebook() { const res = await api.get('/auth/admin/notebook'); return res.data; }
