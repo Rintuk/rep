@@ -132,6 +132,11 @@ export async function startNewCycle(pool: "crypto" | "forex") {
   return res.data as { status: string; pool: string; investors_updated: number; total_capitalized: number; new_pool_base: number };
 }
 
+export async function wipeProfits(pool: "crypto" | "forex") {
+  const res = await api.post("/auth/admin/wipe-profits", null, { params: { pool } });
+  return res.data as { status: string; message: string };
+}
+
 // ── Обычный admin ────────────────────────────────────────────────────────────
 
 export async function approveUser(id: string) {

@@ -2044,6 +2044,52 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
         "new_pool_base": latest_snap.balance_usdt
     }
 
+@router.post("/admin/wipe-profits", dependencies=[Depends(get_admin_user)])
+async def wipe_profits(pool: str = "forex", db: AsyncSession = Depends(get_db)):
+    """
+    Просто обнуляет всю прибыль (locked_pnl, ref_bonus) и сбрасывает плавающую прибыль (entry_pct = текущий пул pct),
+    БЕЗ прибавления к депозиту. Депозит остаётся неизменным.
+    """
+    pool_pnl_pct = await _get_pool_pnl_pct(db)
+
+    forex_pool_pct = 0.0
+    if pool == "forex":
+        forex_snap = (await db.execute(
+            select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+        )).scalar_one_or_none()
+        if forex_snap:
+            fx_ref = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+                forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
+            )
+            forex_pool_pct = round((forex_snap.balance_usdt - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
+
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    
+    for f in fins:
+        if pool == "crypto":
+            f.locked_crypto_pnl = 0.0
+            f.locked_crypto_ref_bonus = 0.0
+            f.entry_pool_pnl_pct = pool_pnl_pct
+        else:
+            f.locked_forex_pnl = 0.0
+            f.locked_forex_ref_bonus = 0.0
+            f.forex_entry_pool_pnl_pct = forex_pool_pct
+
+    # Сбрасываем и сам пул тоже, чтобы история началась с 0%
+    if pool == "forex" and forex_snap:
+        forex_snap.net_invested = forex_snap.balance_usdt
+        forex_snap.real_start_balance = forex_snap.balance_usdt
+    elif pool == "crypto":
+        snap = (await db.execute(
+            select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+        )).scalar_one_or_none()
+        if snap:
+            snap.net_invested = snap.balance_usdt
+            snap.real_start_balance = snap.balance_usdt
+
+    await db.commit()
+    return {"status": "success", "message": f"Прибыль пула {pool} и всех инвесторов полностью обнулена."}
+
 @router.post("/admin/deposits/{request_id}/reject", dependencies=[Depends(get_admin_user)])
 async def reject_deposit(request_id: str, db: AsyncSession = Depends(get_db)):
     req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id))).scalar_one_or_none()

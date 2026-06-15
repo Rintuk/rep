@@ -13,7 +13,7 @@ import {
   cleanupDemoSnapshots, adjustNetInvested,
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
-  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto, startNewCycle,
+  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto, startNewCycle, wipeProfits,
   cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, lockReferralBaseline, emergencyFixForexPnl, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
@@ -223,6 +223,9 @@ export default function AdminPage() {
 
   const [newCycleLoading, setNewCycleLoading] = useState(false);
   const [newCycleMsg, setNewCycleMsg] = useState<string | null>(null);
+
+  const [wipeLoading, setWipeLoading] = useState(false);
+  const [wipeMsg, setWipeMsg] = useState<string | null>(null);
 
   const [statusOverrideMsg, setStatusOverrideMsg] = useState<Record<string, string>>({});
   const [backupLoading, setBackupLoading] = useState(false);
@@ -1158,6 +1161,33 @@ export default function AdminPage() {
                     style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
                       background: "rgba(255,255,255,0.05)", color: isForex ? "#f59e0b" : "#22d3ee", cursor: "pointer", border: `1px solid ${isForex ? "rgba(245,158,11,0.3)" : "rgba(34,211,238,0.3)"}`, opacity: newCycleLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
                     {newCycleLoading ? "Загрузка..." : "Запустить реинвест"}
+                  </button>
+                </div>
+
+                {/* Сбросить всю прибыль (обнуление) */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid rgba(220,38,38,0.5)`, marginBottom: 16 }}>
+                  <div>
+                    <p style={{ color: "#ef4444", fontSize: 13, fontWeight: 600 }}>🗑 Сбросить всю прибыль ({poolLabel}) на 0</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Просто удаляет всю прибыль и бонусы инвесторов. Балансы (депозиты) остаются без изменений.</p>
+                    {wipeMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{wipeMsg}</p>}
+                  </div>
+                  <button onClick={async () => {
+                    if (!confirm(`ВНИМАНИЕ! Вы точно хотите УДАЛИТЬ всю прибыль и бонусы инвесторов в пуле ${poolLabel}? Это действие необратимо!`)) return;
+                    setWipeLoading(true); setWipeMsg(null);
+                    try {
+                      const res = await wipeProfits(isForex ? "forex" : "crypto");
+                      setWipeMsg(res.message);
+                      fetchData();
+                    } catch (e: any) {
+                      setWipeMsg("Ошибка: " + (e?.response?.data?.detail || e.message));
+                    } finally {
+                      setWipeLoading(false);
+                    }
+                  }} disabled={wipeLoading}
+                    style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: "rgba(220,38,38,0.2)", color: "#ef4444", cursor: "pointer", border: `1px solid rgba(220,38,38,0.5)`, opacity: wipeLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                    {wipeLoading ? "..." : "Сбросить в 0"}
                   </button>
                 </div>
 
