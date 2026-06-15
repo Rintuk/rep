@@ -1746,11 +1746,86 @@ async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSessio
         )
         post_deposit_pct = round((pool_total_new - ref_new) / ref_new * 100, 4) if ref_new > 0 else 0.0
         
-        from sqlalchemy import text
-        await db.execute(text(f"UPDATE user_financials SET entry_pool_pnl_pct = {post_deposit_pct} WHERE investment_usdt > 0"))
-        await db.commit()
+        # Only update the new depositor's entry point, not everyone else
+        new_depositor_fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
+        if new_depositor_fin:
+            new_depositor_fin.entry_pool_pnl_pct = post_deposit_pct
+            await db.commit()
 
     return {"status": "approved", "amount": actual_amount}
+
+class ExternalDepositPayload(BaseModel):
+    user_id: str
+    amount: float
+
+@router.post("/admin/external-deposit", dependencies=[Depends(get_admin_user)])
+async def external_deposit(payload: ExternalDepositPayload, db: AsyncSession = Depends(get_db)):
+    """
+    Регистрация внешнего пополнения: деньги пришли снаружи и уже физически на счёте.
+    Правильно увеличивает balance_usdt и net_invested снапшота,
+    добавляет сумму к investment_usdt инвестора,
+    устанавливает его entry_pool_pnl_pct на текущий PnL пула.
+    Не трогает entry_pool_pnl_pct других инвесторов.
+    """
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    current_pnl_pct = 0.0
+    if snap:
+        positions = (await db.execute(
+            select(Position).where(Position.snapshot_id == snap.id)
+        )).scalars().all()
+        pool_total = snap.balance_usdt + sum(
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions
+        )
+        start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
+        total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+        total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+        ref = start + total_inv - total_wd
+        if ref <= 0:
+            ref = snap.net_invested if snap.net_invested > 0 else start
+        current_pnl_pct = round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
+
+    fin = (await db.execute(
+        select(UserFinancials).where(UserFinancials.user_id == payload.user_id)
+    )).scalar_one_or_none()
+
+    if fin:
+        if fin.investment_usdt > 0:
+            incr = current_pnl_pct - fin.entry_pool_pnl_pct
+            if incr > 0:
+                from constants import get_investor_share
+                gross = fin.investment_usdt * (incr / 100)
+                user_profit = round(gross * get_investor_share(fin), 2)
+                if user_profit > 0:
+                    fin.locked_crypto_pnl += user_profit
+        fin.entry_pool_pnl_pct = current_pnl_pct
+        fin.investment_usdt += payload.amount
+        fin.updated_at = datetime.utcnow()
+    else:
+        db.add(UserFinancials(
+            user_id=payload.user_id,
+            investment_usdt=payload.amount,
+            entry_pool_pnl_pct=current_pnl_pct,
+        ))
+
+    if snap:
+        snap.balance_usdt += payload.amount
+        snap.net_invested += payload.amount
+
+    await db.commit()
+
+    return {
+        "status": "success",
+        "user_id": payload.user_id,
+        "amount": payload.amount,
+        "entry_pct": current_pnl_pct,
+        "note": "Внешний депозит зарегистрирован. balance_usdt и net_invested увеличены."
+    }
 
 @router.post("/admin/emergency-fix-pnl")
 async def emergency_fix_pnl(db: AsyncSession = Depends(get_db)):

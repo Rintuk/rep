@@ -17,7 +17,7 @@ import {
   cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, lockReferralBaseline, emergencyFixForexPnl, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
-  silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool,
+  silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool, externalDeposit,
   getPublicSettings, updateAdminSettings,
 } from "@/lib/api";
 import {
@@ -1616,6 +1616,37 @@ export default function AdminPage() {
                                               style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
                                                 background: "rgba(34,201,122,0.6)", color: "#fff", cursor: "pointer" }}>
                                               Пополнить из пула
+                                            </button>
+                                          </div>
+                                        </div>
+                                        {/* Внешний депозит */}
+                                        <div style={{ marginTop: 10, padding: 12, borderRadius: 8, background: "rgba(77,142,255,0.06)", border: "1px solid rgba(77,142,255,0.3)" }}>
+                                          <p style={{ color: "#4d8eff", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>📥 Внешний депозит (деньги пришли извне)</p>
+                                          <p style={{ color: "#888", fontSize: 11, marginBottom: 10 }}>Деньги поступили на счёт снаружи. Увеличивает баланс пула и регистрирует вклад.</p>
+                                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                            <input type="number" id={`ext-deposit-${u.id}`}
+                                              placeholder="Сумма USDT..."
+                                              style={{ flex: 1, padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                                                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(77,142,255,0.3)",
+                                                color: "#fff", outline: "none" }} />
+                                            <button
+                                              onClick={async () => {
+                                                const inp = document.getElementById(`ext-deposit-${u.id}`) as HTMLInputElement;
+                                                const amt = parseFloat(inp?.value || "0");
+                                                if (!amt || isNaN(amt) || amt <= 0) return alert("Введите корректную сумму");
+                                                if (!confirm(`Зарегистрировать внешний депозит ${u.email} на ${amt} $? Баланс пула увеличится на эту сумму.`)) return;
+                                                try {
+                                                  const r = await externalDeposit(u.id, amt);
+                                                  alert(`✅ Готово! Депозит зарегистрирован. entry_pct: ${r.entry_pct}%`);
+                                                  if (inp) inp.value = "";
+                                                  fetchData();
+                                                } catch (e: any) {
+                                                  alert("Ошибка: " + (e?.response?.data?.detail || e.message));
+                                                }
+                                              }}
+                                              style={{ padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none",
+                                                background: "rgba(77,142,255,0.6)", color: "#fff", cursor: "pointer" }}>
+                                              Внешний депозит
                                             </button>
                                           </div>
                                         </div>
