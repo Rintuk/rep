@@ -127,6 +127,11 @@ export async function adjustForexNetInvested(add_amount: number) {
   return res.data as { updated_snapshots: number; add_amount: number; message: string };
 }
 
+export async function startNewCycle(pool: "crypto" | "forex") {
+  const res = await api.post("/auth/admin/start-new-cycle", { pool });
+  return res.data as { status: string; pool: string; investors_updated: number; total_capitalized: number; new_pool_base: number };
+}
+
 // ── Обычный admin ────────────────────────────────────────────────────────────
 
 export async function approveUser(id: string) {

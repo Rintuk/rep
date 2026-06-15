@@ -13,7 +13,7 @@ import {
   cleanupDemoSnapshots, adjustNetInvested,
   getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
-  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto,
+  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto, startNewCycle,
   cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, lockReferralBaseline, emergencyFixForexPnl, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
@@ -220,6 +220,9 @@ export default function AdminPage() {
   const [adjustAmount, setAdjustAmount] = useState("");
   const [adjustLoading, setAdjustLoading] = useState(false);
   const [adjustMsg, setAdjustMsg] = useState<string | null>(null);
+
+  const [newCycleLoading, setNewCycleLoading] = useState(false);
+  const [newCycleMsg, setNewCycleMsg] = useState<string | null>(null);
 
   const [statusOverrideMsg, setStatusOverrideMsg] = useState<Record<string, string>>({});
   const [backupLoading, setBackupLoading] = useState(false);
@@ -1129,6 +1132,33 @@ export default function AdminPage() {
                       }
                     }} />
                   </label>
+                </div>
+
+                {/* Начать новый цикл */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${isForex ? "rgba(245,158,11,0.5)" : "rgba(34,211,238,0.5)"}`, marginBottom: 16 }}>
+                  <div>
+                    <p style={{ color: isForex ? "#f59e0b" : "#22d3ee", fontSize: 13, fontWeight: 600 }}>🔄 Начать новый цикл ({poolLabel})</p>
+                    <p style={{ color: muted, fontSize: 12, marginTop: 4 }}>Прибавляет всю прибыль к депозитам инвесторов и сбрасывает PnL пула до 0%.</p>
+                    {newCycleMsg && <p style={{ color: "#22c97a", fontSize: 12, marginTop: 4 }}>{newCycleMsg}</p>}
+                  </div>
+                  <button onClick={async () => {
+                    if (!confirm(`ВНИМАНИЕ! Вы точно хотите начать новый цикл для ${poolLabel}? Вся невыведенная прибыль админа растворится в базе пула.`)) return;
+                    setNewCycleLoading(true); setNewCycleMsg(null);
+                    try {
+                      const res = await startNewCycle(isForex ? "forex" : "crypto");
+                      setNewCycleMsg(`✅ Успех: капитализировано ${res.total_capitalized} $. База пула: ${res.new_pool_base} $.`);
+                      fetchData();
+                    } catch (e: any) {
+                      setNewCycleMsg("Ошибка: " + (e?.response?.data?.detail || e.message));
+                    } finally {
+                      setNewCycleLoading(false);
+                    }
+                  }} disabled={newCycleLoading}
+                    style={{ marginLeft: 16, padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                      background: "rgba(255,255,255,0.05)", color: isForex ? "#f59e0b" : "#22d3ee", cursor: "pointer", border: `1px solid ${isForex ? "rgba(245,158,11,0.3)" : "rgba(34,211,238,0.3)"}`, opacity: newCycleLoading ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                    {newCycleLoading ? "Загрузка..." : "Запустить реинвест"}
+                  </button>
                 </div>
 
                 {/* Миграция PnL */}

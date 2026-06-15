@@ -1897,6 +1897,153 @@ async def emergency_fix_pnl(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": "success", "new_pct": pool_pnl_pct}
 
+class BoostProfitPayload(BaseModel):
+    percent: float  # например 40.0 = +40% от текущей прибыли
+    pool: str = "crypto"  # "crypto" или "forex"
+
+@router.post("/admin/boost-profit", dependencies=[Depends(get_admin_user)])
+async def boost_profit(payload: BoostProfitPayload, db: AsyncSession = Depends(get_db)):
+    """
+    Начисляет каждому инвестору дополнительный бонус в размере X% от его текущей прибыли.
+    Например, percent=40 означает: если у инвестора прибыль 1000$, добавить ещё 400$.
+    Записывает в locked_crypto_pnl или locked_forex_pnl.
+    Не затрагивает инвесторов с нулевой или отрицательной прибылью.
+    """
+    if payload.percent <= 0:
+        raise HTTPException(status_code=400, detail="Процент должен быть больше нуля")
+
+    from constants import get_investor_share
+
+    pool_pnl_pct = await _get_pool_pnl_pct(db)
+
+    # Для форекс берём отдельно
+    forex_pool_pct = 0.0
+    if payload.pool == "forex":
+        forex_snap = (await db.execute(
+            select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+        )).scalar_one_or_none()
+        if forex_snap:
+            fx_ref = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+                forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
+            )
+            forex_pool_pct = round((forex_snap.balance_usdt - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
+
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    updated = 0
+    total_bonus = 0.0
+    multiplier = payload.percent / 100.0
+
+    for f in fins:
+        if payload.pool == "crypto":
+            if f.investment_usdt <= 0:
+                continue
+            incr = pool_pnl_pct - f.entry_pool_pnl_pct
+            floating = f.investment_usdt * (incr / 100) * get_investor_share(f) if incr > 0 else 0.0
+            current_pnl = round(floating + f.locked_crypto_pnl, 2)
+            if current_pnl <= 0:
+                continue
+            bonus = round(current_pnl * multiplier, 2)
+            f.locked_crypto_pnl += bonus
+            total_bonus += bonus
+        else:
+            if f.forex_investment_usdt <= 0:
+                continue
+            fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
+            floating = f.forex_investment_usdt * (fx_incr / 100) * get_investor_share(f) if fx_incr > 0 else 0.0
+            current_pnl = round(floating + f.locked_forex_pnl, 2)
+            if current_pnl <= 0:
+                continue
+            bonus = round(current_pnl * multiplier, 2)
+            f.locked_forex_pnl += bonus
+            total_bonus += bonus
+        updated += 1
+
+    await db.commit()
+    return {
+        "status": "success",
+        "pool": payload.pool,
+        "percent": payload.percent,
+        "investors_updated": updated,
+        "total_bonus_credited": round(total_bonus, 2)
+    }
+
+class StartNewCyclePayload(BaseModel):
+    pool: str = "crypto"  # "crypto" или "forex"
+
+@router.post("/admin/start-new-cycle", dependencies=[Depends(get_admin_user)])
+async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depends(get_db)):
+    """
+    Капитализация прибыли: вся прибыль и бонусы прибавляются к телу депозита.
+    Цикл пула сбрасывается (PnL% = 0).
+    """
+    from constants import get_investor_share
+
+    pool_pnl_pct = await _get_pool_pnl_pct(db)
+
+    # Получаем последний снапшот пула и его PnL
+    forex_pool_pct = 0.0
+    latest_snap = None
+    if payload.pool == "forex":
+        latest_snap = (await db.execute(
+            select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+        )).scalar_one_or_none()
+        if latest_snap:
+            fx_ref = latest_snap.net_invested if latest_snap.net_invested > 0 else (
+                latest_snap.real_start_balance if latest_snap.real_start_balance != 0.0 else latest_snap.hwm
+            )
+            forex_pool_pct = round((latest_snap.balance_usdt - fx_ref) / fx_ref * 100, 4) if fx_ref > 0 else 0.0
+    else:
+        latest_snap = (await db.execute(
+            select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+        )).scalar_one_or_none()
+
+    if not latest_snap:
+        raise HTTPException(status_code=400, detail="Снапшот пула не найден")
+
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    updated = 0
+    total_capitalized = 0.0
+
+    for f in fins:
+        if payload.pool == "crypto":
+            if f.investment_usdt <= 0 and f.locked_crypto_pnl <= 0 and f.locked_crypto_ref_bonus <= 0:
+                continue
+            incr = pool_pnl_pct - f.entry_pool_pnl_pct
+            floating = f.investment_usdt * (incr / 100) * get_investor_share(f) if incr > 0 else 0.0
+            total_profit = floating + f.locked_crypto_pnl + f.locked_crypto_ref_bonus
+            
+            f.investment_usdt = round(f.investment_usdt + total_profit, 2)
+            f.locked_crypto_pnl = 0.0
+            f.locked_crypto_ref_bonus = 0.0
+            f.entry_pool_pnl_pct = 0.0
+            total_capitalized += total_profit
+        else:
+            if f.forex_investment_usdt <= 0 and f.locked_forex_pnl <= 0 and f.locked_forex_ref_bonus <= 0:
+                continue
+            fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
+            floating = f.forex_investment_usdt * (fx_incr / 100) * get_investor_share(f) if fx_incr > 0 else 0.0
+            total_profit = floating + f.locked_forex_pnl + f.locked_forex_ref_bonus
+            
+            f.forex_investment_usdt = round(f.forex_investment_usdt + total_profit, 2)
+            f.locked_forex_pnl = 0.0
+            f.locked_forex_ref_bonus = 0.0
+            f.forex_entry_pool_pnl_pct = 0.0
+            total_capitalized += total_profit
+        updated += 1
+
+    # Сброс пула
+    latest_snap.net_invested = latest_snap.balance_usdt
+    latest_snap.real_start_balance = latest_snap.balance_usdt
+
+    await db.commit()
+    return {
+        "status": "success",
+        "pool": payload.pool,
+        "investors_updated": updated,
+        "total_capitalized": round(total_capitalized, 2),
+        "new_pool_base": latest_snap.balance_usdt
+    }
+
 @router.post("/admin/deposits/{request_id}/reject", dependencies=[Depends(get_admin_user)])
 async def reject_deposit(request_id: str, db: AsyncSession = Depends(get_db)):
     req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id))).scalar_one_or_none()
