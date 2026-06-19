@@ -96,7 +96,8 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
             stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
             db.add(stat)
 
-        net_invested_pool = sum(fin.investment_usdt for fin in all_fins)
+        # Use actual pool net_invested so admin's money is factored into the total pool size
+        net_invested_pool = max(actual_net_invested, sum(fin.investment_usdt for fin in all_fins))
 
         for t in new_real_trades:
             if t.pnl is not None:
@@ -247,7 +248,8 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
             stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
             db.add(stat)
 
-        fx_net_invested_pool = sum(fin.forex_investment_usdt for fin in all_fins)
+        # Use actual pool net_invested so admin's money is factored into the total pool size
+        fx_net_invested_pool = max(actual_fx_net, sum(fin.forex_investment_usdt for fin in all_fins))
 
         for t in new_real_trades:
             if t.pnl is not None:
