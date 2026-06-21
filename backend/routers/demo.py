@@ -43,9 +43,10 @@ async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSess
         .order_by(VirtualTrade.timestamp.desc()).limit(20)
     )).scalars().all()
 
+    time_limit = va.updated_at or va.created_at or datetime.utcnow()
     start_snap = (await db.execute(
         select(BotSnapshot)
-        .where(BotSnapshot.timestamp <= (va.updated_at or va.created_at))
+        .where(BotSnapshot.timestamp <= time_limit)
         .order_by(BotSnapshot.timestamp.desc())
         .limit(1)
     )).scalar_one_or_none()
@@ -156,9 +157,10 @@ async def get_forex_demo_account(user: User = Depends(get_current_user), db: Asy
             positions.append({"symbol": p.symbol, "amount": round(p.amount * scale, 6),
                                "avg_price": p.avg_price, "value": round(p.amount * cur_price * scale, 2)})
 
+    time_limit = va.updated_at or va.created_at or datetime.utcnow()
     start_snap = (await db.execute(
         select(ForexBotSnapshot)
-        .where(ForexBotSnapshot.timestamp <= (va.updated_at or va.created_at))
+        .where(ForexBotSnapshot.timestamp <= time_limit)
         .order_by(ForexBotSnapshot.timestamp.desc())
         .limit(1)
     )).scalar_one_or_none()
