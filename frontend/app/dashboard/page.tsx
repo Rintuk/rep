@@ -206,11 +206,24 @@ export default function DashboardPage() {
       setNewsFeed(news);
       if (news.length > 0) {
         const lastReadStr = localStorage.getItem("lastReadNewsTime");
+        const getTimeUTC = (dStr: string) => {
+           if (!dStr.includes("Z") && !dStr.includes("+")) return new Date(dStr + "Z").getTime();
+           return new Date(dStr).getTime();
+        };
+
         if (!lastReadStr) {
           setUnreadNewsCount(news.length);
         } else {
-          const lastDate = new Date(lastReadStr).getTime();
-          setUnreadNewsCount(news.filter(n => new Date(n.created_at).getTime() > lastDate).length);
+          const lastDate = getTimeUTC(lastReadStr);
+          const latestNewsDate = getTimeUTC(news[0].created_at);
+          
+          if (lastDate > latestNewsDate + 60000) {
+            // Corrupted future date from old bug, clear it so user can reset properly
+            localStorage.removeItem("lastReadNewsTime");
+            setUnreadNewsCount(news.length);
+          } else {
+            setUnreadNewsCount(news.filter(n => getTimeUTC(n.created_at) > lastDate).length);
+          }
         }
       }
     }).catch(() => {});
