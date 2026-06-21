@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import React from "react";
 import {
   api,
-  getAdminOverview, getAdminForexOverview, getAdminNotebook, resetCryptoNotebook,
+  getAdminOverview, getAdminForexOverview, getAdminNotebook, resetCryptoNotebook, resetForexNotebook,
   approveUser, rejectUser,
   updateUserFinancials, updateUserForexFinancials, setReferralLimit,
   deleteUser, getUserDetail, resetUserPassword,
@@ -1012,27 +1012,29 @@ export default function AdminPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span>📓</span> Записная книжка дохода
                   </div>
-                  {!isForex && (
-                    <button
-                      onClick={async () => {
-                        if (!confirm("Сбросить все крипто-доходы в записной книжке? Это обнулит статистику (сегодня, вчера, неделя, месяц, всего). Действие необратимо.")) return;
-                        try {
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Сбросить все ${isForex ? 'форекс' : 'крипто'}-доходы в записной книжке? Это обнулит статистику (сегодня, вчера, неделя, месяц, всего). Действие необратимо.`)) return;
+                      try {
+                        if (isForex) {
+                          await resetForexNotebook();
+                        } else {
                           await resetCryptoNotebook();
-                          const nb = await getAdminNotebook();
-                          setNotebookData(nb);
-                        } catch (e: any) {
-                          alert("Ошибка: " + (e?.response?.data?.detail || e.message));
                         }
-                      }}
-                      style={{
-                        fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer",
-                        background: "rgba(220,38,38,0.1)", color: "#ff4d4d",
-                        border: "1px solid rgba(220,38,38,0.3)", fontWeight: 600,
-                      }}
-                    >
-                      🗑 Сбросить
-                    </button>
-                  )}
+                        const nb = await getAdminNotebook();
+                        setNotebookData(nb);
+                      } catch (e: any) {
+                        alert("Ошибка: " + (e?.response?.data?.detail || e.message));
+                      }
+                    }}
+                    style={{
+                      fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer",
+                      background: "rgba(220,38,38,0.1)", color: "#ff4d4d",
+                      border: "1px solid rgba(220,38,38,0.3)", fontWeight: 600,
+                    }}
+                  >
+                    🗑 Сбросить
+                  </button>
                 </h2>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {[

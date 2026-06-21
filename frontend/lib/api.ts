@@ -496,4 +496,5 @@ export const getPublicSettings = async () => (await api.get('/auth/public/settin
 export const updateAdminSettings = async (maintenance_enabled: boolean, maintenance_message: string) => (await api.post('/auth/admin/settings', { maintenance_enabled, maintenance_message })).data;
 export async function getAdminNotebook() { const res = await api.get('/auth/admin/notebook'); return res.data; }
 export async function resetCryptoNotebook() { const res = await api.post('/auth/admin/notebook/reset-crypto'); return res.data; }
+export async function resetForexNotebook() { const res = await api.post('/auth/admin/notebook/reset-forex'); return res.data; }
 
