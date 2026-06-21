@@ -1973,14 +1973,14 @@ class StartNewCyclePayload(BaseModel):
 @router.post("/admin/start-new-cycle", dependencies=[Depends(get_admin_user)])
 async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depends(get_db)):
     """
-    Капитализация прибыли: вся прибыль и бонусы прибавляются к телу депозита.
-    Цикл пула сбрасывается (PnL% = 0).
+    Êàïèòàëèçàöèÿ ïðèáûëè: âñÿ ïðèáûëü è áîíóñû ïðèáàâëÿþòñÿ ê òåëó äåïîçèòà.
+    Æèêë ïóëà ñáðàñûâàåòñÿ (PnL% = 0).
     """
     from constants import get_investor_share
 
     pool_pnl_pct = await _get_pool_pnl_pct(db)
 
-    # Получаем последний снапшот пула и его PnL
+    # Ïîëó÷àåì ïîñëåäíèé ñíàïøîò ïóëà è åãî PnL
     forex_pool_pct = 0.0
     latest_snap = None
     if payload.pool == "forex":
@@ -1996,9 +1996,28 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
         latest_snap = (await db.execute(
             select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
         )).scalar_one_or_none()
+        # Äëÿ crypto-ïóëà ñ÷èòàåì PnL% íàïðÿìóþ ÷åðåç net_invested ñíàïøîòà (àíàëîãè÷íî forex),
+        # ÷òîáû íå çàâèñåòü îò _get_pool_pnl_pct, êîòîðàÿ â ñâîé ôîðìóëå ó÷èòûâàåò
+        # total_inv è total_wd — ïîëÿ, êîòîðûå åù¸ íå ñáðîøåíû íà ìîìåíò âûçîâà ýòîãî ýíäïîèíòà.
+        if latest_snap:
+            crypto_ref = latest_snap.net_invested if latest_snap.net_invested > 0 else (
+                latest_snap.real_start_balance if latest_snap.real_start_balance != 0.0 else latest_snap.hwm
+            )
+            if crypto_ref > 0:
+                from models import Position as _Pos
+                _positions = (await db.execute(
+                    select(_Pos).where(_Pos.snapshot_id == latest_snap.id)
+                )).scalars().all()
+                _pool_total = latest_snap.balance_usdt + sum(
+                    p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+                    for p in _positions
+                )
+                pool_pnl_pct = round((_pool_total - crypto_ref) / crypto_ref * 100, 4)
+            else:
+                pool_pnl_pct = 0.0
 
     if not latest_snap:
-        raise HTTPException(status_code=400, detail="Снапшот пула не найден")
+        raise HTTPException(status_code=400, detail="Ñíàïøîò ïóëà íå íàéäåí")
 
     fins = (await db.execute(select(UserFinancials))).scalars().all()
     updated = 0
@@ -2011,11 +2030,16 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
             incr = pool_pnl_pct - f.entry_pool_pnl_pct
             floating = f.investment_usdt * (incr / 100) * get_investor_share(f) if incr > 0 else 0.0
             total_profit = floating + f.locked_crypto_pnl + f.locked_crypto_ref_bonus
-            
+
             f.investment_usdt = round(f.investment_usdt + total_profit, 2)
             f.locked_crypto_pnl = 0.0
             f.locked_crypto_ref_bonus = 0.0
             f.entry_pool_pnl_pct = 0.0
+            # Ïîñëå êàïèòàëèçàöèè real_start_balance ïóëà ñòàíîâèòñÿ ðàâåí balance_usdt,
+            # êîòîðûé óæå âêëþ÷àåò â ñåáÿ âñå èñòîðè÷åñêèå âûâîäû.
+            # Åñëè íå ñáðîñèòü withdrawal_usdt, òî _get_pool_pnl_pct â ñëåäóþùåì öèêëå
+            # áóäåò ñ÷èòàòü: ref = real_start + total_inv - old_wd — çàâûøåííàÿ áàçà → çàíèæåííûé PnL%.
+            f.withdrawal_usdt = 0.0
             total_capitalized += total_profit
         else:
             if f.forex_investment_usdt <= 0 and f.locked_forex_pnl <= 0 and f.locked_forex_ref_bonus <= 0:
@@ -2023,15 +2047,17 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
             fx_incr = forex_pool_pct - f.forex_entry_pool_pnl_pct
             floating = f.forex_investment_usdt * (fx_incr / 100) * get_investor_share(f) if fx_incr > 0 else 0.0
             total_profit = floating + f.locked_forex_pnl + f.locked_forex_ref_bonus
-            
+
             f.forex_investment_usdt = round(f.forex_investment_usdt + total_profit, 2)
             f.locked_forex_pnl = 0.0
             f.locked_forex_ref_bonus = 0.0
             f.forex_entry_pool_pnl_pct = 0.0
+            # Àíàëîãè÷íî ñáðàñûâàåì ôîðåêÁõèñòîðèþ âûâîäîâ
+            f.forex_withdrawal_usdt = 0.0
             total_capitalized += total_profit
         updated += 1
 
-    # Сброс пула
+    # Ñáðîñ ïóëà: base = òåêóùèé áàëàíñ, PnL% = 0 â íà÷àëå íîâîãî öèêëà
     latest_snap.net_invested = latest_snap.balance_usdt
     latest_snap.real_start_balance = latest_snap.balance_usdt
 
