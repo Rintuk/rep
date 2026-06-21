@@ -1973,14 +1973,15 @@ class StartNewCyclePayload(BaseModel):
 @router.post("/admin/start-new-cycle", dependencies=[Depends(get_admin_user)])
 async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depends(get_db)):
     """
-    Êàïèòàëèçàöèÿ ïðèáûëè: âñÿ ïðèáûëü è áîíóñû ïðèáàâëÿþòñÿ ê òåëó äåïîçèòà.
-    Æèêë ïóëà ñáðàñûâàåòñÿ (PnL% = 0).
+    Kapitalizatsiya pribyli: vsya pribyl i bonusy pribavlyayutsya k telu depozita.
+    Tsikl pula sbrasyvayetsya (PnL% = 0).
     """
-    from constants import get_investor_share
+    from constants import get_investor_share, REF_FEES
+    from routers.dashboard import _get_status_and_limits
 
     pool_pnl_pct = await _get_pool_pnl_pct(db)
 
-    # Ïîëó÷àåì ïîñëåäíèé ñíàïøîò ïóëà è åãî PnL
+    # Get latest snapshot and compute PnL%
     forex_pool_pct = 0.0
     latest_snap = None
     if payload.pool == "forex":
@@ -1996,9 +1997,8 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
         latest_snap = (await db.execute(
             select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
         )).scalar_one_or_none()
-        # Äëÿ crypto-ïóëà ñ÷èòàåì PnL% íàïðÿìóþ ÷åðåç net_invested ñíàïøîòà (àíàëîãè÷íî forex),
-        # ÷òîáû íå çàâèñåòü îò _get_pool_pnl_pct, êîòîðàÿ â ñâîé ôîðìóëå ó÷èòûâàåò
-        # total_inv è total_wd — ïîëÿ, êîòîðûå åù¸ íå ñáðîøåíû íà ìîìåíò âûçîâà ýòîãî ýíäïîèíòà.
+        # For crypto: compute PnL% directly from snapshot net_invested (same as forex)
+        # to avoid _get_pool_pnl_pct which uses total_inv/total_wd (not yet reset)
         if latest_snap:
             crypto_ref = latest_snap.net_invested if latest_snap.net_invested > 0 else (
                 latest_snap.real_start_balance if latest_snap.real_start_balance != 0.0 else latest_snap.hwm
@@ -2017,9 +2017,100 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
                 pool_pnl_pct = 0.0
 
     if not latest_snap:
-        raise HTTPException(status_code=400, detail="Ñíàïøîò ïóëà íå íàéäåí")
+        raise HTTPException(status_code=400, detail="Snapshot not found")
 
     fins = (await db.execute(select(UserFinancials))).scalars().all()
+    fins_map = {f.user_id: f for f in fins}
+
+    # ------------------------------------------------------------------
+    # AUTO-ACCRUE REF BONUSES
+    # ref_bonus shown on dashboard is computed dynamically from referral
+    # tree profit — it is NOT stored in locked_crypto_ref_bonus in the DB.
+    # Before capitalizing, we calculate each investor's ref bonus here
+    # (same formula as _calc_referral_tree) and add it to locked_*_ref_bonus
+    # so that the capitalization loop below picks it up correctly.
+    # ------------------------------------------------------------------
+    all_users_for_ref = (await db.execute(select(User))).scalars().all()
+    children_map: dict = {}
+    for u in all_users_for_ref:
+        if u.referred_by:
+            children_map.setdefault(u.referred_by, []).append(u)
+
+    for u in all_users_for_ref:
+        fin_owner = fins_map.get(u.id)
+        if not fin_owner:
+            continue
+
+        # Determine levels_allowed by status
+        my_inv = fin_owner.investment_usdt + fin_owner.forex_investment_usdt
+        q_vol = [u.id]
+        visited_vol: set = {u.id}
+        total_volume = my_inv
+        while q_vol:
+            curr = q_vol.pop(0)
+            for child in children_map.get(curr, []):
+                if child.id not in visited_vol:
+                    visited_vol.add(child.id)
+                    if child.is_active:
+                        cf = fins_map.get(child.id)
+                        if cf:
+                            total_volume += cf.investment_usdt + cf.forex_investment_usdt
+                    q_vol.append(child.id)
+        _, _, levels_allowed = _get_status_and_limits(total_volume, u.manual_status_override)
+
+        # BFS: compute ref bonuses from referral tree
+        crypto_bonus = 0.0
+        forex_bonus  = 0.0
+        queue_ref = [(u.id, 1)]
+        visited_ref: set = {u.id}
+        while queue_ref:
+            curr, depth = queue_ref.pop(0)
+            if depth > 5:
+                continue
+            for child in children_map.get(curr, []):
+                if child.id in visited_ref:
+                    continue
+                visited_ref.add(child.id)
+                queue_ref.append((child.id, depth + 1))
+                if not child.is_active:
+                    continue
+                cf = fins_map.get(child.id)
+                if not cf:
+                    continue
+
+                if payload.pool == "crypto":
+                    inv = cf.investment_usdt
+                    if inv > 0 and depth <= levels_allowed and depth in REF_FEES:
+                        incr = pool_pnl_pct - cf.entry_pool_pnl_pct
+                        new_gross = inv * (incr / 100) if incr > 0 else 0.0
+                        # locked_crypto_pnl already in DB (previously fixed profit)
+                        locked_gross = cf.locked_crypto_pnl / get_investor_share(cf) if cf.locked_crypto_pnl > 0 else 0.0
+                        total_gross = new_gross + locked_gross
+                        if total_gross > 0:
+                            crypto_bonus += total_gross * REF_FEES[depth]
+                else:
+                    fx = cf.forex_investment_usdt
+                    if fx > 0 and depth <= levels_allowed and depth in REF_FEES:
+                        fx_incr = forex_pool_pct - cf.forex_entry_pool_pnl_pct
+                        new_fx_gross = fx * (fx_incr / 100) if fx_incr > 0 else 0.0
+                        locked_fx_gross = cf.locked_forex_pnl / get_investor_share(cf) if cf.locked_forex_pnl > 0 else 0.0
+                        total_fx_gross = new_fx_gross + locked_fx_gross
+                        if total_fx_gross > 0:
+                            forex_bonus += total_fx_gross * REF_FEES[depth]
+
+        # Accumulate into locked bonuses — they will be capitalized below
+        if payload.pool == "crypto" and crypto_bonus > 0:
+            fin_owner.locked_crypto_ref_bonus = round(
+                (fin_owner.locked_crypto_ref_bonus or 0.0) + crypto_bonus, 2
+            )
+        elif payload.pool == "forex" and forex_bonus > 0:
+            fin_owner.locked_forex_ref_bonus = round(
+                (fin_owner.locked_forex_ref_bonus or 0.0) + forex_bonus, 2
+            )
+
+    # ------------------------------------------------------------------
+    # CAPITALIZATION LOOP
+    # ------------------------------------------------------------------
     updated = 0
     total_capitalized = 0.0
 
@@ -2035,10 +2126,8 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
             f.locked_crypto_pnl = 0.0
             f.locked_crypto_ref_bonus = 0.0
             f.entry_pool_pnl_pct = 0.0
-            # Ïîñëå êàïèòàëèçàöèè real_start_balance ïóëà ñòàíîâèòñÿ ðàâåí balance_usdt,
-            # êîòîðûé óæå âêëþ÷àåò â ñåáÿ âñå èñòîðè÷åñêèå âûâîäû.
-            # Åñëè íå ñáðîñèòü withdrawal_usdt, òî _get_pool_pnl_pct â ñëåäóþùåì öèêëå
-            # áóäåò ñ÷èòàòü: ref = real_start + total_inv - old_wd — çàâûøåííàÿ áàçà → çàíèæåííûé PnL%.
+            # After capitalization real_start_balance = balance_usdt (includes all withdrawals).
+            # Reset withdrawal_usdt so _get_pool_pnl_pct in next cycle does not double-count.
             f.withdrawal_usdt = 0.0
             total_capitalized += total_profit
         else:
@@ -2052,12 +2141,12 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
             f.locked_forex_pnl = 0.0
             f.locked_forex_ref_bonus = 0.0
             f.forex_entry_pool_pnl_pct = 0.0
-            # Àíàëîãè÷íî ñáðàñûâàåì ôîðåêÁõèñòîðèþ âûâîäîâ
+            # Same: reset forex withdrawal history
             f.forex_withdrawal_usdt = 0.0
             total_capitalized += total_profit
         updated += 1
 
-    # Ñáðîñ ïóëà: base = òåêóùèé áàëàíñ, PnL% = 0 â íà÷àëå íîâîãî öèêëà
+    # Reset pool: base = current balance, so PnL% = 0 at start of new cycle
     latest_snap.net_invested = latest_snap.balance_usdt
     latest_snap.real_start_balance = latest_snap.balance_usdt
 
