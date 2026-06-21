@@ -3279,10 +3279,18 @@ async def admin_notebook(db: AsyncSession = Depends(get_db)):
 
 @router.post("/admin/notebook/reset-crypto", dependencies=[Depends(get_admin_user)])
 async def admin_notebook_reset_crypto(db: AsyncSession = Depends(get_db)):
-    """Reset all crypto profit records in AdminProfitLog (set crypto_profit = 0 for all rows)."""
-    from sqlalchemy import update as sa_update
-    await db.execute(
-        sa_update(AdminProfitLog).values(crypto_profit=0.0)
-    )
+    """Reset all crypto profit records in AdminProfitLog."""
+    logs = (await db.execute(select(AdminProfitLog))).scalars().all()
+    for log in logs:
+        log.crypto_profit = 0.0
     await db.commit()
     return {"status": "ok", "message": "Crypto notebook reset"}
+
+@router.post("/admin/notebook/reset-forex", dependencies=[Depends(get_admin_user)])
+async def admin_notebook_reset_forex(db: AsyncSession = Depends(get_db)):
+    """Reset all forex profit records in AdminProfitLog."""
+    logs = (await db.execute(select(AdminProfitLog))).scalars().all()
+    for log in logs:
+        log.forex_profit = 0.0
+    await db.commit()
+    return {"status": "ok", "message": "Forex notebook reset"}
