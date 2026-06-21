@@ -178,6 +178,7 @@ export default function DashboardPage() {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [newsFeed, setNewsFeed] = useState<NewsItemType[]>([]);
+  const [unreadNewsCount, setUnreadNewsCount] = useState(0);
   const [selectedNewsImage, setSelectedNewsImage] = useState<string | null>(null);
   const [supportBadge, setSupportBadge] = useState(0);
   const [showChangePass, setShowChangePass] = useState(false);
@@ -201,7 +202,18 @@ export default function DashboardPage() {
     getMyWithdrawals().then(setMyWithdrawals).catch(() => {});
     getMyForexDeposits().then(setMyForexDeposits).catch(() => {});
     getMyForexWithdrawals().then(setMyForexWithdrawals).catch(() => {});
-    getNews().then(setNewsFeed).catch(() => {});
+    getNews().then(news => {
+      setNewsFeed(news);
+      if (news.length > 0) {
+        const lastReadStr = localStorage.getItem("lastReadNewsTime");
+        if (!lastReadStr) {
+          setUnreadNewsCount(news.length);
+        } else {
+          const lastDate = new Date(lastReadStr).getTime();
+          setUnreadNewsCount(news.filter(n => new Date(n.created_at).getTime() > lastDate).length);
+        }
+      }
+    }).catch(() => {});
     const refreshBadge = () => getMyTickets().then(t => setSupportBadge(t.filter(x => x.has_unread).length)).catch(() => {});
     refreshBadge();
     const interval = setInterval(() => fetchData(false), 30000);
@@ -522,7 +534,25 @@ export default function DashboardPage() {
         {/* ── Новости и события ────────────────────────────────────────────── */}
         {newsFeed.length > 0 && (
           <div style={{ ...card, padding: 20 }}>
-            <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>📰 Новости и события</h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h2 style={{ color: "#fff", fontWeight: 600, margin: 0 }}>
+                📰 Новости {unreadNewsCount > 0 && <span style={{ color: "#ff4d4d", fontSize: 13 }}>({unreadNewsCount})</span>}
+              </h2>
+              {unreadNewsCount > 0 && (
+                <button
+                  onClick={() => {
+                    localStorage.setItem("lastReadNewsTime", new Date().toISOString());
+                    setUnreadNewsCount(0);
+                  }}
+                  style={{
+                    fontSize: 11, padding: "4px 10px", borderRadius: 6, cursor: "pointer",
+                    background: "rgba(34,201,122,0.1)", color: "#22c97a", border: "1px solid rgba(34,201,122,0.3)"
+                  }}
+                >
+                  ✓ Прочитано
+                </button>
+              )}
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: 360, overflowY: "auto", paddingRight: 4 }}>
               {newsFeed.map((n, i) => (
                 <div key={n.id} style={{ padding: "14px 0", borderBottom: i < newsFeed.length - 1 ? "1px solid rgba(0,180,255,0.08)" : "none", flexShrink: 0 }}>
