@@ -541,7 +541,9 @@ export default function DashboardPage() {
               {unreadNewsCount > 0 && (
                 <button
                   onClick={() => {
-                    localStorage.setItem("lastReadNewsTime", new Date().toISOString());
+                    if (newsFeed.length > 0) {
+                      localStorage.setItem("lastReadNewsTime", newsFeed[0].created_at);
+                    }
                     setUnreadNewsCount(0);
                   }}
                   style={{
