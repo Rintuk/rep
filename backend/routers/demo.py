@@ -43,9 +43,26 @@ async def get_demo_account(user: User = Depends(get_current_user), db: AsyncSess
         .order_by(VirtualTrade.timestamp.desc()).limit(20)
     )).scalars().all()
 
-    net_balance = round(va.balance_usdt, 2)
-    net_pnl = round(net_balance - va.start_balance, 2)
-    pnl_pct = round((net_pnl / va.start_balance * 100) if va.start_balance > 0 else 0, 2)
+    start_snap = (await db.execute(
+        select(BotSnapshot)
+        .where(BotSnapshot.timestamp <= (va.updated_at or va.created_at))
+        .order_by(BotSnapshot.timestamp.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+    current_pnl_pct = 0.0
+    if snap and snap.net_invested > 0:
+        current_pnl_pct = (snap.balance_usdt - snap.net_invested) / snap.net_invested * 100
+
+    start_pnl_pct = 0.0
+    if start_snap and start_snap.net_invested > 0:
+        start_pnl_pct = (start_snap.balance_usdt - start_snap.net_invested) / start_snap.net_invested * 100
+
+    incr = current_pnl_pct - start_pnl_pct
+    net_pnl = round(va.start_balance * (incr / 100), 2)
+    net_balance = round(va.start_balance + net_pnl, 2)
+    pnl_pct = round(incr, 2)
+
     return {
         "is_started": True, "balance_usdt": net_balance, "start_balance": va.start_balance,
         "pnl": net_pnl, "pnl_pct": pnl_pct, "positions": positions,
@@ -139,8 +156,24 @@ async def get_forex_demo_account(user: User = Depends(get_current_user), db: Asy
             positions.append({"symbol": p.symbol, "amount": round(p.amount * scale, 6),
                                "avg_price": p.avg_price, "value": round(p.amount * cur_price * scale, 2)})
 
-    net_balance = round(va.balance_usdt, 2)
-    net_pnl = round(net_balance - va.start_balance, 2)
+    start_snap = (await db.execute(
+        select(ForexBotSnapshot)
+        .where(ForexBotSnapshot.timestamp <= (va.updated_at or va.created_at))
+        .order_by(ForexBotSnapshot.timestamp.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+
+    current_pnl_pct = 0.0
+    if snap and snap.net_invested > 0:
+        current_pnl_pct = (snap.balance_usdt - snap.net_invested) / snap.net_invested * 100
+
+    start_pnl_pct = 0.0
+    if start_snap and start_snap.net_invested > 0:
+        start_pnl_pct = (start_snap.balance_usdt - start_snap.net_invested) / start_snap.net_invested * 100
+
+    incr = current_pnl_pct - start_pnl_pct
+    net_pnl = round(va.start_balance * (incr / 100), 2)
+    net_balance = round(va.start_balance + net_pnl, 2)
 
     trades = (await db.execute(
         select(ForexVirtualTrade).where(ForexVirtualTrade.user_id == user.id)
