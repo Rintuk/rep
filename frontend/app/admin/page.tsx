@@ -984,7 +984,7 @@ export default function AdminPage() {
                 {[
                   { label: "Пул всего", value: `${data.pool_total.toFixed(2)} $` },
                   { label: "Средства пула", value: `${(data.admin_own_capital + data.admin_own_pnl).toFixed(2)} $`, color: (data.admin_own_capital + data.admin_own_pnl) >= 0 ? "#22c97a" : "#ff4d4d" },
-                  { label: "Свободно USDT", value: `${(data.net_invested_pool - data.pool_positions_usdt).toFixed(2)} $` },
+                  { label: "Свободно USDT", value: `${data.pool_free.toFixed(2)} $` },
                   { label: "В позициях", value: `${data.pool_positions_usdt.toFixed(2)} $` },
                   { label: "HWM (пик)", value: `${data.hwm.toFixed(2)} $` },
                   { label: "Изменение от HWM", value: `${data.drawdown_pct >= 0 ? "+" : ""}${data.drawdown_pct.toFixed(2)}%`, color: pnlColor },
