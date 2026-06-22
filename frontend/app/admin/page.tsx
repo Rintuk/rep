@@ -145,7 +145,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notebookData, setNotebookData] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits" | "withdrawals" | "news" | "support">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "investors" | "referrals" | "trades" | "ai" | "deposits" | "withdrawals" | "news" | "support" | "diagram">("overview");
   const [deposits, setDeposits] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [withdrawals, setWithdrawals] = useState<{id:string;email:string;amount:number;comment:string;status:string;created_at:string}[]>([]);
   const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
@@ -735,6 +735,7 @@ export default function AdminPage() {
     { key: "withdrawals", label: "💸 Выводы", badge: pendingWithdrawals },
     { key: "referrals",   label: `🔗 Реф. (${data.referrals.length})` },
     { key: "trades",      label: "📋 Сделки" },
+    { key: "diagram",     label: "🥧 Диаграмма" },
     ...(!isForex ? [{ key: "ai", label: "🧠 ИИ" }] : []),
     { key: "news", label: "📰 Новости" },
     { key: "support", label: "🎧 Поддержка", badge: tickets.filter(t => t.status === "open").length },
@@ -2164,6 +2165,133 @@ export default function AdminPage() {
             }
           </div>
         )}
+
+        {/* Диаграмма прибыли */}
+        {activeTab === "diagram" && (() => {
+          const totalPnl = data.pool_pnl_usdt;
+          if (totalPnl <= 0) {
+            return (
+              <div style={{ ...card, padding: 40, textAlign: "center" }}>
+                <p style={{ color: muted, fontSize: 15 }}>📉 Пул сейчас без прибыли ({totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)} $)</p>
+                <p style={{ color: muted, fontSize: 12, marginTop: 8 }}>Диаграмма распределения прибыли появится когда пул выйдет в плюс.</p>
+              </div>
+            );
+          }
+
+          // Build slices
+          type Slice = { label: string; value: number; color: string; email?: string };
+          const slices: Slice[] = [];
+
+          // Admin portions
+          const adminFee = Math.max(data.admin_income || 0, 0);
+          const adminCapital = Math.max(data.admin_own_pnl || 0, 0);
+          if (adminFee > 0) slices.push({ label: "Мой доход (20%)", value: adminFee, color: "#22c97a" });
+          if (adminCapital > 0) slices.push({ label: "Доход с моего капитала", value: adminCapital, color: "#17a06a" });
+
+          // Individual investors
+          const invs = (data.investors || []).filter((inv: any) => (inv.pnl || 0) > 0).sort((a: any, b: any) => b.pnl - a.pnl);
+          const TOP_N = 10;
+          const topInvs = invs.slice(0, TOP_N);
+          const otherInvs = invs.slice(TOP_N);
+
+          const investorColors = ["#4488dd", "#6b8ab0", "#9966ee", "#c084fc", "#f59e0b", "#fcd34d", "#ec4899", "#f43f5e", "#14b8a6", "#06b6d4"];
+          topInvs.forEach((inv: any, i: number) => {
+            slices.push({ label: inv.email.split("@")[0], value: inv.pnl, color: investorColors[i % investorColors.length], email: inv.email });
+          });
+          if (otherInvs.length > 0) {
+            const otherSum = otherInvs.reduce((s: number, inv: any) => s + (inv.pnl || 0), 0);
+            if (otherSum > 0) slices.push({ label: `Остальные (${otherInvs.length})`, value: otherSum, color: "#555" });
+          }
+
+          // Unaccounted remainder (referral pool, etc.)
+          const accounted = slices.reduce((s, sl) => s + sl.value, 0);
+          const remainder = totalPnl - accounted;
+          if (remainder > 0.01) slices.push({ label: "Нераспред. (реф./резерв)", value: remainder, color: "#333" });
+
+          const total = slices.reduce((s, sl) => s + sl.value, 0);
+          if (total <= 0) return <div style={{ ...card, padding: 40, textAlign: "center" }}><p style={{ color: muted }}>Нет данных для диаграммы</p></div>;
+
+          // Calculate angles
+          let startAngle = -Math.PI / 2;
+          const arcs = slices.map(sl => {
+            const pct = sl.value / total;
+            const angle = pct * Math.PI * 2;
+            const arc = { ...sl, startAngle, endAngle: startAngle + angle, pct };
+            startAngle += angle;
+            return arc;
+          });
+
+          const R = 120;
+          const cx = 150, cy = 150;
+
+          const describeArc = (start: number, end: number, r: number) => {
+            const x1 = cx + r * Math.cos(start);
+            const y1 = cy + r * Math.sin(start);
+            const x2 = cx + r * Math.cos(end);
+            const y2 = cy + r * Math.sin(end);
+            const large = end - start > Math.PI ? 1 : 0;
+            return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+          };
+
+          return (
+            <div style={{ ...card, padding: 24 }}>
+              <h2 style={{ color: "#fff", fontWeight: 600, fontSize: 14, marginBottom: 20 }}>🥧 Распределение прибыли пула: +{totalPnl.toFixed(2)} $</h2>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 32, alignItems: "center", justifyContent: "center" }}>
+                {/* SVG Pie */}
+                <svg width="300" height="300" viewBox="0 0 300 300" style={{ filter: "drop-shadow(0 4px 24px rgba(0,180,255,0.08))" }}>
+                  {arcs.map((a, i) => (
+                    <path key={i} d={describeArc(a.startAngle, a.endAngle, R)} fill={a.color}
+                      stroke="rgba(3,5,20,1)" strokeWidth="2"
+                      style={{ transition: "transform 0.2s", transformOrigin: `${cx}px ${cy}px`, cursor: "pointer" }}
+                      onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.06)")}
+                      onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+                    >
+                      <title>{a.label}: {a.value.toFixed(2)} $ ({(a.pct * 100).toFixed(1)}%)</title>
+                    </path>
+                  ))}
+                  {/* Center hole */}
+                  <circle cx={cx} cy={cy} r={R * 0.45} fill="rgba(3,5,20,1)" />
+                  <text x={cx} y={cy - 8} textAnchor="middle" fill="#fff" fontSize="16" fontWeight="700">+{totalPnl.toFixed(2)} $</text>
+                  <text x={cx} y={cy + 12} textAnchor="middle" fill={muted} fontSize="10">общая прибыль</text>
+                </svg>
+
+                {/* Legend */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 200 }}>
+                  {arcs.map((a, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 12, height: 12, borderRadius: 3, background: a.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: "#ccc", flex: 1 }}>{a.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#fff", whiteSpace: "nowrap" }}>
+                        +{a.value.toFixed(2)} $ <span style={{ color: muted, fontWeight: 400 }}>({(a.pct * 100).toFixed(1)}%)</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Summary table */}
+              <div style={{ marginTop: 24, padding: 16, borderRadius: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${border}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ color: muted, fontSize: 11, marginBottom: 4 }}>Мой итого</p>
+                    <p style={{ color: "#22c97a", fontSize: 18, fontWeight: 700 }}>+{(adminFee + adminCapital).toFixed(2)} $</p>
+                    <p style={{ color: muted, fontSize: 11 }}>{total > 0 ? ((adminFee + adminCapital) / total * 100).toFixed(1) : "0"}% от прибыли</p>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ color: muted, fontSize: 11, marginBottom: 4 }}>Инвесторам</p>
+                    <p style={{ color: "#4488dd", fontSize: 18, fontWeight: 700 }}>+{data.pool_profit.toFixed(2)} $</p>
+                    <p style={{ color: muted, fontSize: 11 }}>{total > 0 ? (data.pool_profit / total * 100).toFixed(1) : "0"}% от прибыли</p>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ color: muted, fontSize: 11, marginBottom: 4 }}>Прибыль пула</p>
+                    <p style={{ color: "#fff", fontSize: 18, fontWeight: 700 }}>+{totalPnl.toFixed(2)} $</p>
+                    <p style={{ color: muted, fontSize: 11 }}>+{data.pool_pnl_pct.toFixed(2)}%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Новости */}
         {activeTab === "news" && (
