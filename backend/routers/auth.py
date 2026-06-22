@@ -516,8 +516,9 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 4)
 
     # ── Таблица инвесторов + реальный доход админа ───────────────
-    total_gross_pnl = 0.0
-    total_admin_pnl = 0.0
+    total_gross_pnl = 0.0      # суммарный брутто-профит всех инвесторов (без доли админа)
+    total_investor_net_pnl = 0.0  # суммарный нетто-профит инвесторов (их реальный доход)
+    total_admin_pnl = 0.0     # доля админа 20% со всех инвесторов
     investors_table = []
     from routers.forex import _get_forex_pool_pnl_pct
     from routers.dashboard import _calc_referral_tree
@@ -528,18 +529,23 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
         inv = fin.investment_usdt if fin else 0.0
         refs_count = sum(1 for x in all_users if x.referred_by == u.id)
         pnl = 0.0
+        gross_pnl = 0.0
+        locked_gross = 0.0
         if inv > 0 and snap and net_invested_pool > 0:
             entry_pct = fin.entry_pool_pnl_pct if fin else 0.0
             incremental = pool_pnl_pct - entry_pct
             gross_pnl = inv * (incremental / 100)
-            
+
             locked_crypto_pnl = fin.locked_crypto_pnl if fin else 0.0
             pnl = round(gross_pnl * get_investor_share(fin) + locked_crypto_pnl, 2)
-            
+
             # Reconstruct historical gross profit that was locked during migration
-            locked_gross = locked_crypto_pnl / get_investor_share(fin)
-            
+            locked_gross = locked_crypto_pnl / get_investor_share(fin) if get_investor_share(fin) > 0 else 0.0
+
             total_gross_pnl += (gross_pnl + locked_gross)
+            total_investor_net_pnl += pnl
+            # Админ получает POOL_FEE (20%) с брутто-прибыли инвестора
+            total_admin_pnl += (gross_pnl + locked_gross) * POOL_FEE
 
         forex_pnl = 0.0
         forex_inv = fin.forex_investment_usdt if fin else 0.0
@@ -549,17 +555,11 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             fx_gross_pnl = forex_inv * (fx_incremental / 100) if fx_incremental > 0 else 0.0
             fx_locked = fin.locked_forex_pnl if fin else 0.0
             forex_pnl = round(fx_gross_pnl * get_investor_share(fin) + fx_locked, 2)
-            
-            # Временно упрощаем для админской статы: 
-            # Админ получает POOL_FEE (20%) со всех. 
-            # Невыплаченные реферальные % из оставшихся 5% тоже идут админу, но для простоты здесь пока оставим базовые 20%
-            admin_fee = POOL_FEE 
-            total_admin_pnl += (gross_pnl + locked_gross) * admin_fee
-        
+
         status, total_volume, next_vol, crypto_ref, forex_ref, refs_info = await _calc_referral_tree(
             u.id, db, pool_pnl_pct, forex_pool_pct, fin, u.manual_status_override
         )
-        
+
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.withdrawal_usdt if fin else 0.0,
@@ -575,13 +575,16 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             "custom_investor_share": fin.custom_investor_share if fin else None,
         })
 
-    pool_profit = round(total_gross_pnl, 2)
+    # pool_profit = суммарный нетто-доход инвесторов (то что уйдёт им)
+    pool_profit = round(total_investor_net_pnl, 2)
     admin_income = round(total_admin_pnl, 2) if total_admin_pnl > 0 else 0.0
 
-    # Собственный капитал администратора = всё что в пуле минус деньги инвесторов
+    # Собственный капитал администратора = стартовый вклад пула минус деньги инвесторов
     admin_own_capital = round(max(net_invested_pool - total_invested, 0.0), 2)
-    admin_own_pnl = round(pool_pnl_usdt - pool_profit, 2)
-    if admin_own_pnl < 0 and admin_own_capital <= 0:
+    # Доход с собственного капитала = пропорционально доле в пуле от общего PnL
+    if net_invested_pool > 0 and admin_own_capital > 0:
+        admin_own_pnl = round(pool_pnl_usdt * (admin_own_capital / net_invested_pool), 2)
+    else:
         admin_own_pnl = 0.0
     admin_total_income = round(admin_income + admin_own_pnl, 2)
 
