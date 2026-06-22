@@ -105,7 +105,9 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             pool_pnl_usdt = round(pool_free - net_invested_pool, 2)
             pool_pnl_pct = round((pool_free - net_invested_pool) / net_invested_pool * 100, 4)
 
-    total_gross_pnl = total_admin_pnl = 0.0
+    total_gross_pnl = 0.0
+    total_investor_net_pnl = 0.0
+    total_admin_pnl = 0.0
     investors_table = []
     from routers.auth import _get_pool_pnl_pct
     from routers.dashboard import _calc_referral_tree
@@ -116,24 +118,27 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         inv = fin.forex_investment_usdt if fin else 0.0
         refs_count = sum(1 for x in all_users if x.referred_by == u.id)
         pnl = 0.0
+        gross_pnl = 0.0
+        locked_gross = 0.0
         if inv > 0 and snap and net_invested_pool > 0:
             entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
             incremental = pool_pnl_pct - entry_pct
             gross_pnl = inv * (incremental / 100)
             locked_forex_pnl = fin.locked_forex_pnl if fin else 0.0
             pnl = round(gross_pnl * get_investor_share(fin) + locked_forex_pnl, 2)
-            
+
             # Gross
-            locked_gross = locked_forex_pnl / get_investor_share(fin)
-            
+            inv_share = get_investor_share(fin)
+            locked_gross = locked_forex_pnl / inv_share if inv_share > 0 else 0.0
+
             total_gross_pnl += (gross_pnl + locked_gross)
-            admin_fee = POOL_FEE
-            total_admin_pnl += (gross_pnl + locked_gross) * admin_fee
-            
+            total_investor_net_pnl += pnl
+            total_admin_pnl += (gross_pnl + locked_gross) * POOL_FEE
+
         status, total_volume, next_vol, crypto_ref, forex_ref, refs_info = await _calc_referral_tree(
             u.id, db, crypto_pool_pct, pool_pnl_pct, fin, u.manual_status_override
         )
-        
+
         investors_table.append({
             "id": u.id, "email": u.email, "created_at": str(u.created_at),
             "investment": inv, "withdrawal": fin.forex_withdrawal_usdt if fin else 0.0,
@@ -144,13 +149,13 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             "next_vol": next_vol,
         })
 
+    pool_profit = round(total_investor_net_pnl, 2)
     admin_income = round(total_admin_pnl, 2) if total_admin_pnl > 0 else 0.0
     admin_own_capital = round(max(net_invested_pool - total_invested, 0.0), 2)
-    # Admin profit
-    # Рассчитываем профит админа как остаток от общей прибыли пула, чтобы избежать математических дыр
-    # при размытии пула (когда net_invested меняется, а у админа нет фиксированной точки входа)
-    admin_own_pnl = round(pool_pnl_usdt - total_gross_pnl, 2)
-    if admin_own_pnl < 0 and admin_own_capital <= 0:
+    # Доход с собственного капитала = пропорционально доле в пуле от общего PnL
+    if net_invested_pool > 0 and admin_own_capital > 0:
+        admin_own_pnl = round(pool_pnl_usdt * (admin_own_capital / net_invested_pool), 2)
+    else:
         admin_own_pnl = 0.0
 
     return {
@@ -169,7 +174,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         "admin_own_capital": admin_own_capital,
         "admin_own_pnl": admin_own_pnl,
         "admin_total_income": round(admin_income + admin_own_pnl, 2),
-        "pool_profit": round(total_gross_pnl, 2),
+        "pool_profit": pool_profit,
         "pool_pnl_usdt": pool_pnl_usdt,
         "pool_pnl_pct": pool_pnl_pct,
         "real_start_balance": round(real_start, 2),
