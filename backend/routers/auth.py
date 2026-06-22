@@ -306,6 +306,8 @@ async def get_user_detail(user_id: str, db: AsyncSession = Depends(get_db)):
         "forex_withdrawal_usdt": fin.forex_withdrawal_usdt if fin else 0.0,
         "note": fin.note if fin else "",
         "custom_investor_share": fin.custom_investor_share if fin else None,
+        "custom_pool_fee": fin.custom_pool_fee if fin else None,
+        "custom_ref_bonus": fin.custom_ref_bonus if fin else None,
         "referrals": [
             {"id": r.id, "email": r.email, "is_active": r.is_active, "created_at": str(r.created_at)}
             for r in refs
@@ -579,6 +581,8 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
             "total_volume": round(total_volume, 2),
             "next_vol": next_vol,
             "custom_investor_share": fin.custom_investor_share if fin else None,
+            "custom_pool_fee": fin.custom_pool_fee if fin else None,
+            "custom_ref_bonus": fin.custom_ref_bonus if fin else None,
         })
 
     # pool_profit = суммарный нетто-доход инвесторов (то что уйдёт им)

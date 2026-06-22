@@ -149,6 +149,8 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             "next_vol": next_vol,
             "nickname": u.nickname,
             "custom_investor_share": fin.custom_investor_share if fin else None,
+            "custom_pool_fee": fin.custom_pool_fee if fin else None,
+            "custom_ref_bonus": fin.custom_ref_bonus if fin else None,
         })
 
     pool_profit = round(total_investor_net_pnl, 2)

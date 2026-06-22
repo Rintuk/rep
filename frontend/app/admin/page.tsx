@@ -629,9 +629,9 @@ export default function AdminPage() {
         await setReferralLimit(id, Number(f.referral_limit));
         await setCustomInvestorShare(
             id, 
-            f.custom_investor_share ? Number(f.custom_investor_share) / 100 : null,
-            f.custom_pool_fee ? Number(f.custom_pool_fee) / 100 : null,
-            f.custom_ref_bonus ? Number(f.custom_ref_bonus) / 100 : null
+            f.custom_investor_share !== "" && !isNaN(parseFloat(f.custom_investor_share)) ? parseFloat(f.custom_investor_share) / 100 : null,
+            f.custom_pool_fee !== "" && !isNaN(parseFloat(f.custom_pool_fee)) ? parseFloat(f.custom_pool_fee) / 100 : null,
+            f.custom_ref_bonus !== "" && !isNaN(parseFloat(f.custom_ref_bonus)) ? parseFloat(f.custom_ref_bonus) / 100 : null
         );
         setStatusOverrideMsg(prev => ({ ...prev, [id]: "✓ Сохранено!" }));
         setTimeout(() => setStatusOverrideMsg(prev => ({ ...prev, [id]: "" })), 2000);
@@ -652,6 +652,12 @@ export default function AdminPage() {
     try {
       await updateUserFinancials(id, parseFloat(f.investment_usdt) || 0, parseFloat(f.withdrawal_usdt) || 0, f.note);
       await setReferralLimit(id, parseInt(f.referral_limit) || 5);
+      await setCustomInvestorShare(
+        id, 
+        f.custom_investor_share !== "" && !isNaN(parseFloat(f.custom_investor_share)) ? parseFloat(f.custom_investor_share) / 100 : null,
+        f.custom_pool_fee !== "" && !isNaN(parseFloat(f.custom_pool_fee)) ? parseFloat(f.custom_pool_fee) / 100 : null,
+        f.custom_ref_bonus !== "" && !isNaN(parseFloat(f.custom_ref_bonus)) ? parseFloat(f.custom_ref_bonus) / 100 : null
+      );
       setSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
       setTimeout(() => setSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
       fetchData();
@@ -670,9 +676,9 @@ export default function AdminPage() {
       await setReferralLimit(id, parseInt(f.referral_limit) || 5);
       await setCustomInvestorShare(
         id, 
-        f.custom_investor_share ? parseFloat(f.custom_investor_share) / 100 : null,
-        f.custom_pool_fee ? parseFloat(f.custom_pool_fee) / 100 : null,
-        f.custom_ref_bonus ? parseFloat(f.custom_ref_bonus) / 100 : null
+        f.custom_investor_share !== "" && !isNaN(parseFloat(f.custom_investor_share)) ? parseFloat(f.custom_investor_share) / 100 : null,
+        f.custom_pool_fee !== "" && !isNaN(parseFloat(f.custom_pool_fee)) ? parseFloat(f.custom_pool_fee) / 100 : null,
+        f.custom_ref_bonus !== "" && !isNaN(parseFloat(f.custom_ref_bonus)) ? parseFloat(f.custom_ref_bonus) / 100 : null
       );
       setForexSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
       setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
