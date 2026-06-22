@@ -40,7 +40,7 @@ interface Overview {
   positions: { symbol: string; amount: number; avg_price: number; current_price: number; value: number }[];
   trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
   ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
-  investors: { id: string; email: string; nickname?: string | null; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; next_vol?: number; }[];
+  investors: { id: string; email: string; nickname?: string | null; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; next_vol?: number; custom_investor_share?: number | null; }[];
   referrals: { id: string; email: string; nickname?: string | null; is_active: boolean; referred_by_email: string; investment: number }[];
   pending_users: { id: string; email: string; nickname?: string | null; created_at: string }[];
 }
