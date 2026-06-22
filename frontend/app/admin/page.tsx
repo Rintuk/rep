@@ -1663,6 +1663,52 @@ export default function AdminPage() {
                                   <p style={{ color: muted, fontSize: 13 }}>Загрузка...</p>
                                 ) : (
                                   <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                                    {/* Распределение прибыли инвестора */}
+                                    {(() => {
+                                      const invShare = u.custom_investor_share != null ? u.custom_investor_share : 0.75;
+                                      const poolFee = 0.20;
+                                      const refBonus = Math.max(0, 1 - invShare - poolFee);
+                                      const invPct = Math.round(invShare * 100);
+                                      const poolPct = Math.round(poolFee * 100);
+                                      const refPct = Math.round(refBonus * 100);
+                                      return (
+                                        <div style={{ padding: 14, borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${border}` }}>
+                                          <p style={{ color: "#fff", fontSize: 12, fontWeight: 600, marginBottom: 12 }}>📊 Распределение прибыли</p>
+                                          {/* Bar */}
+                                          <div style={{ display: "flex", height: 28, borderRadius: 6, overflow: "hidden", marginBottom: 12 }}>
+                                            <div style={{ width: `${invPct}%`, background: "linear-gradient(135deg, #22c97a, #17a06a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", minWidth: 40 }}>
+                                              {invPct}%
+                                            </div>
+                                            <div style={{ width: `${poolPct}%`, background: "linear-gradient(135deg, #4488dd, #3366bb)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", minWidth: 36 }}>
+                                              {poolPct}%
+                                            </div>
+                                            {refPct > 0 && (
+                                              <div style={{ width: `${refPct}%`, background: "linear-gradient(135deg, #f59e0b, #d97706)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", minWidth: 30 }}>
+                                                {refPct}%
+                                              </div>
+                                            )}
+                                          </div>
+                                          {/* Labels */}
+                                          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#22c97a" }} />
+                                              <span style={{ fontSize: 12, color: "#ccc" }}>Инвестору: <span style={{ color: "#22c97a", fontWeight: 600 }}>{invPct}%</span></span>
+                                              {u.custom_investor_share != null && (
+                                                <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "rgba(34,201,122,0.15)", color: "#22c97a", fontWeight: 600 }}>Особый</span>
+                                              )}
+                                            </div>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#4488dd" }} />
+                                              <span style={{ fontSize: 12, color: "#ccc" }}>Пулу (комиссия): <span style={{ color: "#4488dd", fontWeight: 600 }}>{poolPct}%</span></span>
+                                            </div>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#f59e0b" }} />
+                                              <span style={{ fontSize: 12, color: "#ccc" }}>Реф. бонусы: <span style={{ color: "#f59e0b", fontWeight: 600 }}>{refPct}%</span></span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                     {/* Пул-зависимые поля */}
                                     {!isForex ? (
                                       <div>
