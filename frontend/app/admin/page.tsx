@@ -40,7 +40,7 @@ interface Overview {
   positions: { symbol: string; amount: number; avg_price: number; current_price: number; value: number }[];
   trades: { symbol: string; action: string; amount: number; price: number; pnl: number | null; timestamp: string }[];
   ai_feed: { timestamp: string; action: string; symbol: string; reason: string }[];
-  investors: { id: string; email: string; nickname?: string | null; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; next_vol?: number; custom_investor_share?: number | null; }[];
+  investors: { id: string; email: string; nickname?: string | null; created_at: string; investment: number; withdrawal: number; pnl: number; referrals_count: number; ref_income: number; status?: string; total_volume?: number; next_vol?: number; custom_investor_share?: number | null; custom_pool_fee?: number | null; custom_ref_bonus?: number | null; }[];
   referrals: { id: string; email: string; nickname?: string | null; is_active: boolean; referred_by_email: string; investment: number }[];
   pending_users: { id: string; email: string; nickname?: string | null; created_at: string }[];
 }
@@ -54,6 +54,8 @@ interface InvestorForm {
   forex_investment_usdt: string;
   forex_withdrawal_usdt: string;
   custom_investor_share: string;
+  custom_pool_fee: string;
+  custom_ref_bonus: string;
   referred_by_email: string;
 }
 
@@ -492,11 +494,13 @@ export default function AdminPage() {
           manual_status_override: detail.manual_status_override || "NONE",
           forex_investment_usdt: String(detail.forex_investment_usdt ?? 0),
           forex_withdrawal_usdt: String(detail.forex_withdrawal_usdt ?? 0),
-          custom_investor_share: detail.custom_investor_share !== null ? String(detail.custom_investor_share * 100) : "75",
+          custom_investor_share: detail.custom_investor_share !== null && detail.custom_investor_share !== undefined ? String(detail.custom_investor_share * 100) : "75",
+          custom_pool_fee: detail.custom_pool_fee !== null && detail.custom_pool_fee !== undefined ? String(detail.custom_pool_fee * 100) : "20",
+          custom_ref_bonus: detail.custom_ref_bonus !== null && detail.custom_ref_bonus !== undefined ? String(detail.custom_ref_bonus * 100) : "5",
           referred_by_email: detail.referred_by_email || "",
         }}));
       } catch {
-        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0", custom_investor_share: "75", referred_by_email: "" } }));
+        setForms(prev => ({ ...prev, [id]: { investment_usdt: "0", withdrawal_usdt: "0", note: "", referral_limit: "5", manual_status_override: "NONE", forex_investment_usdt: "0", forex_withdrawal_usdt: "0", custom_investor_share: "75", custom_pool_fee: "20", custom_ref_bonus: "5", referred_by_email: "" } }));
       }
     }
   }
@@ -623,7 +627,12 @@ export default function AdminPage() {
     try {
         await setStatusOverride(id, f.manual_status_override);
         await setReferralLimit(id, Number(f.referral_limit));
-        await setCustomInvestorShare(id, f.custom_investor_share ? Number(f.custom_investor_share) / 100 : null);
+        await setCustomInvestorShare(
+            id, 
+            f.custom_investor_share ? Number(f.custom_investor_share) / 100 : null,
+            f.custom_pool_fee ? Number(f.custom_pool_fee) / 100 : null,
+            f.custom_ref_bonus ? Number(f.custom_ref_bonus) / 100 : null
+        );
         setStatusOverrideMsg(prev => ({ ...prev, [id]: "✓ Сохранено!" }));
         setTimeout(() => setStatusOverrideMsg(prev => ({ ...prev, [id]: "" })), 2000);
         fetchData();
@@ -659,7 +668,12 @@ export default function AdminPage() {
     try {
       await updateUserForexFinancials(id, parseFloat(f.forex_investment_usdt) || 0, parseFloat(f.forex_withdrawal_usdt) || 0, f.note);
       await setReferralLimit(id, parseInt(f.referral_limit) || 5);
-      await setCustomInvestorShare(id, f.custom_investor_share ? parseFloat(f.custom_investor_share) / 100 : null);
+      await setCustomInvestorShare(
+        id, 
+        f.custom_investor_share ? parseFloat(f.custom_investor_share) / 100 : null,
+        f.custom_pool_fee ? parseFloat(f.custom_pool_fee) / 100 : null,
+        f.custom_ref_bonus ? parseFloat(f.custom_ref_bonus) / 100 : null
+      );
       setForexSaveMsg(prev => ({ ...prev, [id]: "✓ Сохранено" }));
       setTimeout(() => setForexSaveMsg(prev => ({ ...prev, [id]: "" })), 2000);
       fetchData();
@@ -1665,9 +1679,14 @@ export default function AdminPage() {
                                   <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                                     {/* Распределение прибыли инвестора */}
                                     {(() => {
-                                      const invShare = u.custom_investor_share != null ? u.custom_investor_share : 0.75;
-                                      const poolFee = 0.20;
-                                      const refBonus = Math.max(0, 1 - invShare - poolFee);
+                                      const fShare = parseFloat(f.custom_investor_share);
+                                      const fPool = parseFloat(f.custom_pool_fee);
+                                      const fRef = parseFloat(f.custom_ref_bonus);
+                                      
+                                      const invShare = !isNaN(fShare) ? fShare / 100 : (u.custom_investor_share != null ? u.custom_investor_share : 0.75);
+                                      const poolFee = !isNaN(fPool) ? fPool / 100 : (u.custom_pool_fee != null ? u.custom_pool_fee : 0.20);
+                                      const refBonus = !isNaN(fRef) ? fRef / 100 : (u.custom_ref_bonus != null ? u.custom_ref_bonus : Math.max(0, 1 - invShare - poolFee));
+                                      
                                       const invPct = Math.round(invShare * 100);
                                       const poolPct = Math.round(poolFee * 100);
                                       const refPct = Math.round(refBonus * 100);
@@ -1716,11 +1735,14 @@ export default function AdminPage() {
                                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
                                           {[
                                             { label: "Инвестировано (USDT)", field: "investment_usdt" as keyof InvestorForm },
-                                            { label: "Выведено (USDT)", field: "withdrawal_usdt" as keyof InvestorForm },
-                                          ].map(({ label, field }) => (
+                                            { label: "Выведено (USDT)", field: "withdrawal_usdt" as keyof InvestorForm, type: "number" },
+                                            { label: "Индивид. % (напр. 80)", field: "custom_investor_share" as keyof InvestorForm, type: "number" },
+                                            { label: "Пул % (напр. 20)", field: "custom_pool_fee" as keyof InvestorForm, type: "number" },
+                                            { label: "Бонус % (напр. 5)", field: "custom_ref_bonus" as keyof InvestorForm, type: "number" },
+                                          ].map(({ label, field, type }) => (
                                             <div key={field}>
                                               <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>
-                                              <input type="number" value={f[field]}
+                                              <input type={type || "text"} value={f[field]}
                                                 onChange={e => updateForm(u.id, field, e.target.value)}
                                                 style={inputStyle} />
                                             </div>
@@ -1805,6 +1827,8 @@ export default function AdminPage() {
                                             { label: "Выведено (USDT)", field: "forex_withdrawal_usdt" as keyof InvestorForm, type: "number" },
                                             { label: "Лимит рефералов (глубина)", field: "referral_limit" as keyof InvestorForm, type: "number" },
                                             { label: "Индивид. % (напр. 80)", field: "custom_investor_share" as keyof InvestorForm, type: "number" },
+                                            { label: "Пул % (напр. 20)", field: "custom_pool_fee" as keyof InvestorForm, type: "number" },
+                                            { label: "Бонус % (напр. 5)", field: "custom_ref_bonus" as keyof InvestorForm, type: "number" },
                                           ].map(({ label, field, type }) => (
                                             <div key={field}>
                                               <label style={{ fontSize: 11, color: muted, display: "block", marginBottom: 6 }}>{label}</label>

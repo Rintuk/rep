@@ -56,6 +56,8 @@ class UserFinancials(Base):
     locked_crypto_ref_bonus: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     locked_forex_ref_bonus:  Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     custom_investor_share:   Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
+    custom_pool_fee:         Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
+    custom_ref_bonus:        Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
 
     note:       Mapped[str]      = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

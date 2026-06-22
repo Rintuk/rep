@@ -200,6 +200,8 @@ async def set_referral_limit(user_id: str, limit: int, db: AsyncSession = Depend
 from pydantic import BaseModel
 class InvestorShareRequest(BaseModel):
     share: Optional[float]
+    pool_fee: Optional[float] = None
+    ref_bonus: Optional[float] = None
 
 @router.post("/admin/investor-share/{user_id}", dependencies=[Depends(get_admin_user)])
 async def set_investor_share(user_id: str, data: InvestorShareRequest, db: AsyncSession = Depends(get_db)):
@@ -235,13 +237,17 @@ async def set_investor_share(user_id: str, data: InvestorShareRequest, db: Async
                 fin.locked_forex_pnl += fx_user_profit
             fin.forex_entry_pool_pnl_pct = forex_pool_pct
             
-        # Update custom share
+        # Update custom share and fees
         fin.custom_investor_share = data.share
+        fin.custom_pool_fee = data.pool_fee
+        fin.custom_ref_bonus = data.ref_bonus
     else:
         # User has no financials yet, just create with the new share
         db.add(UserFinancials(
             user_id=user_id,
-            custom_investor_share=data.share
+            custom_investor_share=data.share,
+            custom_pool_fee=data.pool_fee,
+            custom_ref_bonus=data.ref_bonus
         ))
 
     await db.commit()

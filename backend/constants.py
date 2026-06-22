@@ -6,6 +6,18 @@ def get_investor_share(fin) -> float:
         return float(fin.custom_investor_share)
     return INVESTOR_SHARE
 
+def get_pool_fee(fin) -> float:
+    if fin and getattr(fin, "custom_pool_fee", None) is not None:
+        return float(fin.custom_pool_fee)
+    return POOL_FEE
+
+def get_ref_bonus(fin) -> float:
+    if fin and getattr(fin, "custom_ref_bonus", None) is not None:
+        return float(fin.custom_ref_bonus)
+    inv_s = get_investor_share(fin)
+    pool_f = get_pool_fee(fin)
+    return max(0.0, 1.0 - inv_s - pool_f)
+
 # Многоуровневые реферальные бонусы (Уровень: Процент)
 REF_FEES = {
     1: 0.03,   # 3%

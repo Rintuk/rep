@@ -457,8 +457,8 @@ export async function setUserReferrer(userId: string, referredByEmail: string) {
   return res.data;
 }
 
-export async function setCustomInvestorShare(userId: string, share: number | null) {
-  const res = await api.post(`/auth/admin/investor-share/${userId}`, { share });
+export async function setCustomInvestorShare(userId: string, share: number | null, poolFee: number | null = null, refBonus: number | null = null) {
+  const res = await api.post(`/auth/admin/investor-share/${userId}`, { share, pool_fee: poolFee, ref_bonus: refBonus });
   return res.data;
 }
 
