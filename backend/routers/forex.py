@@ -147,6 +147,8 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             "status": status,
             "total_volume": round(total_volume, 2),
             "next_vol": next_vol,
+            "nickname": u.nickname,
+            "custom_investor_share": fin.custom_investor_share if fin else None,
         })
 
     pool_profit = round(total_investor_net_pnl, 2)
