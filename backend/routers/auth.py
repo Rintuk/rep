@@ -223,18 +223,22 @@ async def set_investor_share(user_id: str, data: InvestorShareRequest, db: Async
         if fin.investment_usdt > 0:
             incr = crypto_pool_pct - fin.entry_pool_pnl_pct
             gross = fin.investment_usdt * (incr / 100)
-            user_profit = round(gross * get_investor_share(fin), 2)
-            if user_profit > 0:
-                fin.locked_crypto_pnl += user_profit
+            if gross > 0:
+                user_profit = round(gross * get_investor_share(fin), 2)
+            else:
+                user_profit = round(gross, 2)
+            fin.locked_crypto_pnl += user_profit
             fin.entry_pool_pnl_pct = crypto_pool_pct
             
         # Lock forex pnl
         if fin.forex_investment_usdt > 0:
             fx_incr = forex_pool_pct - fin.forex_entry_pool_pnl_pct
             fx_gross = fin.forex_investment_usdt * (fx_incr / 100)
-            fx_user_profit = round(fx_gross * get_investor_share(fin), 2)
-            if fx_user_profit > 0:
-                fin.locked_forex_pnl += fx_user_profit
+            if fx_gross > 0:
+                fx_user_profit = round(fx_gross * get_investor_share(fin), 2)
+            else:
+                fx_user_profit = round(fx_gross, 2)
+            fin.locked_forex_pnl += fx_user_profit
             fin.forex_entry_pool_pnl_pct = forex_pool_pct
             
         # Update custom share and fees
@@ -370,11 +374,12 @@ async def update_user_financials(
                 # Существующий инвестор пополняется с пула:
                 # 1. Фиксируем накопленную прибыль на СТАРУЮ сумму по PRE pct
                 incr = pre_pnl_pct - fin.entry_pool_pnl_pct
-                if incr > 0:
-                    gross = old_inv * (incr / 100)
+                gross = old_inv * (incr / 100)
+                if gross > 0:
                     user_profit = round(gross * get_investor_share(fin), 2)
-                    if user_profit > 0:
-                        fin.locked_crypto_pnl += user_profit
+                else:
+                    user_profit = round(gross, 2)
+                fin.locked_crypto_pnl += user_profit
                 # 2. Точку входа ставим на POST-update pct — профит с нуля на новую сумму
                 fin.entry_pool_pnl_pct = post_pnl_pct
         fin.investment_usdt = investment_usdt
@@ -782,6 +787,7 @@ async def crypto_full_reset(db: AsyncSession = Depends(get_db)):
         fin.investment_usdt = 0.0
         fin.withdrawal_usdt = 0.0
         fin.entry_pool_pnl_pct = 0.0
+        fin.locked_crypto_pnl = 0.0
         fin.updated_at = datetime.utcnow()
 
     all_va = (await db.execute(select(VirtualAccount))).scalars().all()
@@ -1826,9 +1832,11 @@ async def external_deposit(payload: ExternalDepositPayload, db: AsyncSession = D
             if incr > 0:
                 from constants import get_investor_share, get_pool_fee
                 gross = fin.investment_usdt * (incr / 100)
-                user_profit = round(gross * get_investor_share(fin), 2)
-                if user_profit > 0:
-                    fin.locked_crypto_pnl += user_profit
+                if gross > 0:
+                    user_profit = round(gross * get_investor_share(fin), 2)
+                else:
+                    user_profit = round(gross, 2)
+                fin.locked_crypto_pnl += user_profit
         fin.entry_pool_pnl_pct = current_pnl_pct
         fin.investment_usdt += payload.amount
         fin.updated_at = datetime.utcnow()
@@ -1886,9 +1894,11 @@ async def forex_external_deposit(payload: ExternalDepositPayload, db: AsyncSessi
             if incr > 0:
                 from constants import get_investor_share, get_pool_fee
                 gross = fin.forex_investment_usdt * (incr / 100)
-                user_profit = round(gross * get_investor_share(fin), 2)
-                if user_profit > 0:
-                    fin.locked_forex_pnl += user_profit
+                if gross > 0:
+                    user_profit = round(gross * get_investor_share(fin), 2)
+                else:
+                    user_profit = round(gross, 2)
+                fin.locked_forex_pnl += user_profit
         fin.forex_entry_pool_pnl_pct = current_forex_pct
         fin.forex_investment_usdt += payload.amount
         fin.updated_at = datetime.utcnow()
@@ -2301,9 +2311,11 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
             if incr > 0:
                 from constants import get_investor_share, get_pool_fee
                 gross = fin.investment_usdt * (incr / 100)
-                user_profit = round(gross * get_investor_share(fin), 2)
-                if user_profit > 0:
-                    fin.locked_crypto_pnl += user_profit
+                if gross > 0:
+                    user_profit = round(gross * get_investor_share(fin), 2)
+                else:
+                    user_profit = round(gross, 2)
+                fin.locked_crypto_pnl += user_profit
         fin.entry_pool_pnl_pct = post_deposit_pct
 
         fin.investment_usdt += payload.amount
@@ -2374,9 +2386,11 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
             if fx_incr > 0:
                 from constants import get_investor_share, get_pool_fee
                 gross = fin.forex_investment_usdt * (fx_incr / 100)
-                user_profit = round(gross * get_investor_share(fin), 2)
-                if user_profit > 0:
-                    fin.locked_forex_pnl += user_profit
+                if gross > 0:
+                    user_profit = round(gross * get_investor_share(fin), 2)
+                else:
+                    user_profit = round(gross, 2)
+                fin.locked_forex_pnl += user_profit
         # Сбрасываем его entry_pct до текущего, чтобы новые инвестиции начали с нуля
         fin.forex_entry_pool_pnl_pct = post_deposit_forex_pct
 
@@ -2518,11 +2532,13 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
         old_wd = fin.withdrawal_usdt
         
         incr = current_pnl_pct - fin.entry_pool_pnl_pct
-        if incr > 0 and fin.investment_usdt > 0:
+        if fin.investment_usdt > 0:
             gross = fin.investment_usdt * (incr / 100)
-            user_profit = round(gross * get_investor_share(fin), 2)
-            if user_profit > 0:
-                fin.locked_crypto_pnl += user_profit
+            if gross > 0:
+                user_profit = round(gross * get_investor_share(fin), 2)
+            else:
+                user_profit = round(gross, 2)
+            fin.locked_crypto_pnl += user_profit
                 
         fin.withdrawal_usdt = round(old_wd + actual_amount, 2)
         fin.investment_usdt = max(0.0, fin.investment_usdt - actual_amount)

@@ -250,11 +250,12 @@ async def update_user_forex_financials(
                 # Фиксируем плавающую прибыль старой суммы, затем обновляем точку входа.
                 # Новые деньги начинают зарабатывать только с этого момента.
                 incr = current_pnl_pct - fin.forex_entry_pool_pnl_pct
-                if incr > 0:
-                    gross = old_inv * (incr / 100)
+                gross = old_inv * (incr / 100)
+                if gross > 0:
                     user_profit = round(gross * get_investor_share(fin), 2)
-                    if user_profit > 0:
-                        fin.locked_forex_pnl += user_profit
+                else:
+                    user_profit = round(gross, 2)
+                fin.locked_forex_pnl += user_profit
                 fin.forex_entry_pool_pnl_pct = current_pnl_pct
         fin.forex_investment_usdt = forex_investment_usdt
         fin.forex_withdrawal_usdt = forex_withdrawal_usdt
@@ -512,11 +513,13 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
         old_wd = fin.forex_withdrawal_usdt
         
         incr = current_pnl_pct - fin.forex_entry_pool_pnl_pct
-        if incr > 0 and fin.forex_investment_usdt > 0:
+        if fin.forex_investment_usdt > 0:
             gross = fin.forex_investment_usdt * (incr / 100)
-            user_profit = round(gross * get_investor_share(fin), 2)
-            if user_profit > 0:
-                fin.locked_forex_pnl += user_profit
+            if gross > 0:
+                user_profit = round(gross * get_investor_share(fin), 2)
+            else:
+                user_profit = round(gross, 2)
+            fin.locked_forex_pnl += user_profit
         
         fin.forex_withdrawal_usdt = round(old_wd + actual_amount, 2)
         fin.forex_investment_usdt = max(0.0, fin.forex_investment_usdt - actual_amount)
@@ -662,6 +665,7 @@ async def forex_full_reset(db: AsyncSession = Depends(get_db)):
         fin.forex_investment_usdt = 0.0
         fin.forex_withdrawal_usdt = 0.0
         fin.forex_entry_pool_pnl_pct = 0.0
+        fin.locked_forex_pnl = 0.0
         fin.updated_at = datetime.utcnow()
 
     # Сбрасываем форекс виртуальные счета
