@@ -7,7 +7,7 @@ from models import (User, UserFinancials, ForexBotSnapshot, ForexPosition, Forex
                     DepositRequest, WithdrawalRequest)
 from security import get_admin_user, get_current_user
 from datetime import datetime, timedelta
-from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get_investor_share
+from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get_investor_share, get_pool_fee
 
 router = APIRouter(prefix="/auth", tags=["forex"])
 
