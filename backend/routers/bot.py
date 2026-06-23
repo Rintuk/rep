@@ -107,7 +107,7 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                     for fin in all_fins:
                         share_of_pool = fin.investment_usdt / net_invested_pool
                         inv_gross = pnl * share_of_pool
-                        inv_net = inv_gross * get_investor_share(fin)
+                        inv_net = inv_gross * get_investor_share(fin) if inv_gross > 0 else inv_gross
                         total_investor_profit += inv_net
                 
                 admin_trade_profit = pnl - total_investor_profit
@@ -259,7 +259,7 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                     for fin in all_fins:
                         share_of_pool = fin.forex_investment_usdt / fx_net_invested_pool
                         inv_gross = pnl * share_of_pool
-                        inv_net = inv_gross * get_investor_share(fin)
+                        inv_net = inv_gross * get_investor_share(fin) if inv_gross > 0 else inv_gross
                         total_investor_profit += inv_net
                 
                 admin_trade_profit = pnl - total_investor_profit

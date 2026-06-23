@@ -125,7 +125,11 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             incremental = pool_pnl_pct - entry_pct
             gross_pnl = inv * (incremental / 100)
             locked_forex_pnl = fin.locked_forex_pnl if fin else 0.0
-            pnl = round(gross_pnl * get_investor_share(fin) + locked_forex_pnl, 2)
+            
+            # Investor gets 75% of profit, but 100% of loss
+            inv_gross_profit = gross_pnl if gross_pnl > 0 else 0.0
+            inv_gross_loss = gross_pnl if gross_pnl <= 0 else 0.0
+            pnl = round(inv_gross_profit * get_investor_share(fin) + inv_gross_loss + locked_forex_pnl, 2)
 
             # Gross
             inv_share = get_investor_share(fin)
@@ -133,7 +137,9 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
 
             total_gross_pnl += (gross_pnl + locked_gross)
             total_investor_net_pnl += pnl
-            total_admin_pnl += (gross_pnl + locked_gross) * POOL_FEE
+            
+            # Admin only gets fee from profits
+            total_admin_pnl += (inv_gross_profit + locked_gross) * get_pool_fee(fin)
 
         status, total_volume, next_vol, crypto_ref, forex_ref, refs_info = await _calc_referral_tree(
             u.id, db, crypto_pool_pct, pool_pnl_pct, fin, u.manual_status_override
