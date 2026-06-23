@@ -110,8 +110,9 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                         inv_net = inv_gross * get_investor_share(fin) if inv_gross > 0 else inv_gross
                         total_investor_profit += inv_net
                 
-                admin_trade_profit = pnl - total_investor_profit
-                stat.crypto_profit += admin_trade_profit
+                # Log only performance fee, preventing admin own capital losses from appearing in notebook
+                admin_fee = sum(pnl * (fin.investment_usdt / net_invested_pool) * get_pool_fee(fin) for fin in all_fins) if pnl > 0 else 0.0
+                stat.crypto_profit += admin_fee
 
     for entry in payload.ai_feed:
         db.add(AIFeedEntry(snapshot_id=snapshot.id, timestamp=entry.timestamp,
@@ -262,8 +263,9 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
                         inv_net = inv_gross * get_investor_share(fin) if inv_gross > 0 else inv_gross
                         total_investor_profit += inv_net
                 
-                admin_trade_profit = pnl - total_investor_profit
-                stat.forex_profit += admin_trade_profit
+                # Log only performance fee
+                admin_fee = sum(pnl * (fin.forex_investment_usdt / fx_net_invested_pool) * get_pool_fee(fin) for fin in all_fins) if pnl > 0 else 0.0
+                stat.forex_profit += admin_fee
 
     for entry in payload.ai_feed:
         db.add(ForexAIFeedEntry(snapshot_id=snapshot.id, timestamp=entry.timestamp,

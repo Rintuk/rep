@@ -334,23 +334,41 @@ async def approve_forex_deposit(request_id: str, actual_amount: float, db: Async
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     if req.status != "pending":
-        raise HTTPException(status_code=400, detail="Заявка уже обработана")
+        raise HTTPException(status_code=400, detail="Заявка уже не в ожидании")
 
     current_pnl_pct = await _get_forex_pool_pnl_pct(db)
 
-    # АВТО-МИГРАЦИЯ PNL (защита от размытия процентов)
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    
+    new_pnl_pct = current_pnl_pct
+    if snap:
+        snap.balance_usdt += actual_amount
+        snap.net_invested += actual_amount
+        snap.hwm += actual_amount
+        
+        from models import ForexPosition
+        fx_positions = (await db.execute(select(ForexPosition).where(ForexPosition.snapshot_id == snap.id))).scalars().all()
+        forex_pool_positions = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in fx_positions)
+        pool_total_new = snap.balance_usdt + forex_pool_positions
+        
+        ref = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm)
+        if ref > 0:
+            new_pnl_pct = round((pool_total_new - ref) / ref * 100, 4)
+
     from routers.auth import _migrate_pnl_internal
-    await _migrate_pnl_internal(db, override_forex_pct=current_pnl_pct)
+    await _migrate_pnl_internal(db, override_forex_pct=current_pnl_pct, final_forex_pct=new_pnl_pct)
 
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
         old_inv = fin.forex_investment_usdt
         new_inv = old_inv + actual_amount
         if old_inv <= 0:
-            fin.forex_entry_pool_pnl_pct = current_pnl_pct
+            fin.forex_entry_pool_pnl_pct = new_pnl_pct
         else:
             fin.forex_entry_pool_pnl_pct = round(
-                (old_inv * fin.forex_entry_pool_pnl_pct + actual_amount * current_pnl_pct) / new_inv, 4
+                (old_inv * fin.forex_entry_pool_pnl_pct + actual_amount * new_pnl_pct) / new_inv, 4
             )
         fin.forex_investment_usdt = new_inv
         fin.updated_at = datetime.utcnow()
@@ -358,20 +376,11 @@ async def approve_forex_deposit(request_id: str, actual_amount: float, db: Async
         db.add(UserFinancials(
             user_id=req.user_id,
             forex_investment_usdt=actual_amount,
-            forex_entry_pool_pnl_pct=current_pnl_pct,
+            forex_entry_pool_pnl_pct=new_pnl_pct,
         ))
 
     req.status = "approved"
     req.updated_at = datetime.utcnow()
-    
-    # ВАЖНО: Увеличиваем капитал пула, чтобы депозит не считался прибылью
-    snap = (await db.execute(
-        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
-    )).scalar_one_or_none()
-    if snap:
-        snap.net_invested += actual_amount
-        snap.hwm += actual_amount
-
     await db.commit()
     return {"status": "approved", "amount": actual_amount}
 
@@ -472,46 +481,52 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
     if not req:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
     if req.status != "pending":
-        raise HTTPException(status_code=400, detail="Заявка уже обработана")
+        raise HTTPException(status_code=400, detail="Заявка уже не в ожидании")
 
-    # Считаем PnL пула ДО вывода средств
-    forex_snap = (await db.execute(
+    current_pnl_pct = await _get_forex_pool_pnl_pct(db)
+
+    snap = (await db.execute(
         select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
     
-    current_pnl_pct = 0.0
-    if forex_snap:
-        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm)
-        if fx_net_inv > 0:
-            # Прибавляем выведенную сумму обратно к пулу
-            pool_total_before = forex_snap.balance_usdt + actual_amount
-            current_pnl_pct = round((pool_total_before - fx_net_inv) / fx_net_inv * 100, 4)
+    new_pnl_pct = current_pnl_pct
+    if snap:
+        snap.balance_usdt -= actual_amount
+        snap.net_invested -= actual_amount
+        
+        from models import ForexPosition
+        fx_positions = (await db.execute(select(ForexPosition).where(ForexPosition.snapshot_id == snap.id))).scalars().all()
+        forex_pool_positions = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in fx_positions)
+        pool_total_new = snap.balance_usdt + forex_pool_positions
+        
+        ref = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm)
+        if ref > 0:
+            new_pnl_pct = round((pool_total_new - ref) / ref * 100, 4)
 
-    # АВТО-МИГРАЦИЯ PNL
     from routers.auth import _migrate_pnl_internal
-    await _migrate_pnl_internal(db, override_forex_pct=current_pnl_pct)
+    await _migrate_pnl_internal(db, override_forex_pct=current_pnl_pct, final_forex_pct=new_pnl_pct)
 
     fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == req.user_id))).scalar_one_or_none()
     if fin:
-        fin.forex_investment_usdt = max(fin.forex_investment_usdt - actual_amount, 0.0)
-        fin.forex_withdrawal_usdt = round(fin.forex_withdrawal_usdt + actual_amount, 2)
-        # Баг 3 fix: при полном выводе обнуляем locked_forex_pnl, иначе при новом депозите будет двойной счёт
+        from constants import get_investor_share
+        old_wd = fin.forex_withdrawal_usdt
+        
+        incr = current_pnl_pct - fin.forex_entry_pool_pnl_pct
+        if incr > 0 and fin.forex_investment_usdt > 0:
+            gross = fin.forex_investment_usdt * (incr / 100)
+            user_profit = round(gross * get_investor_share(fin), 2)
+            if user_profit > 0:
+                fin.locked_forex_pnl += user_profit
+        
+        fin.forex_withdrawal_usdt = round(old_wd + actual_amount, 2)
+        fin.forex_investment_usdt = max(0.0, fin.forex_investment_usdt - actual_amount)
         if fin.forex_investment_usdt <= 0:
             fin.locked_forex_pnl = 0.0
+            fin.forex_entry_pool_pnl_pct = new_pnl_pct
         fin.updated_at = datetime.utcnow()
 
     req.status = "approved"
     req.updated_at = datetime.utcnow()
-    
-    # ВАЖНО: Уменьшаем капитал пула
-    snap = (await db.execute(
-        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
-    )).scalar_one_or_none()
-    if snap:
-        snap.net_invested -= actual_amount
-        if snap.net_invested < 0:
-            snap.net_invested = 0
-
     await db.commit()
     return {"status": "approved", "amount": actual_amount}
 
@@ -578,26 +593,24 @@ async def adjust_forex_net_invested(add_amount: float, db: AsyncSession = Depend
         from models import ForexPosition
         fx_positions = (await db.execute(select(ForexPosition).where(ForexPosition.snapshot_id == snap.id))).scalars().all()
         forex_pool_positions = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in fx_positions)
-        pool_total = snap.balance_usdt + forex_pool_positions
         
+        current_pnl_pct = await _get_forex_pool_pnl_pct(db)
+        
+        snap.balance_usdt += add_amount
+        snap.net_invested += add_amount
+        
+        pool_total_new = snap.balance_usdt + forex_pool_positions
         ref = snap.net_invested if snap.net_invested > 0 else (snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm)
-        # ВРЕМЕННЫЙ ФИКС: так как баланс уже обновился, вычитаем add_amount для получения старого процента
-        current_pnl_pct = round(((pool_total - add_amount) - ref) / ref * 100, 4) if ref > 0 else 0.0
-        ref_post = ref + add_amount
-        post_adjust_pct = round((pool_total - ref) / ref_post * 100, 4) if ref_post > 0 else 0.0
         
+        post_adjust_pct = round((pool_total_new - ref) / ref * 100, 4) if ref > 0 else 0.0
         await _migrate_pnl_internal(db, override_forex_pct=current_pnl_pct, final_forex_pct=post_adjust_pct)
     else:
         await _migrate_pnl_internal(db)
         
-    snaps = (await db.execute(select(ForexBotSnapshot))).scalars().all()
-    for s in snaps:
-        s.net_invested = round(s.net_invested + add_amount, 4)
     await db.commit()
     return {
-        "updated_snapshots": len(snaps),
-        "add_amount": add_amount,
-        "message": f"Форекс net_invested скорректирован на +{add_amount} $ в {len(snaps)} снимках",
+        "status": "ok",
+        "message": f"net_invested и balance_usdt успешно скорректированы на {add_amount}"
     }
 
 
