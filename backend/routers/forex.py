@@ -15,15 +15,26 @@ router = APIRouter(prefix="/auth", tags=["forex"])
 # Override удален, используем только БД
 
 async def _get_forex_pool_pnl_pct(db: AsyncSession) -> float:
+    from models import ForexPosition
     snap = (await db.execute(
         select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
     if not snap:
         return 0.0
+    
+    positions = (await db.execute(
+        select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
+    )).scalars().all()
+    
+    pool_total = snap.balance_usdt + sum(
+        p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+        for p in positions
+    )
+    
     ref = snap.net_invested if snap.net_invested > 0 else (
         snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
     )
-    return round((snap.balance_usdt - ref) / ref * 100, 4) if ref > 0 else 0.0
+    return round((pool_total - ref) / ref * 100, 4) if ref > 0 else 0.0
 
 
 # ── Форекс обзор для администратора ──────────────────────────────────────────
@@ -48,7 +59,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             for p in snap_positions
         )
         pool_free = snap.balance_usdt
-        pool_total = pool_free
+        pool_total = pool_free + pool_positions_usdt
         positions = [{"symbol": p.symbol, "amount": p.amount, "avg_price": p.avg_price,
                       "current_price": p.current_price if (p.current_price or 0) > 0 else p.avg_price,
                       "value": round(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price), 2)}
@@ -102,8 +113,8 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         )
         real_start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         if net_invested_pool > 0:
-            pool_pnl_usdt = round(pool_free - net_invested_pool, 2)
-            pool_pnl_pct = round((pool_free - net_invested_pool) / net_invested_pool * 100, 4)
+            pool_pnl_usdt = round(pool_total - net_invested_pool, 2)
+            pool_pnl_pct = round((pool_total - net_invested_pool) / net_invested_pool * 100, 4)
 
     total_gross_pnl = 0.0
     total_investor_net_pnl = 0.0
@@ -214,10 +225,19 @@ async def admin_forex_pool_history(db: AsyncSession = Depends(get_db)):
         return []
 
     for s in clean_snaps:
+        from models import ForexPosition
+        _positions = (await db.execute(
+            select(ForexPosition).where(ForexPosition.snapshot_id == s.id)
+        )).scalars().all()
+        _pool_total = s.balance_usdt + sum(
+            p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+            for p in _positions
+        )
+        
         ref = s.net_invested
-        pnl = round(s.balance_usdt - ref, 2)
-        pnl_pct = round((pnl / ref) * 100, 2)
-        result.append({"ts": s.timestamp.strftime("%d.%m %H:%M"), "pool_total": round(s.balance_usdt, 2),
+        pnl = round(_pool_total - ref, 2)
+        pnl_pct = round((pnl / ref) * 100, 2) if ref > 0 else 0.0
+        result.append({"ts": s.timestamp.strftime("%d.%m %H:%M"), "pool_total": round(_pool_total, 2),
                         "pnl": pnl, "pnl_pct": pnl_pct})
     return result
 
