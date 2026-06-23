@@ -4,7 +4,7 @@ from sqlalchemy import select, and_, func
 from datetime import datetime
 from config import settings
 from database import get_db
-from constants import get_investor_share
+from constants import get_investor_share, get_pool_fee
 from models import (BotSnapshot, Position, Trade, AIFeedEntry, VirtualAccount, VirtualTrade,
                     ForexBotSnapshot, ForexPosition, ForexTrade, ForexAIFeedEntry,
                     ForexVirtualAccount, ForexVirtualTrade, UserFinancials, User, DEMO_START_BALANCE, AdminProfitLog)

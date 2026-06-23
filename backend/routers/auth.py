@@ -7,7 +7,7 @@ from models import User, UserFinancials, BotSnapshot, Position, Trade, AIFeedEnt
 from schemas import RegisterIn, LoginIn, TokenOut, NewsItemCreate, NewsItemOut
 from security import hash_password, verify_password, create_access_token, get_admin_user, get_current_user
 from datetime import datetime, timedelta
-from constants import INVESTOR_SHARE, get_investor_share, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get_investor_share
+from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get_investor_share, get_pool_fee
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -1824,7 +1824,7 @@ async def external_deposit(payload: ExternalDepositPayload, db: AsyncSession = D
         if fin.investment_usdt > 0:
             incr = current_pnl_pct - fin.entry_pool_pnl_pct
             if incr > 0:
-                from constants import get_investor_share
+                from constants import get_investor_share, get_pool_fee
                 gross = fin.investment_usdt * (incr / 100)
                 user_profit = round(gross * get_investor_share(fin), 2)
                 if user_profit > 0:
@@ -1884,7 +1884,7 @@ async def forex_external_deposit(payload: ExternalDepositPayload, db: AsyncSessi
         if fin.forex_investment_usdt > 0:
             incr = current_forex_pct - fin.forex_entry_pool_pnl_pct
             if incr > 0:
-                from constants import get_investor_share
+                from constants import get_investor_share, get_pool_fee
                 gross = fin.forex_investment_usdt * (incr / 100)
                 user_profit = round(gross * get_investor_share(fin), 2)
                 if user_profit > 0:
@@ -1938,7 +1938,7 @@ async def boost_profit(payload: BoostProfitPayload, db: AsyncSession = Depends(g
     if payload.percent <= 0:
         raise HTTPException(status_code=400, detail="Процент должен быть больше нуля")
 
-    from constants import get_investor_share
+    from constants import get_investor_share, get_pool_fee
 
     pool_pnl_pct = await _get_pool_pnl_pct(db)
 
@@ -2004,7 +2004,7 @@ async def start_new_cycle(payload: StartNewCyclePayload, db: AsyncSession = Depe
     Kapitalizatsiya pribyli: vsya pribyl i bonusy pribavlyayutsya k telu depozita.
     Tsikl pula sbrasyvayetsya (PnL% = 0).
     """
-    from constants import get_investor_share, REF_FEES
+    from constants import get_investor_share, get_pool_fee, REF_FEES
     from routers.dashboard import _get_status_and_limits
 
     pool_pnl_pct = await _get_pool_pnl_pct(db)
@@ -2299,7 +2299,7 @@ async def deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSession = 
         if fin.investment_usdt > 0:
             incr = post_deposit_pct - fin.entry_pool_pnl_pct
             if incr > 0:
-                from constants import get_investor_share
+                from constants import get_investor_share, get_pool_fee
                 gross = fin.investment_usdt * (incr / 100)
                 user_profit = round(gross * get_investor_share(fin), 2)
                 if user_profit > 0:
@@ -2372,7 +2372,7 @@ async def forex_deposit_from_pool(payload: DepositFromPoolPayload, db: AsyncSess
         if fin.forex_investment_usdt > 0:
             fx_incr = post_deposit_forex_pct - fin.forex_entry_pool_pnl_pct
             if fx_incr > 0:
-                from constants import get_investor_share
+                from constants import get_investor_share, get_pool_fee
                 gross = fin.forex_investment_usdt * (fx_incr / 100)
                 user_profit = round(gross * get_investor_share(fin), 2)
                 if user_profit > 0:
