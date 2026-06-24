@@ -75,7 +75,8 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     for t in payload.recent_trades:
         already = (await db.execute(
             select(Trade).where(and_(Trade.symbol == t.symbol, Trade.action == t.action,
-                                     Trade.timestamp == t.timestamp, Trade.price == t.price))
+                                     Trade.timestamp == t.timestamp, Trade.price == t.price,
+                                     Trade.amount == t.amount))
         )).scalars().first()
         if already:
             continue
@@ -244,7 +245,8 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     for t in payload.recent_trades:
         already = (await db.execute(
             select(ForexTrade).where(and_(ForexTrade.symbol == t.symbol, ForexTrade.action == t.action,
-                                          ForexTrade.timestamp == t.timestamp, ForexTrade.price == t.price))
+                                          ForexTrade.timestamp == t.timestamp, ForexTrade.price == t.price,
+                                          ForexTrade.amount == t.amount))
         )).scalars().first()
         if already:
             continue

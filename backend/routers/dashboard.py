@@ -189,13 +189,20 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             select(Trade).order_by(Trade.timestamp.desc()).limit(500)
         )).scalars().all()
         trades = []
-        today_str = datetime.utcnow().date().isoformat()
+        today = datetime.utcnow().date()
         for t in all_trades:
-            key = (t.symbol, t.action, t.timestamp, t.price)
+            key = (t.symbol, t.action, t.timestamp, t.price, t.amount)
             if key not in seen:
                 seen.add(key)
                 trades.append(t)
-            if len(trades) >= 15 and t.timestamp[:10] < today_str:
+            try:
+                trade_date = datetime.fromisoformat(t.timestamp.replace(".", "-").replace(" ", "T").replace("Z", "+00:00")[:19]).date()
+            except Exception:
+                try:
+                    trade_date = datetime.utcfromtimestamp(float(t.timestamp)).date()
+                except Exception:
+                    trade_date = today # Fallback
+            if len(trades) >= 15 and trade_date < today:
                 break
 
         ai_feed = (await db.execute(
@@ -275,15 +282,22 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         all_fx_trades = (await db.execute(
             select(ForexTrade).order_by(ForexTrade.timestamp.desc()).limit(500)
         )).scalars().all()
-        today_str = datetime.utcnow().date().isoformat()
+        today = datetime.utcnow().date()
         for t in all_fx_trades:
-            key = (t.symbol, t.action, t.timestamp, t.price)
+            key = (t.symbol, t.action, t.timestamp, t.price, t.amount)
             if key not in seen_fx:
                 seen_fx.add(key)
                 forex_trades_out.append(TradeOut(symbol=t.symbol, action=t.action,
                                                   amount=t.amount, price=t.price,
                                                   pnl=t.pnl, timestamp=t.timestamp))
-            if len(forex_trades_out) >= 15 and t.timestamp[:10] < today_str:
+            try:
+                trade_date = datetime.fromisoformat(t.timestamp.replace(".", "-").replace(" ", "T").replace("Z", "+00:00")[:19]).date()
+            except Exception:
+                try:
+                    trade_date = datetime.utcfromtimestamp(float(t.timestamp)).date()
+                except Exception:
+                    trade_date = today # Fallback
+            if len(forex_trades_out) >= 15 and trade_date < today:
                 break
 
     # Расчет статусов и бонусов (общий для крипты и форекса)

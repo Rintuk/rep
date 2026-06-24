@@ -59,14 +59,21 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         )).scalars().all()
         seen_trades: set = set()
         trades = []
-        today_str = datetime.utcnow().date().isoformat()
+        today = datetime.utcnow().date()
         for t in all_trade_rows:
-            key = (t.symbol, t.action, t.timestamp, t.price)
+            key = (t.symbol, t.action, t.timestamp, t.price, t.amount)
             if key not in seen_trades:
                 seen_trades.add(key)
                 trades.append({"symbol": t.symbol, "action": t.action, "amount": t.amount,
                                 "price": t.price, "pnl": t.pnl, "timestamp": t.timestamp})
-            if len(trades) >= 30 and t.timestamp[:10] < today_str:
+            try:
+                trade_date = datetime.fromisoformat(t.timestamp.replace(".", "-").replace(" ", "T").replace("Z", "+00:00")[:19]).date()
+            except Exception:
+                try:
+                    trade_date = datetime.utcfromtimestamp(float(t.timestamp)).date()
+                except Exception:
+                    trade_date = today # Fallback
+            if len(trades) >= 30 and trade_date < today:
                 break
 
         ai_rows = (await db.execute(
