@@ -755,7 +755,7 @@ export default function DashboardPage() {
             <div style={{ overflowY: "auto", flex: 1, paddingRight: 8 }}>
             {poolTrades.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Сделок нет</p>
-              : poolTrades.slice(0, 8).map((t, i) => (
+              : poolTrades.map((t, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: (ACTION_COLOR[t.action] ?? "#888") + "22", color: ACTION_COLOR[t.action] ?? "#888" }}>{ACTION_LABEL[t.action] ?? t.action}</span>
