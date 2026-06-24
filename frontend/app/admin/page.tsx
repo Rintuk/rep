@@ -2205,7 +2205,7 @@ export default function AdminPage() {
                         </td>
                         <td style={{ padding: "12px 16px", color: "#fff", fontWeight: 500 }}>{t.symbol}</td>
 
-                        <td style={{ padding: "12px 16px", color: muted }}>{(t.amount || 0).toFixed(6)}</td>
+                        <td style={{ padding: "12px 16px", color: muted }}>{(t.amount || 0).toFixed(2)}</td>
                         <td style={{ padding: "12px 16px", fontWeight: 600, color: t.pnl != null ? (t.pnl >= 0 ? "#22c97a" : "#ff4d4d") : muted }}>
                           {t.pnl != null ? `${t.pnl >= 0 ? "+" : ""}${t.pnl.toFixed(2)} $` : "—"}
                         </td>
