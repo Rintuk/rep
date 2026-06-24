@@ -2192,7 +2192,7 @@ export default function AdminPage() {
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 520, fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${border}` }}>
-                      {["Действие", "Монета", "Цена", "Кол-во", "PnL", "Время"].map((h, i) => (
+                      {["Действие", "Монета", "Кол-во", "PnL", "Время"].map((h, i) => (
                         <th key={i} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 500, color: muted }}>{h}</th>
                       ))}
                     </tr>
@@ -2204,7 +2204,7 @@ export default function AdminPage() {
                           <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: ACTION_COLOR[t.action] + "22", color: ACTION_COLOR[t.action] }}>{t.action}</span>
                         </td>
                         <td style={{ padding: "12px 16px", color: "#fff", fontWeight: 500 }}>{t.symbol}</td>
-                        <td style={{ padding: "12px 16px", color: "#fff" }}>${t.price.toFixed(4)}</td>
+
                         <td style={{ padding: "12px 16px", color: muted }}>{(t.amount || 0).toFixed(6)}</td>
                         <td style={{ padding: "12px 16px", fontWeight: 600, color: t.pnl != null ? (t.pnl >= 0 ? "#22c97a" : "#ff4d4d") : muted }}>
                           {t.pnl != null ? `${t.pnl >= 0 ? "+" : ""}${t.pnl.toFixed(2)} $` : "—"}
