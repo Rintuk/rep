@@ -112,7 +112,7 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
             total_invested = sum(f.investment_usdt for f in all_fins)
             admin_own_capital = round(max(net_invested_pool - total_invested, 0.0), 2)
             if admin_own_capital > 0:
-                pool_pnl_usdt = round(real_total_now - net_invested_pool, 2)
+                pool_pnl_usdt = round(payload.balance_usdt - net_invested_pool, 2)
                 admin_own_pnl = round(pool_pnl_usdt * (admin_own_capital / net_invested_pool), 2)
             else:
                 admin_own_pnl = 0.0
@@ -262,7 +262,7 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
         
         forex_pool_pct = 0.0
         if actual_fx_net > 0:
-            forex_pool_pct = round((real_total_now - actual_fx_net) / actual_fx_net * 100, 4)
+            forex_pool_pct = round((balance_usd - actual_fx_net) / actual_fx_net * 100, 4)
             
         total_admin_pnl = 0.0
         fx_net_invested_pool = max(actual_fx_net, sum(f.forex_investment_usdt for f in all_fins))
@@ -285,7 +285,7 @@ async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
             total_invested = sum(f.forex_investment_usdt for f in all_fins)
             admin_own_capital = round(max(fx_net_invested_pool - total_invested, 0.0), 2)
             if admin_own_capital > 0:
-                pool_pnl_usdt = round(real_total_now - fx_net_invested_pool, 2)
+                pool_pnl_usdt = round(balance_usd - fx_net_invested_pool, 2)
                 admin_own_pnl = round(pool_pnl_usdt * (admin_own_capital / fx_net_invested_pool), 2)
             else:
                 admin_own_pnl = 0.0
