@@ -189,13 +189,13 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             select(Trade).order_by(Trade.timestamp.desc()).limit(500)
         )).scalars().all()
         trades = []
-        today = datetime.utcnow().date()
+        today_str = datetime.utcnow().date().isoformat()
         for t in all_trades:
             key = (t.symbol, t.action, t.timestamp, t.price)
             if key not in seen:
                 seen.add(key)
                 trades.append(t)
-            if len(trades) >= 15 and t.timestamp.date() < today:
+            if len(trades) >= 15 and t.timestamp[:10] < today_str:
                 break
 
         ai_feed = (await db.execute(
@@ -275,7 +275,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         all_fx_trades = (await db.execute(
             select(ForexTrade).order_by(ForexTrade.timestamp.desc()).limit(500)
         )).scalars().all()
-        today = datetime.utcnow().date()
+        today_str = datetime.utcnow().date().isoformat()
         for t in all_fx_trades:
             key = (t.symbol, t.action, t.timestamp, t.price)
             if key not in seen_fx:
@@ -283,7 +283,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
                 forex_trades_out.append(TradeOut(symbol=t.symbol, action=t.action,
                                                   amount=t.amount, price=t.price,
                                                   pnl=t.pnl, timestamp=t.timestamp))
-            if len(forex_trades_out) >= 15 and t.timestamp.date() < today:
+            if len(forex_trades_out) >= 15 and t.timestamp[:10] < today_str:
                 break
 
     # Расчет статусов и бонусов (общий для крипты и форекса)
