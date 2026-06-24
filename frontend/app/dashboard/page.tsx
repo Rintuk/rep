@@ -765,7 +765,7 @@ export default function DashboardPage() {
                     {t.action === "DEPOSIT"
                       ? <p style={{ color: "#f59e0b", fontSize: 13, fontWeight: 600 }}>+{t.amount.toFixed(2)} USDT</p>
                       : <>
-                          <p style={{ color: "#fff", fontSize: 13 }}>${t.price.toFixed(4)}</p>
+                          <p style={{ color: "#fff", fontSize: 13 }}>{(t.amount || 0).toFixed(2)} шт</p>
                           {t.pnl != null && <p style={{ color: t.pnl >= 0 ? "#22c97a" : "#ff4d4d", fontSize: 11 }}>{t.pnl >= 0 ? "+" : ""}{t.pnl.toFixed(2)}$</p>}
                         </>
                     }
