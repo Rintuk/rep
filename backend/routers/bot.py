@@ -87,6 +87,177 @@ async def _bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
     # Calculate admin profit accurately based on total historical PnL
     if balance_usd > 0:
         all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+        from routers.auth import _get_pool_pnl_pct
+        from constants import get_investor_share, get_pool_fee
+        crypto_pool_pct = await _get_pool_pnl_pct(db)
+        
+        total_admin_pnl = 0.0
+        net_invested_pool = max(actual_net_invested, sum(f.investment_usdt for f in all_fins))
+        
+        if net_invested_pool > 0:
+            for fin in all_fins:
+                inv = fin.investment_usdt
+                if inv > 0:
+                    entry_pct = fin.entry_pool_pnl_pct
+                    incremental = crypto_pool_pct - entry_pct
+                    gross_pnl = inv * (incremental / 100)
+                    locked_crypto_pnl = fin.locked_crypto_pnl
+                    
+                    inv_gross_profit = gross_pnl if gross_pnl > 0 else 0.0
+                    inv_share = get_investor_share(fin)
+                    locked_gross = locked_crypto_pnl / inv_share if inv_share > 0 else 0.0
+                    
+                    total_admin_pnl += (inv_gross_profit + locked_gross) * get_pool_fee(fin)
+            
+            total_invested = sum(f.investment_usdt for f in all_fins)
+            admin_own_capital = round(max(net_invested_pool - total_invested, 0.0), 2)
+            if admin_own_capital > 0:
+                pool_pnl_usdt = round(real_total_now - net_invested_pool, 2)
+                admin_own_pnl = round(pool_pnl_usdt * (admin_own_capital / net_invested_pool), 2)
+            else:
+                admin_own_pnl = 0.0
+        else:
+            admin_own_pnl = 0.0
+            
+        current_admin_total_income = total_admin_pnl + admin_own_pnl
+        
+        all_logs = (await db.execute(select(AdminProfitLog))).scalars().all()
+        today_str = datetime.utcnow().strftime("%Y-%m-%d")
+        
+        sum_past_crypto = sum(l.crypto_profit for l in all_logs if l.date != today_str)
+        stat = next((l for l in all_logs if l.date == today_str), None)
+        if not stat:
+            stat = AdminProfitLog(date=today_str, crypto_profit=0.0, forex_profit=0.0)
+            db.add(stat)
+            
+        stat.crypto_profit = round(current_admin_total_income - sum_past_crypto, 2)
+
+    for entry in payload.ai_feed:
+        db.add(AIFeedEntry(snapshot_id=snapshot.id, timestamp=entry.timestamp,
+                           action=entry.action, symbol=entry.symbol, reason=entry.reason))
+
+    if real_total_now > 0:
+        virtual_accounts = (await db.execute(
+            select(VirtualAccount).where(VirtualAccount.is_started == True)
+        )).scalars().all()
+        for va in virtual_accounts:
+            if va.start_real_total <= 0:
+                va.start_real_total = real_total_now
+                va.updated_at = datetime.utcnow()
+                continue
+            # Баланс меняется только при новых закрытых сделках
+            scale = va.start_balance / va.start_real_total if va.start_real_total > 0 else 1.0
+            for t in new_real_trades:
+                exists = (await db.execute(
+                    select(VirtualTrade).where(and_(
+                        VirtualTrade.user_id == va.user_id, VirtualTrade.symbol == t.symbol,
+                        VirtualTrade.action == t.action, VirtualTrade.timestamp == t.timestamp,
+                        VirtualTrade.price == t.price,
+                    ))
+                )).scalars().first()
+                if exists:
+                    continue
+                scaled_pnl = round(t.pnl * scale, 4) if t.pnl is not None else None
+                if scaled_pnl is not None:
+                    va.balance_usdt = round(va.balance_usdt + scaled_pnl, 4)
+                db.add(VirtualTrade(user_id=va.user_id, symbol=t.symbol, action=t.action,
+                                    amount=round((t.amount or 0) * scale, 6), price=t.price,
+                                    pnl=scaled_pnl, timestamp=t.timestamp))
+            va.updated_at = datetime.utcnow()
+
+    await db.commit()
+
+    KEEP_SNAPSHOTS = 100
+    KEEP_VIRTUAL_TRADES = 500
+    old_snapshots = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).offset(KEEP_SNAPSHOTS)
+    )).scalars().all()
+    for s in old_snapshots:
+        await db.delete(s)
+
+    va_users = (await db.execute(select(VirtualAccount.user_id))).scalars().all()
+    for uid in va_users:
+        old_vtrades = (await db.execute(
+            select(VirtualTrade).where(VirtualTrade.user_id == uid)
+            .order_by(VirtualTrade.id.desc()).offset(KEEP_VIRTUAL_TRADES)
+        )).scalars().all()
+        for vt in old_vtrades:
+            await db.delete(vt)
+
+    await db.commit()
+    return {"status": "ok", "snapshot_id": snapshot.id}
+
+
+async def _forex_bot_update_impl(payload: BotUpdateIn, db: AsyncSession):
+    try:
+        ts = datetime.fromisoformat(payload.timestamp.replace("Z", "+00:00"))
+    except Exception:
+        ts = datetime.utcnow()
+
+    balance_usd      = payload.balance_usdt
+    hwm_usd          = payload.hwm
+    real_start_usd   = payload.real_start_balance
+    net_invested_usd = payload.net_invested
+
+    # Проверяем — первый ли это снапшот (пул только что сброшен/запущен)
+    existing_count = (await db.execute(
+        select(func.count()).select_from(ForexBotSnapshot)
+    )).scalar_one()
+    is_first_snapshot = existing_count == 0
+
+    real_total_now = balance_usd + sum(
+        p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+        for p in payload.positions
+    )
+
+    last_forex_snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    
+    actual_fx_net = last_forex_snap.net_invested if last_forex_snap and last_forex_snap.net_invested > 0 else net_invested_usd
+    actual_fx_start = last_forex_snap.real_start_balance if last_forex_snap and last_forex_snap.real_start_balance != 0.0 else real_start_usd
+
+    snapshot = ForexBotSnapshot(
+        bot_id=payload.bot_id, timestamp=ts,
+        balance_usdt=balance_usd, mode=payload.mode,
+        hwm=hwm_usd, drawdown_pct=payload.drawdown_pct,
+        real_start_balance=actual_fx_start, net_invested=actual_fx_net,
+    )
+    db.add(snapshot)
+    await db.flush()
+
+    # При первом снапшоте калибруем точку входа всех инвесторов под текущий PnL пула,
+    # чтобы incremental = 0 и прибыль у всех стартовала с нуля
+    if is_first_snapshot and net_invested_usd > 0:
+        current_pnl_pct = round((balance_usd - net_invested_usd) / net_invested_usd * 100, 4)
+        all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+        for fin in all_fins:
+            fin.forex_entry_pool_pnl_pct = current_pnl_pct
+
+    for p in payload.positions:
+        db.add(ForexPosition(snapshot_id=snapshot.id, symbol=p.symbol,
+                             amount=p.amount,
+                             avg_price=p.avg_price,
+                             current_price=p.current_price if (p.current_price or 0) > 0 else p.avg_price))
+
+    new_real_trades = []
+    for t in payload.recent_trades:
+        already = (await db.execute(
+            select(ForexTrade).where(and_(ForexTrade.symbol == t.symbol, ForexTrade.action == t.action,
+                                          ForexTrade.timestamp == t.timestamp, ForexTrade.price == t.price))
+        )).scalars().first()
+        if already:
+            continue
+        db.add(ForexTrade(snapshot_id=snapshot.id, symbol=t.symbol, action=t.action,
+                          amount=t.amount, price=t.price,
+                          pnl=t.pnl,
+                          timestamp=t.timestamp))
+        new_real_trades.append(t)
+
+    
+    # Calculate admin profit accurately based on total historical PnL
+    if balance_usd > 0:
+        all_fins = (await db.execute(select(UserFinancials))).scalars().all()
         from constants import get_investor_share, get_pool_fee
         
         forex_pool_pct = 0.0
