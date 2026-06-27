@@ -185,7 +185,7 @@ export default function AdminPage() {
       });
     }
     return sortableItems;
-  }, [data?.investors, sortConfig]);
+  }, [data?.investors, sortConfig, hideInactiveInvestors]);
 
   const requestSort = (key: string | null) => {
     if (!key) return;
