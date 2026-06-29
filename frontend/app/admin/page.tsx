@@ -8,10 +8,10 @@ import {
   approveUser, rejectUser,
   updateUserFinancials, updateUserForexFinancials, setReferralLimit,
   deleteUser, getUserDetail, resetUserPassword,
-  getAdminDeposits, approveDeposit, rejectDeposit, getAdminPoolHistory,
+  getAdminDeposits, approveDeposit, approveDepositFromPool, rejectDeposit, getAdminPoolHistory,
   getAdminWithdrawals, approveWithdrawal, rejectWithdrawal, getUserHistory,
   cleanupDemoSnapshots, adjustNetInvested,
-  getAdminForexDeposits, approveForexDeposit, rejectForexDeposit, getAdminForexPoolHistory,
+  getAdminForexDeposits, approveForexDeposit, approveForexDepositFromPool, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
   cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto, startNewCycle, wipeProfits,
   cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, lockReferralBaseline, emergencyFixForexPnl, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
@@ -429,11 +429,21 @@ export default function AdminPage() {
     } catch { /* график недоступен */ }
   }
 
-  async function handleApproveDeposit(id: string) {
+async function handleApproveDeposit(id: string) {
     const amount = parseFloat(actualAmounts[id] || "0");
     if (!amount || amount <= 0) return;
     if (activePool === "forex") await approveForexDeposit(id, amount);
     else await approveDeposit(id, amount);
+    setConfirmingDeposit(null);
+    fetchData();
+  }
+
+  async function handleApproveDepositFromPool(id: string) {
+    const amount = parseFloat(actualAmounts[id] || "0");
+    if (!amount || amount <= 0) return;
+    if (!confirm(`Пополнить депозит на ${amount} USDT из пула админа?`)) return;
+    if (activePool === "forex") await approveForexDepositFromPool(id, amount);
+    else await approveDepositFromPool(id, amount);
     setConfirmingDeposit(null);
     fetchData();
   }

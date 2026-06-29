@@ -1716,6 +1716,30 @@ async def list_deposit_requests(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/admin/deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
+
+@router.post("/admin/deposits/{request_id}/approve-from-pool", dependencies=[Depends(get_admin_user)])
+async def approve_deposit_from_pool(request_id: str, actual_amount: float, db: AsyncSession = Depends(get_db)):
+    if actual_amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть положительной")
+    req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id))).scalar_one_or_none()
+    if not req:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail="Заявка уже не в ожидании")
+
+    # Сначала выполняем логику пополнения из пула (пересчет процентов не нужен, так как пула баланс не меняется)
+    payload = DepositFromPoolPayload(user_id=req.user_id, amount=actual_amount)
+    await deposit_from_pool(payload, db)
+
+    # Помечаем заявку как одобренную (хотя баланс снапшота не увеличился)
+    req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id))).scalar_one_or_none()
+    req.status = "approved"
+    req.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"status": "success", "message": "Депозит пополнен из пула админа"}
+
+
+@router.post("/admin/deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
 async def approve_deposit(request_id: str, actual_amount: float, db: AsyncSession = Depends(get_db)):
     if actual_amount <= 0:
         raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
