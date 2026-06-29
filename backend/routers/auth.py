@@ -1715,8 +1715,6 @@ async def list_deposit_requests(db: AsyncSession = Depends(get_db)):
     return result
 
 
-@router.post("/admin/deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
-
 @router.post("/admin/deposits/{request_id}/approve-from-pool", dependencies=[Depends(get_admin_user)])
 async def approve_deposit_from_pool(request_id: str, actual_amount: float, db: AsyncSession = Depends(get_db)):
     if actual_amount <= 0:

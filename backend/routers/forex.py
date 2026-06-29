@@ -333,8 +333,6 @@ async def list_forex_deposits(db: AsyncSession = Depends(get_db)):
     return result
 
 
-@router.post("/admin/forex-deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
-
 @router.post("/admin/deposits/{request_id}/forex-approve-from-pool", dependencies=[Depends(get_admin_user)])
 async def forex_approve_deposit_from_pool(request_id: str, actual_amount: float, db: AsyncSession = Depends(get_db)):
     if actual_amount <= 0:
@@ -356,7 +354,7 @@ async def forex_approve_deposit_from_pool(request_id: str, actual_amount: float,
     return {"status": "success", "message": "Форекс депозит пополнен из пула админа"}
 
 
-@router.post("/admin/deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
+@router.post("/admin/forex-deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
 async def approve_forex_deposit(request_id: str, actual_amount: float, db: AsyncSession = Depends(get_db)):
     if actual_amount <= 0:
         raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
