@@ -81,6 +81,11 @@ export async function approveForexDeposit(id: string, actual_amount: number) {
   return res.data;
 }
 
+export async function approveForexDepositFromPool(id: string, actual_amount: number) {
+  const res = await api.post(`/auth/admin/deposits/${id}/forex-approve-from-pool`, null, { params: { actual_amount } });
+  return res.data;
+}
+
 export async function rejectForexDeposit(id: string) {
   const res = await api.post(`/auth/admin/forex-deposits/${id}/reject`);
   return res.data;
