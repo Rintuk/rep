@@ -448,6 +448,16 @@ async function handleApproveDeposit(id: string) {
     fetchData();
   }
 
+  
+  async function handleApproveDepositFromPoolDirect(id: string, amount: number) {
+    if (!amount || amount <= 0) return;
+    if (!confirm(`Пополнить депозит на ${amount} USDT из пула админа?`)) return;
+    if (activePool === "forex") await approveForexDepositFromPool(id, amount);
+    else await approveDepositFromPool(id, amount);
+    setConfirmingDeposit(null);
+    fetchData();
+  }
+
   async function handleRejectDeposit(id: string) {
     if (!confirm("Отклонить заявку?")) return;
     if (activePool === "forex") await rejectForexDeposit(id);
@@ -2084,6 +2094,10 @@ async function handleApproveDeposit(id: string) {
                         <button onClick={() => { setConfirmingDeposit(d.id); setActualAmounts(prev => ({ ...prev, [d.id]: String(d.amount) })); }}
                           style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 14px", borderRadius: 8, background: "rgba(13,58,32,0.8)", color: "#22c97a", cursor: "pointer", border: "none" }}>
                           <CheckCircle size={14} /> Подтвердить
+                        </button>
+                        <button onClick={() => handleApproveDepositFromPoolDirect(d.id, d.amount)}
+                          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 14px", borderRadius: 8, background: "rgba(34,201,122,0.6)", color: "#fff", cursor: "pointer", border: "none" }}>
+                          Из пула
                         </button>
                         <button onClick={() => handleRejectDeposit(d.id)}
                           style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 14px", borderRadius: 8, background: "rgba(58,13,13,0.8)", color: "#ff4d4d", cursor: "pointer", border: "none" }}>
