@@ -335,23 +335,30 @@ async def list_forex_deposits(db: AsyncSession = Depends(get_db)):
 
 @router.post("/admin/deposits/{request_id}/forex-approve-from-pool", dependencies=[Depends(get_admin_user)])
 async def forex_approve_deposit_from_pool(request_id: str, actual_amount: float, db: AsyncSession = Depends(get_db)):
-    if actual_amount <= 0:
-        raise HTTPException(status_code=400, detail="Сумма должна быть положительной")
-    req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id, DepositRequest.pool_type == "forex"))).scalar_one_or_none()
-    if not req:
-        raise HTTPException(status_code=404, detail="Заявка не найдена")
-    if req.status != "pending":
-        raise HTTPException(status_code=400, detail="Заявка уже не в ожидании")
+    try:
+        if actual_amount <= 0:
+            raise HTTPException(status_code=400, detail="Сумма должна быть положительной")
+        req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id, DepositRequest.pool_type == "forex"))).scalar_one_or_none()
+        if not req:
+            raise HTTPException(status_code=404, detail="Заявка не найдена")
+        if req.status != "pending":
+            raise HTTPException(status_code=400, detail="Заявка уже не в ожидании")
 
-    from routers.auth import DepositFromPoolPayload, forex_deposit_from_pool
-    payload = DepositFromPoolPayload(user_id=req.user_id, amount=actual_amount)
-    await forex_deposit_from_pool(payload, db)
+        from routers.auth import DepositFromPoolPayload, forex_deposit_from_pool
+        payload = DepositFromPoolPayload(user_id=req.user_id, amount=actual_amount)
+        await forex_deposit_from_pool(payload, db)
 
-    req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id, DepositRequest.pool_type == "forex"))).scalar_one_or_none()
-    req.status = "approved"
-    req.updated_at = datetime.utcnow()
-    await db.commit()
-    return {"status": "success", "message": "Форекс депозит пополнен из пула админа"}
+        req = (await db.execute(select(DepositRequest).where(DepositRequest.id == request_id, DepositRequest.pool_type == "forex"))).scalar_one_or_none()
+        req.status = "approved"
+        req.updated_at = datetime.utcnow()
+        await db.commit()
+        return {"status": "success", "message": "Форекс депозит пополнен из пула"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        raise HTTPException(status_code=400, detail="INTERNAL_ERROR: " + err_msg)
 
 
 @router.post("/admin/forex-deposits/{request_id}/approve", dependencies=[Depends(get_admin_user)])
