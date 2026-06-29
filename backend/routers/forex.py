@@ -221,6 +221,7 @@ async def admin_forex_pool_history(db: AsyncSession = Depends(get_db)):
     if not clean_snaps:
         return []
 
+    result = []
     for s in clean_snaps:
         ref = s.net_invested
         pnl = round(s.balance_usdt - ref, 2)
