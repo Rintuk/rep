@@ -630,7 +630,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db)):
 
         forex_pnl = 0.0
         forex_inv = fin.forex_investment_usdt if fin else 0.0
-        if forex_inv > 0 and forex_snap and forex_pool_pct is not None:
+        if forex_inv > 0 and forex_pool_pct is not None:
             fx_entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
             fx_incremental = forex_pool_pct - fx_entry_pct
             fx_gross_pnl = forex_inv * (fx_incremental / 100)
