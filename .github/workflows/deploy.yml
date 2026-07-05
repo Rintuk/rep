@@ -28,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm install
 
       - name: Build
         working-directory: frontend
@@ -37,7 +37,7 @@ jobs:
           NEXT_PUBLIC_WALLET_ADDRESS: TWDLBDKEoA8kGdR7bvUkG5f5a2ZLUbvNuw
           NEXT_PUBLIC_WALLET_NETWORK: USDT TRC20
           NEXT_PUBLIC_BASE_PATH: /rep
-        run: npm run build
+        run: rm -rf .next && npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
