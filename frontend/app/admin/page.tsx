@@ -20,6 +20,7 @@ import {
   silentWithdraw, revertSilentWithdraw, depositFromPool, depositForexFromPool, externalDeposit, forexExternalDeposit,
   getPublicSettings, updateAdminSettings,
   getPoolProfitMatches,
+  getForexPoolProfitMatches,
 } from "@/lib/api";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
@@ -154,6 +155,8 @@ export default function AdminPage() {
   const [poolHistory, setPoolHistory] = useState<{ts:string;pool_total:number;pnl:number;pnl_pct:number}[]>([]);
   const [poolProfitMatches, setPoolProfitMatches] = useState<{profit: number; matches: {id:string;user_id:string;email:string;amount:number;comment:string;created_at:string}[]} | null>(null);
   const [dismissedMatchIds, setDismissedMatchIds] = useState<Set<string>>(new Set());
+  const [forexPoolProfitMatches, setForexPoolProfitMatches] = useState<{profit: number; matches: {id:string;user_id:string;email:string;amount:number;comment:string;created_at:string}[]} | null>(null);
+  const [dismissedForexMatchIds, setDismissedForexMatchIds] = useState<Set<string>>(new Set());
 
   const [sortConfig, setSortConfig] = useState<{ key: string | null; direction: "asc" | "desc" }>({ key: "investment", direction: "desc" });
   const [hideInactiveInvestors, setHideInactiveInvestors] = useState(true);
@@ -430,11 +433,17 @@ export default function AdminPage() {
       const hist = activePool === "forex" ? await getAdminForexPoolHistory() : await getAdminPoolHistory();
       setPoolHistory(hist);
     } catch { /* график недоступен */ }
-    // Загружаем совпадения заявок с прибылью крипто-пула (только для крипто)
+    // Загружаем совпадения заявок с прибылью пула
     if (activePool === "crypto") {
       try {
         const matches = await getPoolProfitMatches();
         setPoolProfitMatches(matches);
+      } catch { /* не критично */ }
+    }
+    if (activePool === "forex") {
+      try {
+        const matches = await getForexPoolProfitMatches();
+        setForexPoolProfitMatches(matches);
       } catch { /* не критично */ }
     }
   }
@@ -2061,7 +2070,7 @@ async function handleApproveDeposit(id: string) {
         {activeTab === "deposits" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
-            {/* Баннер совпадений с прибылью пула */}
+            {/* Баннер совпадений с прибылью крипто-пула */}
             {poolProfitMatches && poolProfitMatches.profit > 0 && activePool === "crypto" && (() => {
               const visibleMatches = poolProfitMatches.matches.filter(m => !dismissedMatchIds.has(m.id));
               if (visibleMatches.length === 0) return null;
@@ -2124,6 +2133,84 @@ async function handleApproveDeposit(id: string) {
                           </button>
                           <button
                             onClick={() => setDismissedMatchIds(prev => new Set([...prev, m.id]))}
+                            style={{
+                              fontSize: 12, padding: "7px 12px", borderRadius: 8,
+                              background: "rgba(255,255,255,0.07)", color: "#888",
+                              cursor: "pointer", border: "none",
+                            }}>
+                            Позже
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Баннер совпадений с прибылью форекс-пула */}
+            {forexPoolProfitMatches && forexPoolProfitMatches.profit > 0 && activePool === "forex" && (() => {
+              const visibleMatches = forexPoolProfitMatches.matches.filter(m => !dismissedForexMatchIds.has(m.id));
+              if (visibleMatches.length === 0) return null;
+              return (
+                <div style={{
+                  background: "linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(34,201,122,0.10) 100%)",
+                  border: "1px solid rgba(99,102,241,0.35)",
+                  borderRadius: 14,
+                  padding: "18px 20px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 20 }}>💡</span>
+                    <div>
+                      <p style={{ color: "#818cf8", fontWeight: 700, fontSize: 14, margin: 0 }}>
+                        Прибыль форекс-пула: +{forexPoolProfitMatches.profit.toFixed(2)} USDT
+                      </p>
+                      <p style={{ color: "#aaa", fontSize: 12, margin: "2px 0 0" }}>
+                        Найдены заявки с суммой близкой к прибыли (±$10). Хотите покрыть из прибыли пула?
+                      </p>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {visibleMatches.map(m => (
+                      <div key={m.id} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        flexWrap: "wrap", gap: 8,
+                        background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "10px 14px",
+                      }}>
+                        <div>
+                          <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{m.email}</span>
+                          <span style={{ color: "#818cf8", fontWeight: 700, fontSize: 14, marginLeft: 12 }}>
+                            {m.amount.toFixed(2)} USDT
+                          </span>
+                          {m.comment && <span style={{ color: "#888", fontSize: 11, marginLeft: 8 }}>💬 {m.comment}</span>}
+                          <span style={{ color: "#555", fontSize: 11, marginLeft: 8 }}>
+                            {new Date(m.created_at).toLocaleString("ru")}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Покрыть заявку ${m.email} на ${m.amount} USDT из прибыли форекс-пула?`)) return;
+                              try {
+                                await approveForexDepositFromPool(m.id, m.amount);
+                                setDismissedForexMatchIds(prev => new Set([...prev, m.id]));
+                                fetchData();
+                              } catch (e: any) {
+                                alert("Ошибка: " + (e?.response?.data?.detail || e?.message));
+                              }
+                            }}
+                            style={{
+                              fontSize: 12, padding: "7px 14px", borderRadius: 8,
+                              background: "rgba(99,102,241,0.7)", color: "#fff",
+                              cursor: "pointer", border: "none", fontWeight: 600,
+                            }}>
+                            ✓ Из пула
+                          </button>
+                          <button
+                            onClick={() => setDismissedForexMatchIds(prev => new Set([...prev, m.id]))}
                             style={{
                               fontSize: 12, padding: "7px 12px", borderRadius: 8,
                               background: "rgba(255,255,255,0.07)", color: "#888",

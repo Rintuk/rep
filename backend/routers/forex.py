@@ -231,6 +231,53 @@ async def admin_forex_pool_history(db: AsyncSession = Depends(get_db)):
     return result
 
 
+@router.get("/admin/forex-pool-profit-matches", dependencies=[Depends(get_admin_user)])
+async def forex_pool_profit_matches(db: AsyncSession = Depends(get_db)):
+    """
+    Возвращает текущую абсолютную прибыль форекс-пула (USDT) и список pending-заявок,
+    сумма которых попадает в диапазон [profit - 10, profit + 10].
+    Если прибыль <= 0 — возвращает пустой список.
+    Только чтение — ничего не изменяет.
+    """
+    snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    if not snap:
+        return {"profit": 0.0, "matches": []}
+
+    ref = snap.net_invested if snap.net_invested > 0 else (
+        snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
+    )
+    pool_profit = round(snap.balance_usdt - ref, 2)
+
+    if pool_profit <= 0:
+        return {"profit": pool_profit, "matches": []}
+
+    # Ищем pending форекс-заявки в диапазоне ±10$ от прибыли пула
+    pending = (await db.execute(
+        select(DepositRequest).where(
+            DepositRequest.status == "pending",
+            DepositRequest.pool_type == "forex",
+        ).order_by(DepositRequest.created_at.asc())
+    )).scalars().all()
+
+    matches = []
+    for req in pending:
+        if abs(req.amount - pool_profit) <= 10.0:
+            user = (await db.execute(select(User).where(User.id == req.user_id))).scalar_one_or_none()
+            matches.append({
+                "id": req.id,
+                "user_id": req.user_id,
+                "email": user.email if user else "?",
+                "amount": req.amount,
+                "comment": req.comment or "",
+                "created_at": str(req.created_at),
+            })
+
+    return {"profit": pool_profit, "matches": matches}
+
+
 # ── Форекс финансы пользователей ─────────────────────────────────────────────
 
 @router.patch("/admin/users/{user_id}/forex-financials", dependencies=[Depends(get_admin_user)])
