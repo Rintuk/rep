@@ -415,17 +415,17 @@ export default function AdminPage() {
     try {
       const isForex = activePool === "forex";
       const [d, dep, wdr, nb] = await Promise.all([
-        isForex ? getAdminForexOverview() : getAdminOverview(),
-        isForex ? getAdminForexDeposits() : getAdminDeposits(),
-        isForex ? getAdminForexWithdrawals() : getAdminWithdrawals(),
-        getAdminNotebook(),
+        (isForex ? getAdminForexOverview() : getAdminOverview()).catch(e => { throw new Error(`Overview: ${e.response?.data?.detail || e.message}`); }),
+        (isForex ? getAdminForexDeposits() : getAdminDeposits()).catch(e => { throw new Error(`Deposits: ${e.response?.data?.detail || e.message}`); }),
+        (isForex ? getAdminForexWithdrawals() : getAdminWithdrawals()).catch(e => { throw new Error(`Withdrawals: ${e.response?.data?.detail || e.message}`); }),
+        getAdminNotebook().catch(e => { throw new Error(`Notebook: ${e.response?.data?.detail || e.message}`); }),
       ]);
       setData(d);
       setDeposits(dep);
       setWithdrawals(wdr);
         setNotebookData(nb);
-    } catch {
-      setError("Нет доступа или ошибка загрузки");
+    } catch (e: any) {
+      setError(`Нет доступа или ошибка загрузки (${e.message})`);
     } finally {
       setLoading(false);
     }
