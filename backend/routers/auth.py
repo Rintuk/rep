@@ -442,7 +442,69 @@ async def admin_pool_history(db: AsyncSession = Depends(get_db)):
     return result
 
 
+@router.get("/admin/pool-profit-matches", dependencies=[Depends(get_admin_user)])
+async def pool_profit_matches(db: AsyncSession = Depends(get_db)):
+    """
+    Возвращает текущую абсолютную прибыль крипто-пула (USDT) и список pending-заявок,
+    сумма которых попадает в диапазон [profit - 10, profit + 10].
+    Если прибыль <= 0 — возвращает пустой список совпадений.
+    Только чтение — ничего не изменяет.
+    """
+    # Считаем абсолютную прибыль пула (в USDT)
+    snap = (await db.execute(
+        select(BotSnapshot).order_by(BotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+
+    if not snap:
+        return {"profit": 0.0, "matches": []}
+
+    positions = (await db.execute(
+        select(Position).where(Position.snapshot_id == snap.id)
+    )).scalars().all()
+
+    pool_total = snap.balance_usdt + sum(
+        p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price)
+        for p in positions
+    )
+
+    start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
+    total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
+    total_wd = (await db.execute(select(func.sum(UserFinancials.withdrawal_usdt)))).scalar() or 0.0
+    ref = start + total_inv - total_wd
+    if ref <= 0:
+        ref = snap.net_invested if snap.net_invested > 0 else start
+
+    pool_profit = round(pool_total - ref, 2)
+
+    if pool_profit <= 0:
+        return {"profit": pool_profit, "matches": []}
+
+    # Ищем pending заявки в диапазоне ±10$ от прибыли пула
+    pending = (await db.execute(
+        select(DepositRequest).where(
+            DepositRequest.status == "pending",
+            DepositRequest.pool_type == "crypto",
+        ).order_by(DepositRequest.created_at.asc())
+    )).scalars().all()
+
+    matches = []
+    for req in pending:
+        if abs(req.amount - pool_profit) <= 10.0:
+            user = (await db.execute(select(User).where(User.id == req.user_id))).scalar_one_or_none()
+            matches.append({
+                "id": req.id,
+                "user_id": req.user_id,
+                "email": user.email if user else "?",
+                "amount": req.amount,
+                "comment": req.comment or "",
+                "created_at": str(req.created_at),
+            })
+
+    return {"profit": pool_profit, "matches": matches}
+
+
 @router.get("/admin/overview", dependencies=[Depends(get_admin_user)])
+
 async def admin_overview(db: AsyncSession = Depends(get_db)):
     """Полный обзор для администратора."""
     # ── Снимок бота ──────────────────────────────────────────────

@@ -216,6 +216,11 @@ export async function approveDepositFromPool(id: string, actual_amount: number) 
   return res.data;
 }
 
+export async function getPoolProfitMatches() {
+  const res = await api.get("/auth/admin/pool-profit-matches");
+  return res.data as { profit: number; matches: { id: string; user_id: string; email: string; amount: number; comment: string; created_at: string }[] };
+}
+
 
 export async function rejectDeposit(id: string) {
   const res = await api.post(`/auth/admin/deposits/${id}/reject`);
