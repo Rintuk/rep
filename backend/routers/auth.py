@@ -504,7 +504,6 @@ async def pool_profit_matches(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/admin/overview", dependencies=[Depends(get_admin_user)])
-
 async def admin_overview(db: AsyncSession = Depends(get_db)):
     """Полный обзор для администратора."""
     # ── Снимок бота ──────────────────────────────────────────────
