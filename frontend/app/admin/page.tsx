@@ -2423,7 +2423,8 @@ async function handleApproveDeposit(id: string) {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.trades.map((t, i) => (
+                    {/*
+                    data.trades.map((t, i) => (
                       <tr key={i} className="adm-row" style={{ borderBottom: `1px solid ${border}` }}>
                         <td style={{ padding: "12px 16px" }}>
                           <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: ACTION_COLOR[t.action] + "22", color: ACTION_COLOR[t.action] }}>{t.action}</span>
@@ -2436,7 +2437,8 @@ async function handleApproveDeposit(id: string) {
                         </td>
                         <td style={{ padding: "12px 16px", fontSize: 11, color: muted }}>{t.timestamp}</td>
                       </tr>
-                    ))}
+                    ))
+                    */}
                   </tbody>
                 </table>
               </div>
@@ -2450,7 +2452,8 @@ async function handleApproveDeposit(id: string) {
             {data.ai_feed.length === 0
               ? <p style={{ color: muted, fontSize: 13 }}>Решений пока нет</p>
               : <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-                {data.ai_feed.map((a, i) => (
+                {/*
+                data.ai_feed.map((a, i) => (
                   <div key={i} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: `1px solid ${border}` }}>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 8px", borderRadius: 4, background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action], alignSelf: "flex-start", marginTop: 2 }}>{a.action}</span>
                     <div style={{ flex: 1 }}>
@@ -2461,7 +2464,8 @@ async function handleApproveDeposit(id: string) {
                       <p style={{ color: muted, fontSize: 13 }}>{a.reason}</p>
                     </div>
                   </div>
-                ))}
+                ))
+                */}
               </div>
             }
           </div>
