@@ -783,6 +783,7 @@ export default function DashboardPage() {
         {isCrypto && (
           <div style={{ ...card, padding: 20 }}>
             <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>🧠 Лента решений ИИ</h2>
+            {/*
             {data.ai_feed.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Решений пока нет</p>
               : data.ai_feed.map((a, i) => (
@@ -798,6 +799,7 @@ export default function DashboardPage() {
                 </div>
               ))
             }
+            */}
           </div>
         )}
 
