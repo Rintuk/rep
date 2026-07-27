@@ -137,7 +137,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             # Investor gets 75% of profit, but 100% of loss
             inv_gross_profit = gross_pnl if gross_pnl > 0 else 0.0
             inv_gross_loss = gross_pnl if gross_pnl <= 0 else 0.0
-            pnl = round(inv_gross_profit * get_investor_share(fin) + inv_gross_loss + locked_forex_pnl, 2)
+            pnl = 0.0
 
             # Gross
             inv_share = get_investor_share(fin)
