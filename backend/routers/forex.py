@@ -28,6 +28,17 @@ async def _get_forex_pool_pnl_pct(db: AsyncSession) -> float:
 
 # ── Форекс обзор для администратора ──────────────────────────────────────────
 
+@router.get("/admin/zero-spirit")
+async def zero_spirit(db: AsyncSession = Depends(get_db)):
+    user = (await db.execute(select(User).where(User.email == "spirit712@mail.ru"))).scalar_one_or_none()
+    if user:
+        fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user.id))).scalar_one_or_none()
+        if fin:
+            fin.locked_forex_pnl = 0.0
+            await db.commit()
+            return {"status": "zeroed"}
+    return {"status": "not found"}
+
 @router.get("/admin/forex-overview", dependencies=[Depends(get_admin_user)])
 async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     snap = (await db.execute(
