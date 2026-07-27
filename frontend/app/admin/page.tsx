@@ -13,7 +13,7 @@ import {
   cleanupDemoSnapshots, adjustNetInvested,
   getAdminForexDeposits, approveForexDeposit, approveForexDepositFromPool, rejectForexDeposit, getAdminForexPoolHistory,
   getAdminForexWithdrawals, approveForexWithdrawal, rejectForexWithdrawal,
-  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto, startNewCycle, wipeProfits,
+  cleanupForexDemoSnapshots, adjustForexNetInvested, forexFullReset, forexImportFromCrypto, startNewCycle, wipeProfits, distributeForexProfit,
   cryptoFullReset, backupDatabase, restoreFullBackup, migratePnL, diagEntryPoints, fixBrokenEntryPoints, lockReferralBaseline, emergencyFixForexPnl, setStatusOverride, setCustomInvestorShare, getUserReferralTree,
   getAdminNews, createNews, deleteNews, NewsItem as NewsItemType, uploadNewsImage,
   getAdminTickets, replyToTicket, adminCloseTicket, clearAllTickets, clearClosedTickets, SupportTicket,
@@ -884,6 +884,31 @@ async function handleApproveDeposit(id: string) {
               {pool === "crypto" ? "₿ Крипто Пул" : "💱 Форекс Пул"}
             </button>
           ))}
+          {activePool === "forex" && (
+            <button
+              onClick={async () => {
+                const amt = prompt("Введите сумму прибыли для распределения ($):");
+                if (!amt) return;
+                const numAmt = parseFloat(amt);
+                if (isNaN(numAmt) || numAmt <= 0) return alert("Неверная сумма!");
+                if (!confirm(`Точно распределить ${numAmt}$ среди инвесторов Форекс пула?`)) return;
+                try {
+                  await distributeForexProfit(numAmt);
+                  alert("Успешно распределено!");
+                  fetchData();
+                } catch (e: any) {
+                  alert("Ошибка: " + (e?.response?.data?.detail || e.message));
+                }
+              }}
+              style={{
+                padding: "9px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                border: "1px solid rgba(34,201,122,0.7)", background: "rgba(34,201,122,0.15)", color: "#22c97a",
+                marginLeft: "auto"
+              }}
+            >
+              + Начислить прибыль (Форекс)
+            </button>
+          )}
         </div>
 
         {/* Открытые тикеты поддержки */}

@@ -267,10 +267,10 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
 
         forex_entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
         forex_incremental = forex_pool_pnl_pct - forex_entry_pct
-        forex_gross = forex_investment * (forex_incremental / 100) if forex_investment > 0 else 0.0
+        forex_gross = 0.0
         locked_forex_pnl = fin.locked_forex_pnl if fin else 0.0
-        forex_pnl = round(forex_gross * get_investor_share(fin) + locked_forex_pnl, 2)
-        forex_pnl_pct = round(forex_incremental * get_investor_share(fin), 2)
+        forex_pnl = round(locked_forex_pnl, 2)
+        forex_pnl_pct = 0.0
 
         forex_positions_out = [
             PositionOut(symbol=p.symbol, amount=p.amount, avg_price=p.avg_price,

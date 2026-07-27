@@ -66,6 +66,11 @@ export async function getAdminForexOverview() {
   return res.data;
 }
 
+export async function distributeForexProfit(amount: number) {
+  const res = await api.post("/auth/admin/forex-distribute-profit", { amount });
+  return res.data;
+}
+
 export async function getAdminForexPoolHistory() {
   const res = await api.get("/auth/admin/forex-pool-history");
   return res.data as { ts: string; pool_total: number; pnl: number; pnl_pct: number }[];

@@ -137,7 +137,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
             # Investor gets 75% of profit, but 100% of loss
             inv_gross_profit = gross_pnl if gross_pnl > 0 else 0.0
             inv_gross_loss = gross_pnl if gross_pnl <= 0 else 0.0
-            pnl = 0.0
+            pnl = locked_forex_pnl
 
             # Gross
             inv_share = get_investor_share(fin)
@@ -204,6 +204,35 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         "referrals": referrals_l1,
         "pending_users": [{"id": u.id, "email": u.email, "created_at": str(u.created_at)} for u in pending],
     }
+
+from pydantic import BaseModel
+
+class DistributeProfitPayload(BaseModel):
+    amount: float
+
+@router.post("/admin/forex-distribute-profit", dependencies=[Depends(get_admin_user)])
+async def forex_distribute_profit(payload: DistributeProfitPayload, db: AsyncSession = Depends(get_db)):
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+        
+    # Находим всех инвесторов с активным депозитом в форекс
+    all_fins = (await db.execute(select(UserFinancials).where(UserFinancials.forex_investment_usdt > 0))).scalars().all()
+    
+    if not all_fins:
+        raise HTTPException(status_code=400, detail="No active forex investors found")
+        
+    total_investment = sum(fin.forex_investment_usdt for fin in all_fins)
+    
+    for fin in all_fins:
+        share_of_pool = fin.forex_investment_usdt / total_investment
+        gross_profit = payload.amount * share_of_pool
+        net_profit = gross_profit * get_investor_share(fin)
+        
+        # Добавляем к зафиксированной прибыли
+        fin.locked_forex_pnl += net_profit
+        
+    await db.commit()
+    return {"status": "success", "distributed": payload.amount}
 
 
 @router.get("/admin/forex-pool-history", dependencies=[Depends(get_admin_user)])
