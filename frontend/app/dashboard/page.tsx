@@ -753,6 +753,7 @@ export default function DashboardPage() {
           <div style={{ ...card, padding: 20, height: 320, display: "flex", flexDirection: "column" }}>
             <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16, flexShrink: 0 }}>📋 Последние сделки</h2>
             <div style={{ overflowY: "auto", flex: 1, paddingRight: 8 }}>
+            {/*
             {poolTrades.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Сделок нет</p>
               : poolTrades.map((t, i) => (
@@ -773,6 +774,7 @@ export default function DashboardPage() {
                 </div>
               ))
             }
+            */}
             </div>
           </div>
         </div>
