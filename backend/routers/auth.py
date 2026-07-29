@@ -3439,6 +3439,49 @@ async def admin_notebook_reset_forex(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": "ok", "message": "Forex notebook reset"}
 
+@router.post("/admin/reset-ref-bonus-final")
+async def admin_reset_ref_bonus_final(db: AsyncSession = Depends(get_db)):
+    from routers.dashboard import dashboard
+    all_users = (await db.execute(select(User))).scalars().all()
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    fins_map = {f.user_id: f for f in all_fins}
+    
+    count = 0
+    for u in all_users:
+        fin = fins_map.get(u.id)
+        if not fin: continue
+        
+        # We need to simulate what the dashboard calculates!
+        # Instead of calling dashboard(), we can just use the exact hardcoded values from dashboard.py!
+        from routers.dashboard import _calc_referral_tree
+        from routers.auth import _get_pool_pnl_pct
+        
+        crypto_pool_pct = await _get_pool_pnl_pct(db)
+        
+        # Hardcoded forex values from dashboard.py
+        forex_balance = 27043.0
+        forex_snap = (await db.execute(select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1))).scalar_one_or_none()
+        if forex_snap:
+            fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+                forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
+            )
+            forex_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4) if fx_net_inv > 0 else 0.0
+        else:
+            forex_pool_pnl_pct = 0.0
+            
+        status, total_volume, next_vol, crypto_ref, forex_ref, refs_info = await _calc_referral_tree(
+            u.id, db, crypto_pool_pct, forex_pool_pnl_pct, fin, u.manual_status_override
+        )
+        
+        # crypto_ref and forex_ref are the TOTAL computed including the current offset.
+        # So we just subtract the current total from the locked fields to make the total 0.
+        fin.locked_crypto_ref_bonus -= crypto_ref
+        fin.locked_forex_ref_bonus -= forex_ref
+        count += 1
+        
+    await db.commit()
+    return {"status": "SUCCESS", "users_reset": count}
+
 @router.get("/admin/dump-ref-bonus")
 async def admin_dump_ref_bonus(db: AsyncSession = Depends(get_db)):
     from routers.dashboard import _calc_referral_tree
