@@ -131,6 +131,7 @@ class DashboardOut(BaseModel):
     # Крипто пул
     balance_usdt: float
     pool_total_usdt: float
+    pool_invested_usdt: float = 0.0
     email: str
     nickname: Optional[str] = None
     pool_positions_usdt: float
@@ -154,6 +155,7 @@ class DashboardOut(BaseModel):
     ai_feed: List[AIFeedOut]
     # Форекс пул
     forex_pool_total: float = 0.0
+    forex_pool_invested: float = 0.0
     forex_pool_positions: float = 0.0
     forex_balance: float = 0.0
     forex_server_online: bool = False

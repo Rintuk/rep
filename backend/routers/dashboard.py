@@ -174,6 +174,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         pool_positions_usdt = 0.0
         pool_total_usdt = 0.0
         pool_pnl_pct = 0.0
+        net_inv = 0.0
         server_online = True # Forced True during temporary bot data outage
         user_pnl = 0.0
         user_pnl_pct = 0.0
@@ -240,7 +241,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     # Баг 6 fix: инициализируем forex_pool_pnl_pct до блока if forex_snap:
     # иначе если форекс-снапшота нет — NameError на строке 269
     forex_pool_pnl_pct = 0.0
-    forex_pool_total = forex_pool_positions = forex_balance = 0.0
+    forex_pool_total = forex_pool_positions = forex_balance = fx_net_inv = 0.0
     forex_server_online = True # Forced True during temporary bot data outage
     forex_last_updated = None
     forex_investment = fin.forex_investment_usdt if fin else 0.0
@@ -311,6 +312,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     return DashboardOut(
         balance_usdt=snap.balance_usdt if snap else 0.0,
         pool_total_usdt=round(pool_total_usdt, 2),
+        pool_invested_usdt=round(net_inv, 2),
         pool_positions_usdt=round(pool_positions_usdt, 2),
         mode=snap.mode if snap else "OFFLINE",
         hwm=snap.hwm if snap else 0.0,
@@ -327,8 +329,9 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
                                 price=t.price, pnl=t.pnl, timestamp=t.timestamp) for t in trades],
         ai_feed=[AIFeedOut(timestamp=a.timestamp, action=a.action,
                            symbol=a.symbol, reason=a.reason) for a in ai_feed],
-        # Форекс
+        # Форекс пул
         forex_pool_total=round(forex_pool_total, 2),
+        forex_pool_invested=round(fx_net_inv, 2),
         forex_pool_positions=round(forex_pool_positions, 2),
         forex_balance=round(forex_balance, 2),
         forex_server_online=forex_server_online,

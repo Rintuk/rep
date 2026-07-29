@@ -345,6 +345,7 @@ export default function DashboardPage() {
   const poolPnlPct = isCrypto ? data.user_pnl_pct : data.forex_pnl_pct;
   const poolTotal = isCrypto ? data.pool_total_usdt : (data.forex_pool_total ?? 0);
   const poolPositionsUsdt = isCrypto ? data.pool_positions_usdt : (data.forex_pool_positions ?? 0);
+  const poolInvestedUsdt = isCrypto ? (data as any).pool_invested_usdt : ((data as any).forex_pool_invested ?? 0);
   const poolBalance = isCrypto ? data.balance_usdt : (data.forex_balance ?? 0);
   const poolOnline = isCrypto ? data.server_online : (data.forex_server_online ?? false);
   const poolLastUpdated = isCrypto ? data.last_updated : (data.forex_last_updated ?? null);
@@ -522,7 +523,7 @@ export default function DashboardPage() {
 
           {[
             { icon: <Wallet size={18}/>, label: "Общий пул", value: `${poolTotal.toFixed(2)} $`, sub: `свободно: ${poolBalance.toFixed(2)} $`, color: "#4488dd" },
-            { icon: <Activity size={18}/>, label: "Пул в позициях", value: `${Math.abs(poolPositionsUsdt).toFixed(2)} $`, sub: null, color: "#9966ee" },
+            { icon: <Activity size={18}/>, label: "Пул в позициях", value: `${Math.abs(poolPositionsUsdt).toFixed(2)} $`, sub: poolInvestedUsdt > 0 ? `вложено: ${poolInvestedUsdt.toFixed(2)} $` : null, color: "#9966ee" },
             { icon: <Wallet size={18}/>, label: "Инвестировано", value: poolInvestment > 0 ? `${poolInvestment.toFixed(2)} $` : "—", sub: poolInvestment > 0 ? "ваш вклад в пул" : "нет данных", color: "#22c97a" },
             { icon: <TrendingUp size={18}/>, label: "Чистый доход", value: poolInvestment > 0 ? `+${Math.max(0, poolPnl).toFixed(2)} $` : "—", sub: poolInvestment > 0 ? `+${Math.max(0, poolPnlPct).toFixed(2)}%` : "нет вложений", color: "#22c97a" },
             ...(isCrypto && data.ref_bonus > 0 ? [{ icon: <TrendingUp size={18}/>, label: "Реф. доход", value: `+${data.ref_bonus.toFixed(2)} $`, sub: "3% от прибыли", color: "#f59e0b" }] : []),
