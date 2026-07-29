@@ -3439,3 +3439,45 @@ async def admin_notebook_reset_forex(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": "ok", "message": "Forex notebook reset"}
 
+@router.get("/admin/dump-ref-bonus")
+async def admin_dump_ref_bonus(db: AsyncSession = Depends(get_db)):
+    from routers.dashboard import _calc_referral_tree
+    from routers.auth import _get_pool_pnl_pct
+    
+    crypto_pool_pct = await _get_pool_pnl_pct(db)
+    
+    forex_snap = (await db.execute(
+        select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
+    )).scalar_one_or_none()
+    
+    forex_pool_pnl_pct = 0.0
+    if forex_snap:
+        forex_balance = forex_snap.balance_usdt
+        fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
+            forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
+        )
+        forex_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4) if fx_net_inv > 0 else 0.0
+        
+    all_users = (await db.execute(select(User))).scalars().all()
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    fins_map = {f.user_id: f for f in all_fins}
+    
+    res = []
+    for u in all_users:
+        if u.is_admin: continue
+        fin = fins_map.get(u.id)
+        if not fin: continue
+        
+        status, total_volume, next_vol, crypto_ref, forex_ref, refs_info = await _calc_referral_tree(
+            u.id, db, crypto_pool_pct, forex_pool_pnl_pct, fin, u.manual_status_override
+        )
+        
+        res.append({
+            "email": u.email,
+            "locked_crypto": fin.locked_crypto_ref_bonus,
+            "locked_forex": fin.locked_forex_ref_bonus,
+            "displayed_crypto": crypto_ref,
+            "displayed_forex": forex_ref,
+        })
+    return {"status": "ok", "data": res}
+
