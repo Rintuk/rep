@@ -176,6 +176,8 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     else:
         admin_own_pnl = 0.0
 
+    pool_pnl_usdt_calc = round(pool_profit + admin_income, 2)
+    pool_pnl_pct_calc = round(pool_pnl_usdt_calc / net_invested_pool * 100, 4) if net_invested_pool > 0 else 0.0
     return {
         "pool_total": 54399.0,
         "pool_free": 27043.0,
@@ -193,8 +195,8 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         "admin_own_pnl": admin_own_pnl,
         "admin_total_income": round(admin_income + admin_own_pnl, 2),
         "pool_profit": pool_profit,
-        "pool_pnl_usdt": 0.0,
-        "pool_pnl_pct": 0.0,
+        "pool_pnl_usdt": pool_pnl_usdt_calc,
+        "pool_pnl_pct": pool_pnl_pct_calc,
         "real_start_balance": round(real_start, 2),
         "net_invested_pool": round(net_invested_pool, 2),
         "positions": positions,
