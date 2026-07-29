@@ -293,7 +293,8 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
             forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
         )
-        forex_pool_pnl_pct = round((forex_balance - fx_net_inv) / fx_net_inv * 100, 4) if fx_net_inv > 0 else 0.0
+        # While bot is offline, force dynamic pnl pct to 0 to rely purely on manual locked profit
+        forex_pool_pnl_pct = 0.0
 
         forex_entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
         forex_incremental = forex_pool_pnl_pct - forex_entry_pct

@@ -111,7 +111,8 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         real_start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         if net_invested_pool > 0:
             pool_pnl_usdt = round(pool_free - net_invested_pool, 2)
-            pool_pnl_pct = round((pool_free - net_invested_pool) / net_invested_pool * 100, 4)
+            # While bot is offline, force dynamic pnl pct to 0 to rely purely on manual locked profit
+            pool_pnl_pct = 0.0
 
     total_gross_pnl = 0.0
     total_investor_net_pnl = 0.0
