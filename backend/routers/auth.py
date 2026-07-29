@@ -3464,7 +3464,6 @@ async def admin_dump_ref_bonus(db: AsyncSession = Depends(get_db)):
     
     res = []
     for u in all_users:
-        if u.is_admin: continue
         fin = fins_map.get(u.id)
         if not fin: continue
         
