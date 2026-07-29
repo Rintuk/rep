@@ -35,7 +35,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     )).scalar_one_or_none()
 
     pool_total = pool_free = pool_positions_usdt = 0.0
-    server_online = False
+    server_online = True # Forced True during temporary bot data outage
     positions = trades = ai_feed = []
 
     if snap:

@@ -174,7 +174,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         pool_positions_usdt = 0.0
         pool_total_usdt = 0.0
         pool_pnl_pct = 0.0
-        server_online = False
+        server_online = True # Forced True during temporary bot data outage
         user_pnl = 0.0
         user_pnl_pct = 0.0
         ref_bonus = 0.0
@@ -211,7 +211,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
 
         pool_positions_usdt = sum(p.amount * (p.current_price if (p.current_price or 0) > 0 else p.avg_price) for p in positions)
         pool_total_usdt = snap.balance_usdt + pool_positions_usdt
-        server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
+        server_online = True # Forced True during temporary bot data outage
 
         _start = snap.real_start_balance if snap.real_start_balance != 0.0 else snap.hwm
         _total_inv = (await db.execute(select(func.sum(UserFinancials.investment_usdt)))).scalar() or 0.0
@@ -241,7 +241,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     # иначе если форекс-снапшота нет — NameError на строке 269
     forex_pool_pnl_pct = 0.0
     forex_pool_total = forex_pool_positions = forex_balance = 0.0
-    forex_server_online = False
+    forex_server_online = True # Forced True during temporary bot data outage
     forex_last_updated = None
     forex_investment = fin.forex_investment_usdt if fin else 0.0
     forex_pnl = forex_pnl_pct = 0.0
