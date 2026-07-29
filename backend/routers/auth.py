@@ -3439,3 +3439,13 @@ async def admin_notebook_reset_forex(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": "ok", "message": "Forex notebook reset"}
 
+@router.post("/admin/clear-forex-ref-debt")
+async def clear_forex_ref_debt(db: AsyncSession = Depends(get_db)):
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    count = 0
+    for fin in all_fins:
+        fin.locked_forex_ref_bonus = 0.0
+        count += 1
+    await db.commit()
+    return {"status": "SUCCESS", "cleared": count}
+
