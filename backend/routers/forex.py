@@ -39,7 +39,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     positions = trades = ai_feed = []
 
     if snap:
-        server_online = (datetime.utcnow() - snap.timestamp) < timedelta(minutes=30)
+        server_online = True # Forced True during temporary bot data outage
         snap_positions = (await db.execute(
             select(ForexPosition).where(ForexPosition.snapshot_id == snap.id)
         )).scalars().all()

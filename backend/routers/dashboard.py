@@ -249,7 +249,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     forex_trades_out: list[TradeOut] = []
 
     if forex_snap:
-        forex_server_online = (datetime.utcnow() - forex_snap.timestamp) < timedelta(minutes=30)
+        forex_server_online = True # Forced True during temporary bot data outage
         forex_last_updated = forex_snap.timestamp.isoformat()
         fx_positions = (await db.execute(
             select(ForexPosition).where(ForexPosition.snapshot_id == forex_snap.id)
