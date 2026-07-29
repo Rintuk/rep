@@ -3439,3 +3439,12 @@ async def admin_notebook_reset_forex(db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": "ok", "message": "Forex notebook reset"}
 
+@router.get("/admin/dump-locked-forex")
+async def dump_locked_forex(db: AsyncSession = Depends(get_db)):
+    all_fins = (await db.execute(select(UserFinancials))).scalars().all()
+    data = []
+    for fin in all_fins:
+        if getattr(fin, "locked_forex_pnl", 0.0) != 0.0:
+            data.append({"user_id": fin.user_id, "locked": fin.locked_forex_pnl})
+    return {"status": "ok", "data": data}
+
