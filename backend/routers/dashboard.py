@@ -125,7 +125,8 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
             if fx > 0 and depth <= levels_allowed and depth in REF_FEES:
                 fx_entry = f.forex_entry_pool_pnl_pct if f else 0.0
                 fx_incr = forex_pool_pct - fx_entry
-                new_fx_gross = fx * (fx_incr / 100) if fx_incr > 0 else 0.0
+                # While bot is offline, disable dynamic forex profit for referrals
+                new_fx_gross = 0.0
                 locked_fx_gross = f.locked_forex_pnl / get_investor_share(f) if f and getattr(f, "locked_forex_pnl", 0.0) > 0 else 0.0
                 total_fx_gross = new_fx_gross + locked_fx_gross
                 if total_fx_gross > 0:

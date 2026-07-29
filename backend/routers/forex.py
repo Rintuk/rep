@@ -132,7 +132,8 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
         if inv > 0 and snap and net_invested_pool > 0:
             entry_pct = fin.forex_entry_pool_pnl_pct if fin else 0.0
             incremental = pool_pnl_pct - entry_pct
-            gross_pnl = inv * (incremental / 100)
+            # While bot is offline, disable dynamic forex profit
+            gross_pnl = 0.0
             locked_forex_pnl = fin.locked_forex_pnl if fin else 0.0
             
             # Investor gets 75% of profit, but 100% of loss
