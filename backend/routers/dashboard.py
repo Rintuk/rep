@@ -133,17 +133,45 @@ async def _calc_referral_tree(user_id: str, db: AsyncSession, crypto_pool_pct: f
                     forex_bonus += fb
 
             # Add to refs_info (all active refs, all levels)
-            refs_info.append(ReferralInfo(
-                id=child.id,
-                parent_id=curr,
-                email=child.email,
-                nickname=child.nickname,
-                investment_usdt=inv + fx,
-                bonus_usdt=cb + fb,
-                level=depth
-            ))
+            refs_info.append({
+                "id": child.id,
+                "parent_id": curr,
+                "email": child.email,
+                "nickname": child.nickname,
+                "investment_usdt": inv + fx,
+                "cb": cb,
+                "fb": fb,
+                "level": depth
+            })
             
-    return status, total_volume, next_vol, crypto_bonus, forex_bonus, refs_info
+    # Apply offsets
+    locked_crypto = my_fin.locked_crypto_ref_bonus if my_fin else 0.0
+    locked_forex = my_fin.locked_forex_ref_bonus if my_fin else 0.0
+    
+    total_crypto = max(0.0, crypto_bonus + locked_crypto)
+    total_forex = max(0.0, forex_bonus + locked_forex)
+    
+    c_ratio = total_crypto / crypto_bonus if crypto_bonus > 0 else 0.0
+    f_ratio = total_forex / forex_bonus if forex_bonus > 0 else 0.0
+    
+    final_refs_info = []
+    for r in refs_info:
+        if isinstance(r, dict):
+            final_cb = r["cb"] * c_ratio
+            final_fb = r["fb"] * f_ratio
+            final_refs_info.append(ReferralInfo(
+                id=r["id"],
+                parent_id=r["parent_id"],
+                email=r["email"],
+                nickname=r["nickname"],
+                investment_usdt=r["investment_usdt"],
+                bonus_usdt=final_cb + final_fb,
+                level=r["level"]
+            ))
+        else:
+            final_refs_info.append(r)
+            
+    return status, total_volume, next_vol, total_crypto, total_forex, final_refs_info
 
 
 @router.get("/news", response_model=list[NewsItemOut])
