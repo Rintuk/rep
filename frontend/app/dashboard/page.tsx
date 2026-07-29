@@ -753,28 +753,10 @@ export default function DashboardPage() {
           <div style={{ ...card, padding: 20, height: 320, display: "flex", flexDirection: "column" }}>
             <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16, flexShrink: 0 }}>📋 Последние сделки</h2>
             <div style={{ overflowY: "auto", flex: 1, paddingRight: 8 }}>
-            {/*
             {poolTrades.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Сделок нет</p>
-              : poolTrades.map((t, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: (ACTION_COLOR[t.action] ?? "#888") + "22", color: ACTION_COLOR[t.action] ?? "#888" }}>{ACTION_LABEL[t.action] ?? t.action}</span>
-                    <span style={{ color: "#fff", fontSize: 13 }}>{t.symbol}</span>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    {t.action === "DEPOSIT"
-                      ? <p style={{ color: "#f59e0b", fontSize: 13, fontWeight: 600 }}>+{t.amount.toFixed(2)} USDT</p>
-                      : <>
-                          <p style={{ color: "#fff", fontSize: 13 }}>{(t.amount || 0).toFixed(2)} шт</p>
-                          {t.pnl != null && <p style={{ color: t.pnl >= 0 ? "#22c97a" : "#ff4d4d", fontSize: 11 }}>{t.pnl >= 0 ? "+" : ""}{t.pnl.toFixed(2)}$</p>}
-                        </>
-                    }
-                  </div>
-                </div>
-              ))
+              : poolTrades.map((t, i) => null)
             }
-            */}
             </div>
           </div>
         </div>
@@ -783,23 +765,10 @@ export default function DashboardPage() {
         {isCrypto && (
           <div style={{ ...card, padding: 20 }}>
             <h2 style={{ color: "#fff", fontWeight: 600, marginBottom: 16 }}>🧠 Лента решений ИИ</h2>
-            {/*
             {data.ai_feed.length === 0
               ? <p style={{ color: "#4a6a9a", fontSize: 13 }}>Решений пока нет</p>
-              : data.ai_feed.map((a, i) => (
-                <div key={i} style={{ display: "flex", gap: 12, padding: "12px 0", borderBottom: "1px solid rgba(0,180,255,0.08)" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: ACTION_COLOR[a.action] + "22", color: ACTION_COLOR[a.action], alignSelf: "flex-start", marginTop: 2, whiteSpace: "nowrap" }}>{a.action}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ color: "#fff", fontWeight: 600, fontSize: 13 }}>{a.symbol}</span>
-                      <span style={{ color: "#4a6a9a", fontSize: 11 }}>{a.timestamp}</span>
-                    </div>
-                    <p style={{ color: "#4a6a9a", fontSize: 12, lineHeight: 1.5 }}>{a.reason}</p>
-                  </div>
-                </div>
-              ))
+              : data.ai_feed.map((a, i) => null)
             }
-            */}
           </div>
         )}
 
