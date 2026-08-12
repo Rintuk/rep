@@ -267,12 +267,16 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         select(ForexBotSnapshot).order_by(ForexBotSnapshot.timestamp.desc()).limit(1)
     )).scalar_one_or_none()
 
+    from constants import get_investor_share
+    all_fins_forex = (await db.execute(select(UserFinancials))).scalars().all()
+    total_locked_gross = sum(f.locked_forex_pnl / get_investor_share(f) for f in all_fins_forex if getattr(f, "locked_forex_pnl", 0.0) != 0.0 and get_investor_share(f) > 0)
+
     # Баг 6 fix: инициализируем forex_pool_pnl_pct до блока if forex_snap:
     # иначе если форекс-снапшота нет — NameError на строке 269
     forex_pool_pnl_pct = 0.0
     forex_pool_positions = 21455.0
-    forex_balance = 27043.0
-    forex_pool_total = 54399.0
+    forex_balance = 27043.0 + total_locked_gross
+    forex_pool_total = 54399.0 + total_locked_gross
     fx_net_inv = 0.0
     forex_server_online = True # Forced True during temporary bot data outage
     forex_last_updated = None
@@ -288,8 +292,8 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
             select(ForexPosition).where(ForexPosition.snapshot_id == forex_snap.id)
         )).scalars().all()
         forex_pool_positions = 21455.0
-        forex_balance = 27043.0
-        forex_pool_total = 54399.0
+        forex_balance = 27043.0 + total_locked_gross
+        forex_pool_total = 54399.0 + total_locked_gross
 
         fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
             forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm
