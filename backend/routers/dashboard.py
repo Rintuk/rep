@@ -276,7 +276,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     forex_pool_pnl_pct = 0.0
     forex_pool_positions = 20858.0
     forex_balance = 27043.0 + total_locked_gross
-    forex_pool_total = 54399.0 + total_locked_gross
+    forex_pool_total = 54990.0 + total_locked_gross
     fx_net_inv = 0.0
     forex_server_online = True # Forced True during temporary bot data outage
     forex_last_updated = None
@@ -293,7 +293,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         )).scalars().all()
         forex_pool_positions = 20858.0
         forex_balance = 27043.0 + total_locked_gross
-        forex_pool_total = 54399.0 + total_locked_gross
+        forex_pool_total = 54990.0 + total_locked_gross
 
         fx_net_inv = forex_snap.net_invested if forex_snap.net_invested > 0 else (
             forex_snap.real_start_balance if forex_snap.real_start_balance != 0.0 else forex_snap.hwm

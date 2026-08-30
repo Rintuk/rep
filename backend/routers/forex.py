@@ -189,7 +189,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     pool_pnl_usdt_calc = round(total_locked_gross, 2)
     pool_pnl_pct_calc = round(pool_pnl_usdt_calc / net_invested_pool * 100, 4) if net_invested_pool > 0 else 0.0
     return {
-        "pool_total": 54399.0 + pool_pnl_usdt_calc,
+        "pool_total": 54990.0 + pool_pnl_usdt_calc,
         "pool_free": 27043.0 + pool_pnl_usdt_calc,
         "pool_positions_usdt": 20858.0,
         "server_online": server_online,
