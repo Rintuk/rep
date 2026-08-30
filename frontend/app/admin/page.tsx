@@ -425,6 +425,12 @@ export default function AdminPage() {
       setWithdrawals(wdr);
         setNotebookData(nb);
     } catch (e: any) {
+      const msg = e?.message || "";
+      if (msg.includes("Недействительный токен") || msg.includes("401") || msg.includes("Unauthorized")) {
+        localStorage.removeItem("token");
+        router.push("/login");
+        return;
+      }
       setError(`Нет доступа или ошибка загрузки (${e.message})`);
     } finally {
       setLoading(false);

@@ -135,6 +135,11 @@ export default function DemoPage() {
     try {
       const d = pool === "forex" ? await getForexDemoAccount() : await getDemoAccount();
       setData(d);
+    } catch (e: any) {
+      if (e?.response?.status === 401 || e?.response?.status === 403) {
+        localStorage.removeItem("token");
+        router.push("/login");
+      }
     } finally {
       setLoading(false);
     }
