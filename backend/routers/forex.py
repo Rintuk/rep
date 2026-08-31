@@ -178,7 +178,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     else:
         admin_own_pnl = 0.0
 
-    total_locked_gross = 256.0
+    total_locked_gross = 256.0 + 1348.74
     for u in investors:
         fin = fins_map.get(u.id)
         if fin and fin.locked_forex_pnl != 0.0:
