@@ -269,7 +269,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
 
     from constants import get_investor_share
     all_fins_forex = (await db.execute(select(UserFinancials))).scalars().all()
-    total_locked_gross = 265.0
+    total_locked_gross = sum(f.locked_forex_pnl / get_investor_share(f) for f in all_fins_forex if getattr(f, "locked_forex_pnl", 0.0) != 0.0 and get_investor_share(f) > 0)
 
     # Баг 6 fix: инициализируем forex_pool_pnl_pct до блока if forex_snap:
     # иначе если форекс-снапшота нет — NameError на строке 269
