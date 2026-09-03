@@ -725,6 +725,50 @@ async def set_user_referrer(user_id: str, payload: SetReferrerPayload, db: Async
         u.referred_by = None
     await db.commit()
     return {"status": "success", "referred_by": u.referred_by}
+@router.post("/admin/fix-negative-pnl", dependencies=[Depends(get_admin_user)])
+async def fix_negative_pnl_endpoint(db: AsyncSession = Depends(get_db)):
+    """Находит все отрицательные PNL, обнуляет их и возвращает бэкап для возможного восстановления."""
+    result = await db.execute(select(UserFinancials, User).join(User, User.id == UserFinancials.user_id))
+    rows = result.all()
+    
+    backup_data = []
+    
+    for fin, user in rows:
+        if fin.locked_forex_pnl < 0 or fin.locked_crypto_pnl < 0:
+            backup_data.append({
+                "user_id": fin.user_id,
+                "email": user.email,
+                "old_crypto_pnl": fin.locked_crypto_pnl,
+                "old_forex_pnl": fin.locked_forex_pnl
+            })
+            
+            fin.locked_crypto_pnl = max(0.0, fin.locked_crypto_pnl)
+            fin.locked_forex_pnl = max(0.0, fin.locked_forex_pnl)
+            
+    if backup_data:
+        await db.commit()
+        return {"status": "success", "fixed_count": len(backup_data), "backup": backup_data}
+    else:
+        return {"status": "success", "fixed_count": 0, "message": "Нет инвесторов с отрицательным PNL"}
+
+@router.post("/admin/restore-negative-pnl", dependencies=[Depends(get_admin_user)])
+async def restore_negative_pnl_endpoint(backup_data: list, db: AsyncSession = Depends(get_db)):
+    """Восстанавливает отрицательные PNL из предоставленного JSON бэкапа."""
+    restored_count = 0
+    for item in backup_data:
+        user_id = item.get("user_id")
+        old_crypto = item.get("old_crypto_pnl")
+        old_forex = item.get("old_forex_pnl")
+        if user_id:
+            fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == user_id))).scalar_one_or_none()
+            if fin:
+                fin.locked_crypto_pnl = float(old_crypto) if old_crypto is not None else fin.locked_crypto_pnl
+                fin.locked_forex_pnl = float(old_forex) if old_forex is not None else fin.locked_forex_pnl
+                restored_count += 1
+                
+    if restored_count > 0:
+        await db.commit()
+    return {"status": "success", "restored_count": restored_count}
 
 @router.post("/admin/adjust-net-invested", dependencies=[Depends(get_admin_user)])
 async def adjust_net_invested(add_amount: float, db: AsyncSession = Depends(get_db)):
@@ -2621,12 +2665,16 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
         
         incr = current_pnl_pct - fin.entry_pool_pnl_pct
         if fin.investment_usdt > 0:
-            gross = fin.investment_usdt * (incr / 100)
-            if gross > 0:
-                user_profit = round(gross * get_investor_share(fin), 2)
-            else:
-                user_profit = round(gross, 2)
-            fin.locked_crypto_pnl += user_profit
+            # --- START FIX: Disable dynamic PNL locking during offline mode ---
+            # To restore dynamic PNL, uncomment the following block and remove 'gross = 0.0'
+            # gross = fin.investment_usdt * (incr / 100)
+            # if gross > 0:
+            #     user_profit = round(gross * get_investor_share(fin), 2)
+            # else:
+            #     user_profit = round(gross, 2)
+            # fin.locked_crypto_pnl += user_profit
+            gross = 0.0
+            # --- END FIX ---
                 
         fin.withdrawal_usdt = round(old_wd + actual_amount, 2)
         fin.investment_usdt = max(0.0, fin.investment_usdt - actual_amount)

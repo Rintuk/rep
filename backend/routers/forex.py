@@ -639,12 +639,16 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
         
         incr = current_pnl_pct - fin.forex_entry_pool_pnl_pct
         if fin.forex_investment_usdt > 0:
-            gross = fin.forex_investment_usdt * (incr / 100)
-            if gross > 0:
-                user_profit = round(gross * get_investor_share(fin), 2)
-            else:
-                user_profit = round(gross, 2)
-            fin.locked_forex_pnl += user_profit
+            # --- START FIX: Disable dynamic PNL locking during offline mode ---
+            # To restore dynamic PNL, uncomment the following block and remove 'gross = 0.0'
+            # gross = fin.forex_investment_usdt * (incr / 100)
+            # if gross > 0:
+            #     user_profit = round(gross * get_investor_share(fin), 2)
+            # else:
+            #     user_profit = round(gross, 2)
+            # fin.locked_forex_pnl += user_profit
+            gross = 0.0
+            # --- END FIX ---
         
         fin.forex_withdrawal_usdt = round(old_wd + actual_amount, 2)
         fin.forex_investment_usdt = max(0.0, fin.forex_investment_usdt - actual_amount)
