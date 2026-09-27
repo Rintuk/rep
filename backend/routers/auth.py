@@ -166,6 +166,11 @@ async def admin_migrate_offsets(db: AsyncSession = Depends(get_db)):
         await db.commit()
     except Exception as e:
         pass
+    try:
+        await db.execute(text('ALTER TABLE global_settings ADD COLUMN forex_pool_base_offset FLOAT DEFAULT 0.0'))
+        await db.commit()
+    except Exception as e:
+        pass
     return {"status": "ok"}
 
 from pydantic import BaseModel
@@ -205,6 +210,51 @@ async def admin_evict_user(payload: EvictUserPayload, db: AsyncSession = Depends
     fin.updated_at = datetime.utcnow()
     await db.commit()
     return {"status": "ok"}
+
+@router.post("/admin/reinvest-all", dependencies=[Depends(get_admin_user)])
+async def admin_reinvest_all(db: AsyncSession = Depends(get_db)):
+    """Реинвестирует всю прибыль и бонусы в депозит, обнуляя счетчики дохода."""
+    from constants import get_investor_share
+    
+    # Сначала фиксируем весь динамический профит в locked_pnl
+    await _migrate_pnl_internal(db, override_forex_pct=0.0, final_forex_pct=0.0)
+    
+    fins = (await db.execute(select(UserFinancials))).scalars().all()
+    settings = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+    
+    offset = settings.forex_pnl_offset if settings else 0.0
+    sum_pnl = sum(f.locked_forex_pnl / get_investor_share(f) for f in fins if getattr(f, "locked_forex_pnl", 0.0) != 0.0 and get_investor_share(f) > 0)
+    total_locked_gross = -59.28 + offset + sum_pnl
+    
+    for f in fins:
+        # Forex
+        if getattr(f, 'locked_forex_pnl', 0.0) > 0 or getattr(f, 'locked_forex_ref_bonus', 0.0) > 0:
+            f.forex_investment_usdt += getattr(f, 'locked_forex_pnl', 0.0) + getattr(f, 'locked_forex_ref_bonus', 0.0)
+            f.locked_forex_pnl = 0.0
+            f.locked_forex_ref_bonus = 0.0
+            f.forex_entry_pool_pnl_pct = 0.0
+        
+        # Crypto
+        if getattr(f, 'locked_crypto_pnl', 0.0) > 0 or getattr(f, 'locked_crypto_ref_bonus', 0.0) > 0:
+            f.investment_usdt += getattr(f, 'locked_crypto_pnl', 0.0) + getattr(f, 'locked_crypto_ref_bonus', 0.0)
+            f.locked_crypto_pnl = 0.0
+            f.locked_crypto_ref_bonus = 0.0
+            
+    if settings:
+        settings.forex_pool_base_offset += total_locked_gross
+        settings.forex_pnl_offset = 59.28 # resets -59.28 base to 0
+        settings.crypto_pnl_offset = 0.0
+        
+    await db.commit()
+    
+    # Set correct entry points for the new cycle
+    new_crypto_pct = await _get_pool_pnl_pct(db)
+    for f in fins:
+        f.entry_pool_pnl_pct = new_crypto_pct
+        f.forex_entry_pool_pnl_pct = 0.0
+        
+    await db.commit()
+    return {"status": "ok", "old_total_locked_gross": round(total_locked_gross, 2)}
 
 @router.get("/admin/users", dependencies=[Depends(get_admin_user)])
 async def list_users(db: AsyncSession = Depends(get_db)):
