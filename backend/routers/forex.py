@@ -178,7 +178,10 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     else:
         admin_own_pnl = 0.0
 
-    total_locked_gross = -59.28
+    from models import GlobalSettings
+    settings = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+    offset = settings.forex_pnl_offset if settings else 0.0
+    total_locked_gross = -59.28 + offset
     for u in investors:
         fin = fins_map.get(u.id)
         if fin and fin.locked_forex_pnl != 0.0:
@@ -653,6 +656,14 @@ async def approve_forex_withdrawal(request_id: str, actual_amount: float, db: As
         fin.forex_withdrawal_usdt = round(old_wd + actual_amount, 2)
         fin.forex_investment_usdt = max(0.0, fin.forex_investment_usdt - actual_amount)
         if fin.forex_investment_usdt <= 0:
+            if fin.locked_forex_pnl != 0.0:
+                share = get_investor_share(fin)
+                if share > 0:
+                    lost_gross = fin.locked_forex_pnl / share
+                    from models import GlobalSettings
+                    settings = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+                    if settings:
+                        settings.forex_pnl_offset += lost_gross
             fin.locked_forex_pnl = 0.0
             fin.forex_entry_pool_pnl_pct = new_pnl_pct
         fin.updated_at = datetime.utcnow()

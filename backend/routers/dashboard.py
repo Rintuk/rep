@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from database import get_db
 from models import (BotSnapshot, Position, Trade, AIFeedEntry, UserFinancials, User,
-                    ForexBotSnapshot, ForexPosition, ForexTrade, NewsItem)
+                    ForexBotSnapshot, ForexPosition, ForexTrade, NewsItem, GlobalSettings)
 from schemas import DashboardOut, PositionOut, TradeOut, AIFeedOut, ReferralInfo, NewsItemOut
 from security import get_current_user
 from constants import INVESTOR_SHARE, POOL_FEE, REF_FEES, STATUS_THRESHOLDS, get_investor_share
@@ -268,8 +268,10 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     )).scalar_one_or_none()
 
     from constants import get_investor_share
+    settings = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+    offset = settings.forex_pnl_offset if settings else 0.0
     all_fins_forex = (await db.execute(select(UserFinancials))).scalars().all()
-    total_locked_gross = -59.28 + sum(f.locked_forex_pnl / get_investor_share(f) for f in all_fins_forex if getattr(f, "locked_forex_pnl", 0.0) != 0.0 and get_investor_share(f) > 0)
+    total_locked_gross = -59.28 + offset + sum(f.locked_forex_pnl / get_investor_share(f) for f in all_fins_forex if getattr(f, "locked_forex_pnl", 0.0) != 0.0 and get_investor_share(f) > 0)
 
     # Баг 6 fix: инициализируем forex_pool_pnl_pct до блока if forex_snap:
     # иначе если форекс-снапшота нет — NameError на строке 269

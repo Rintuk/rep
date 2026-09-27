@@ -16,6 +16,9 @@ class GlobalSettings(Base):
     maintenance_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     maintenance_message: Mapped[str] = mapped_column(Text, default="Техобслуживание сайта. Скоро вернемся.")
 
+    forex_pnl_offset: Mapped[float] = mapped_column(Float, default=0.0)
+    crypto_pnl_offset: Mapped[float] = mapped_column(Float, default=0.0)
+
 class User(Base):
     __tablename__ = "users"
 

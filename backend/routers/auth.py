@@ -153,6 +153,59 @@ async def login(data: LoginIn, db: AsyncSession = Depends(get_db)):
 
 
 # ── Админ: управление пользователями ──────────────────────────
+@router.post("/admin/migrate-offsets", dependencies=[Depends(get_admin_user)])
+async def admin_migrate_offsets(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    try:
+        await db.execute(text('ALTER TABLE global_settings ADD COLUMN forex_pnl_offset FLOAT DEFAULT 0.0'))
+        await db.commit()
+    except Exception as e:
+        pass
+    try:
+        await db.execute(text('ALTER TABLE global_settings ADD COLUMN crypto_pnl_offset FLOAT DEFAULT 0.0'))
+        await db.commit()
+    except Exception as e:
+        pass
+    return {"status": "ok"}
+
+from pydantic import BaseModel
+class EvictUserPayload(BaseModel):
+    user_id: str
+
+@router.post("/admin/evict-user", dependencies=[Depends(get_admin_user)])
+async def admin_evict_user(payload: EvictUserPayload, db: AsyncSession = Depends(get_db)):
+    """Обнуляет аккаунт пользователя, передавая его средства в пул админа без изменения общего пула."""
+    fin = (await db.execute(select(UserFinancials).where(UserFinancials.user_id == payload.user_id))).scalar_one_or_none()
+    if not fin:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        
+    from models import GlobalSettings
+    settings = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+    
+    # Forex
+    if fin.locked_forex_pnl != 0.0:
+        share = get_investor_share(fin)
+        if share > 0:
+            lost_gross = fin.locked_forex_pnl / share
+            if settings:
+                settings.forex_pnl_offset += lost_gross
+    fin.locked_forex_pnl = 0.0
+    fin.forex_investment_usdt = 0.0
+    
+    # Crypto
+    if fin.locked_crypto_pnl != 0.0:
+        share = get_investor_share(fin)
+        if share > 0:
+            lost_gross = fin.locked_crypto_pnl / share
+            if settings:
+                settings.crypto_pnl_offset += lost_gross
+    fin.locked_crypto_pnl = 0.0
+    fin.investment_usdt = 0.0
+    
+    fin.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"status": "ok"}
+
 @router.get("/admin/users", dependencies=[Depends(get_admin_user)])
 async def list_users(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).order_by(User.created_at.desc()))
@@ -2679,6 +2732,14 @@ async def approve_withdrawal(request_id: str, actual_amount: float, db: AsyncSes
         fin.withdrawal_usdt = round(old_wd + actual_amount, 2)
         fin.investment_usdt = max(0.0, fin.investment_usdt - actual_amount)
         if fin.investment_usdt <= 0:
+            if fin.locked_crypto_pnl != 0.0:
+                share = get_investor_share(fin)
+                if share > 0:
+                    lost_gross = fin.locked_crypto_pnl / share
+                    from models import GlobalSettings
+                    settings = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+                    if settings:
+                        settings.crypto_pnl_offset += lost_gross
             fin.locked_crypto_pnl = 0.0
             fin.entry_pool_pnl_pct = new_pnl_pct
         fin.updated_at = datetime.utcnow()
