@@ -89,17 +89,6 @@ app.include_router(support.router)
 async def health():
     return {"status": "ok"}
 
-@app.get("/force-reinvest")
-async def force_reinvest():
-    from database import AsyncSessionLocal
-    from routers.auth import admin_reinvest_all
-    try:
-        async with AsyncSessionLocal() as session:
-            res = await admin_reinvest_all(session)
-            return {"status": "forced", "res": res}
-    except Exception as e:
-        return {"error": str(e)}
-
 @app.get("/debug-pool")
 async def debug_pool(db: AsyncSession = Depends(get_db)):
     from models import BotSnapshot, UserFinancials, Position
