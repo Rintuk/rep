@@ -891,7 +891,8 @@ async function handleApproveDeposit(id: string) {
             </button>
           ))}
           {activePool === "forex" && (
-            <button
+            <>
+  <button
               onClick={async () => {
                 const amt = prompt("Введите сумму прибыли для распределения ($):");
                 if (!amt) return;
@@ -935,7 +936,9 @@ async function handleApproveDeposit(id: string) {
             >
               Пул в позициях
             </button>
-          )}
+          
+  </>
+)}
         </div>
 
         {/* Открытые тикеты поддержки */}
