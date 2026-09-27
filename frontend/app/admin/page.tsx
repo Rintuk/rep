@@ -165,14 +165,14 @@ export default function AdminPage() {
     if (!data?.investors) return [];
     let sortableItems = [...data.investors];
     if (hideInactiveInvestors) {
-      sortableItems = sortableItems.filter(i => 
-        (i.investment && i.investment > 0) || 
-        (i.referrals_count && i.referrals_count > 0) ||
-        (i.pnl && Math.abs(i.pnl) > 0) ||
-        (i.withdrawal && i.withdrawal > 0) ||
-        (i.ref_income && i.ref_income > 0)
-      );
-    }
+        sortableItems = sortableItems.filter(i => 
+          (i.investment && i.investment > 0) || 
+          (i.forex_investment && i.forex_investment > 0) ||
+          (i.pnl && Math.abs(i.pnl) > 0) ||
+          (i.forex_pnl && Math.abs(i.forex_pnl) > 0) ||
+          (i.ref_income && i.ref_income > 0)
+        );
+      }
     if (sortConfig.key !== null) {
       sortableItems.sort((a: any, b: any) => {
         let aValue = a[sortConfig.key!];
