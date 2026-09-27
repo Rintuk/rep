@@ -19,6 +19,7 @@ class GlobalSettings(Base):
     forex_pnl_offset: Mapped[float] = mapped_column(Float, default=0.0)
     crypto_pnl_offset: Mapped[float] = mapped_column(Float, default=0.0)
     forex_pool_base_offset: Mapped[float] = mapped_column(Float, default=0.0)
+    forex_pool_positions: Mapped[float] = mapped_column(Float, default=19700.0)
 
 class User(Base):
     __tablename__ = "users"

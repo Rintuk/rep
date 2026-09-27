@@ -276,7 +276,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
     # Баг 6 fix: инициализируем forex_pool_pnl_pct до блока if forex_snap:
     # иначе если форекс-снапшота нет — NameError на строке 269
     forex_pool_pnl_pct = 0.0
-    forex_pool_positions = 19700.0
+    forex_pool_positions = settings.forex_pool_positions if settings else 19700.0
     base_offset = settings.forex_pool_base_offset if settings else 0.0
     forex_balance = 27043.0 + base_offset + total_locked_gross
     forex_pool_total = 54990.0 + base_offset + total_locked_gross
@@ -294,7 +294,7 @@ async def dashboard(user: User = Depends(get_current_user), db: AsyncSession = D
         fx_positions = (await db.execute(
             select(ForexPosition).where(ForexPosition.snapshot_id == forex_snap.id)
         )).scalars().all()
-        forex_pool_positions = 19700.0
+        forex_pool_positions = settings.forex_pool_positions if settings else 19700.0
         forex_balance = 27043.0 + base_offset + total_locked_gross
         forex_pool_total = 54990.0 + base_offset + total_locked_gross
 

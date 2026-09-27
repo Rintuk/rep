@@ -195,7 +195,7 @@ async def admin_forex_overview(db: AsyncSession = Depends(get_db)):
     return {
         "pool_total": 54990.0 + base_offset + pool_pnl_usdt_calc,
         "pool_free": 27043.0 + base_offset + pool_pnl_usdt_calc,
-        "pool_positions_usdt": 19700.0,
+        "pool_positions_usdt": settings.forex_pool_positions if settings else 19700.0,
         "server_online": server_online,
         "drawdown_pct": snap.drawdown_pct if snap else 0.0,
         "hwm": snap.hwm if snap else 0.0,

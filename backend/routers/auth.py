@@ -211,6 +211,18 @@ async def admin_evict_user(payload: EvictUserPayload, db: AsyncSession = Depends
     await db.commit()
     return {"status": "ok"}
 
+class SetForexPositionsPayload(BaseModel):
+    amount: float
+
+@router.post("/admin/set-forex-positions", dependencies=[Depends(get_admin_user)])
+async def admin_set_forex_positions(payload: SetForexPositionsPayload, db: AsyncSession = Depends(get_db)):
+    from models import GlobalSettings
+    settings = (await db.execute(select(GlobalSettings))).scalar_one_or_none()
+    if settings:
+        settings.forex_pool_positions = payload.amount
+        await db.commit()
+    return {"status": "ok"}
+
 @router.post("/admin/reinvest-all", dependencies=[Depends(get_admin_user)])
 async def admin_reinvest_all(db: AsyncSession = Depends(get_db)):
     """Реинвестирует всю прибыль и бонусы в депозит, обнуляя счетчики дохода."""

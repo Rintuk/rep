@@ -914,6 +914,27 @@ async function handleApproveDeposit(id: string) {
             >
               + Начислить прибыль (Форекс)
             </button>
+            <button
+              onClick={async () => {
+                const amt = prompt("Введите новый объем пула в позициях (USDT):", "19700");
+                if (!amt) return;
+                const numAmt = parseFloat(amt);
+                if (isNaN(numAmt) || numAmt < 0) return alert("Неверная сумма!");
+                try {
+                  await api.post("/auth/admin/set-forex-positions", { amount: numAmt });
+                  alert("Успешно!");
+                  fetchData();
+                } catch (e: any) {
+                  alert("Ошибка: " + (e?.response?.data?.detail || e.message));
+                }
+              }}
+              style={{
+                padding: "9px 22px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                border: "1px solid rgba(0,180,255,0.7)", background: "rgba(0,180,255,0.15)", color: "#00b4ff"
+              }}
+            >
+              Пул в позициях
+            </button>
           )}
         </div>
 
